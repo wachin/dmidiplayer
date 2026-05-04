@@ -156,8 +156,9 @@ Si QSynth ya esta abierto, la app intentara conectarse automaticamente a un
 destino que parezca QSynth/FluidSynth. Si no lo hace, usa el selector `Destino
 MIDI`, pulsa `Refrescar` y luego `Conectar`.
 
-Debajo del slider de posicion hay controles iniciales de `Pitch`, `Tempo` y
-`Volume`, ademas de un loop basico por compases.
+Debajo del slider de posicion hay controles iniciales repartidos en dos filas:
+una para `Pitch`, `Tempo`, `Volume` y navegacion por compases, y otra para el
+loop basico por compases.
 `Pitch` permite transponer entre -12 y +12 semitonos, sin alterar el canal de
 percusion GM 10. `Tempo` permite reproducir entre 50% y 200% de la velocidad
 original. `Volume` envia MIDI CC7 a los canales y escala cambios CC7 del

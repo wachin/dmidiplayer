@@ -1020,10 +1020,12 @@ Tareas:
 - Crea `AppSettings` para recordar la ultima carpeta abierta.
 - Tiene toolbar minima: abrir, reproducir, pausa, detener, anterior y siguiente.
 - Tiene controles iniciales de tono, tempo y volumen con reset.
-- Tiene controles iniciales de loop por ticks.
+- Tiene navegacion inicial por compases con `Bar -` y `Bar +`.
+- Tiene controles iniciales de loop por compases.
 - Tiene selector de destinos MIDI ALSA con refrescar/conectar.
-- Los controles de tono/tempo/volumen/loop/destino MIDI viven en filas
-  compactas dentro del panel principal para no saturar la toolbar.
+- Los controles de tono/tempo/volumen/navegacion por compas/loop/destino MIDI
+  viven en filas compactas dentro del panel principal para no saturar la
+  toolbar ni ensanchar demasiado la ventana.
 - Tiene lista de archivos, etiqueta de informacion, slider de posicion,
   teclado y etiqueta del ultimo evento.
 - El slider de posicion llama a `SequencePlayer.seek()` al soltarlo.
