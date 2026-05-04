@@ -63,8 +63,8 @@ class MainWindow(QMainWindow):
         self.volume_control = self._spinbox(0, 200, 100, self.player.set_volume_percent, "%")
         self.loop_check = QCheckBox(self.tr("Loop"))
         self.loop_check.toggled.connect(self._toggle_loop)
-        self.loop_start = self._spinbox(0, 0, 0, self._update_loop_range)
-        self.loop_end = self._spinbox(0, 0, 0, self._update_loop_range)
+        self.loop_start = self._spinbox(1, 1, 1, self._update_loop_range)
+        self.loop_end = self._spinbox(1, 1, 1, self._update_loop_range)
         self._updating_position = False
 
         self._build_toolbar()
@@ -125,9 +125,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.volume_control)
         layout.addWidget(self._button("100%", lambda: self.volume_control.setValue(100)))
         layout.addWidget(self.loop_check)
-        layout.addWidget(QLabel(self.tr("Start:")))
+        layout.addWidget(QLabel(self.tr("Start bar:")))
         layout.addWidget(self.loop_start)
-        layout.addWidget(QLabel(self.tr("End:")))
+        layout.addWidget(QLabel(self.tr("End bar:")))
         layout.addWidget(self.loop_end)
         layout.addStretch(1)
         return row
@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
         )
         self.event_label.setText(self.tr("File loaded"))
         self.position.setEnabled(midi.length_ticks > 0)
-        self._reset_loop_controls(midi.length_ticks)
+        self._reset_loop_controls()
         self._select_playlist_file(file_name)
         self._update_time_label(0, midi.length_ticks)
         self.keyboard.clear()
@@ -326,16 +326,17 @@ class MainWindow(QMainWindow):
         self.player.seek(self.position.value())
         self.keyboard.clear()
 
-    def _reset_loop_controls(self, length_ticks: int) -> None:
+    def _reset_loop_controls(self) -> None:
         if self.loop_check is None or self.loop_start is None or self.loop_end is None:
             return
+        bar_count = max(1, self.player.sequence.bar_count)
         with QSignalBlocker(self.loop_check), QSignalBlocker(self.loop_start), QSignalBlocker(self.loop_end):
             self.loop_check.setChecked(False)
-            self.loop_start.setRange(0, length_ticks)
-            self.loop_end.setRange(0, length_ticks)
-            self.loop_start.setValue(0)
-            self.loop_end.setValue(length_ticks)
-        self.player.set_loop_range(0, length_ticks)
+            self.loop_start.setRange(1, bar_count)
+            self.loop_end.setRange(1, bar_count)
+            self.loop_start.setValue(1)
+            self.loop_end.setValue(bar_count)
+        self.player.set_loop_range(0, self.player.sequence.length_ticks)
         self.player.set_loop_enabled(False)
 
     def _toggle_loop(self, enabled: bool) -> None:
@@ -345,7 +346,16 @@ class MainWindow(QMainWindow):
     def _update_loop_range(self) -> None:
         if self.loop_start is None or self.loop_end is None:
             return
-        self.player.set_loop_range(self.loop_start.value(), self.loop_end.value())
+        if self.player.sequence.midi is None:
+            return
+        start_bar = self.loop_start.value()
+        end_bar = max(start_bar, self.loop_end.value())
+        if end_bar != self.loop_end.value():
+            with QSignalBlocker(self.loop_end):
+                self.loop_end.setValue(end_bar)
+        start_tick = self.player.sequence.tick_for_bar(start_bar)
+        end_tick = self.player.sequence.tick_for_bar(end_bar + 1)
+        self.player.set_loop_range(start_tick, end_tick)
 
     def _set_tempo_percent(self, value: int) -> None:
         self.player.set_tempo_percent(value)

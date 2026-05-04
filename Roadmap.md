@@ -402,10 +402,12 @@ Estado funcional:
   - escala eventos MIDI CC7 entre 0% y 200%;
   - envia CC7 a los 16 canales cuando se cambia el control;
   - limita valores al rango MIDI 0-127.
-- Hay loop basico por ticks MIDI:
+- Hay loop basico por compases:
   - controles `Loop`, `Start` y `End` en el panel principal;
+  - la UI muestra numeros de compas y los convierte internamente a ticks MIDI
+    con `tick_for_bar()`;
   - al llegar al final del rango, vuelve al inicio y envia `all_notes_off`;
-  - aun falta loop por compases musicales.
+  - aun falta dialogo completo de loop y acciones de salto por compas.
 - La UI usa cadenas fuente en ingles y puede cargar traducciones Qt Linguist
   compiladas desde `dmidiplayer/dmidiplayer_py/translations`.
 - La aplicacion guarda configuracion en `.config` en Linux y AppData/equivalente
@@ -490,8 +492,9 @@ hardware MIDI, QSynth u otro sintetizador ALSA.
   PPQ, pero aun necesita mas pruebas de borde y comparacion contra Drumstick
   C++.
 - El scheduler de `dmidiplayer_py.player` ya usa tiempos reales, seek basico y
-  loop por ticks; tambien aplica escala de tempo. Sigue dependiendo de `QTimer`
-  y aun no implementa loop por compases ni compensacion avanzada de latencia.
+  loop; tambien aplica escala de tempo. La UI del loop ya trabaja por compases
+  y convierte a ticks antes de llamar al scheduler. Sigue dependiendo de
+  `QTimer` y aun no implementa compensacion avanzada de latencia.
 - El transpose inicial ya afecta eventos de nota, pero aun falta integrarlo con
   song settings, canales bloqueados y UI final.
 - Aun falta volumen por canal y restaurar volumen original por cancion/canal
@@ -530,9 +533,8 @@ Prioridad recomendada para continuar:
    - cargar `guiplayer.ui`;
    - conectar acciones basicas contra el `SequencePlayer` Python.
 4. Traducir `dmidiplayer_py_es.ts` en Qt Linguist y compilar `.qm`.
-5. Convertir los controles `Loop`, `Start` y `End` para trabajar por compases
-   usando `tick_for_bar()`.
-6. Agregar acciones de avanzar/retroceder por compas y salto a compas.
+5. Agregar acciones de avanzar/retroceder por compas y salto a compas.
+6. Portar el dialogo completo de loop cuando se empiece a cargar la UI C++.
 
 No repetir:
 
