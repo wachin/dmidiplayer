@@ -22,6 +22,52 @@ La conversion debe hacerse por capas. Primero se porta `drumstick_py`, luego se
 conecta `dmidiplayer_py` contra esa API Python. El C++ original se conserva
 como referencia hasta que cada modulo tenga paridad funcional y pruebas.
 
+## Ecosistema Drumstick completo
+
+![Drumstick ecosystem](drumstick-ecosystem.webp)
+
+La imagen `drumstick-ecosystem.webp` resume la relacion entre las bibliotecas y
+programas de la familia Drumstick. Los bloques verdes son bibliotecas o
+utilidades Drumstick; los bloques rosados son aplicaciones externas o
+dependencias externas. Para este port, el punto importante es que
+`dmidiplayer_py` no debe verse como un programa aislado: depende de un
+ecosistema Python equivalente a las bibliotecas C++ originales.
+
+Bibliotecas C++ de referencia y equivalentes Python esperados:
+
+- `Drumstick::ALSA`: capa Linux sobre ALSA Sequencer. En Python se esta
+  reemplazando dentro de `drumstick_py.rt` usando `ctypes` sobre
+  `libasound.so.2`.
+- `Drumstick::File`: lectura/escritura de `.mid`, `.kar`, `.rmi` y `.wrk`. En
+  Python se reemplaza con `drumstick_py.file`.
+- `Drumstick::RT`: E/S MIDI realtime con backends ALSA, FluidSynth y otros. En
+  Python debe quedar como API de salida/entrada reusable por `dmidiplayer_py`,
+  `vpiano_py` y futuras utilidades.
+- `Drumstick::Widgets`: widgets MIDI Qt, especialmente teclado/piano virtual.
+  En Python se reemplaza con `drumstick_py.widgets`.
+
+Ademas de `dmidiplayer_py`, el objetivo final incluye portar completamente a
+PyQt6 las tres utilidades graficas de Drumstick mencionadas en
+`drumstick/readme.md`:
+
+- `drumgrid`: "Drumstick Drum Grid", editor/reproductor grafico de patrones de
+  percusion. Depende principalmente de la capa ALSA.
+- `guiplayer`: "Drumstick ALSA MIDI Player", reproductor grafico de archivos
+  MIDI/WRK basado en Drumstick::ALSA y Drumstick::File. Es una referencia
+  directa para el reproductor y para pruebas comparativas del port.
+- `vpiano`: "Drumstick Virtual Piano", piano virtual grafico basado en
+  Drumstick::RT y Drumstick::Widgets. Debe servir para validar entrada/salida
+  realtime y widgets reutilizables.
+
+Estas tres aplicaciones deben tener scripts ejecutables Python propios, UI
+PyQt6 completa, pruebas basicas y documentacion de uso. La meta es que el
+repositorio termine ofreciendo una familia coherente:
+
+- `dmidiplayer-py`
+- `drumstick-drumgrid-py`
+- `drumstick-guiplayer-py`
+- `drumstick-vpiano-py`
+
 ## Objetivo final de paridad funcional
 
 La meta de este port es que `dmidiplayer_py`, usando `drumstick_py`, llegue a
@@ -289,6 +335,8 @@ la migracion.
   ALSA basica y flujos criticos de UI.
 - La aplicacion nunca deja notas sonando al detener, buscar, cerrar o fallar la
   salida MIDI.
+- `drumgrid`, `guiplayer` y `vpiano` existen tambien como aplicaciones PyQt6
+  completas y reutilizan `drumstick_py` en vez de duplicar logica MIDI.
 
 ## Estado actual al cierre
 
@@ -375,6 +423,9 @@ Estado funcional:
   arrancar, intenta autoconectarse.
 - Se creo `README.md` en la raiz con notas de prueba en MX Linux 23, kernel RT,
   QjackCtl, QSynth y `FluidR3.sf2`.
+- Se agrego `drumstick-ecosystem.webp` a la raiz y se documento en este Roadmap
+  para dejar claro que el port tambien incluye las utilidades graficas
+  `drumgrid`, `guiplayer` y `vpiano`.
 
 Ejecucion actual:
 
@@ -768,7 +819,31 @@ Criterios de salida:
 
 ## Fase 8: utilidades de Drumstick
 
-Prioridad despues de dmidiplayer:
+Objetivo: portar a Python/PyQt6 las utilidades incluidas en `drumstick/utils`,
+manteniendo las CLI como herramientas de diagnostico y convirtiendo por
+completo las utilidades graficas.
+
+Prioridad grafica obligatoria:
+
+- `utils/drumgrid`: debe convertirse en `drumstick-drumgrid-py`.
+  - UI PyQt6 completa para crear y reproducir patrones de bateria.
+  - Reusar `drumstick_py.rt` para salida ALSA/realtime.
+  - Mantener comportamiento equivalente al ejecutable C++ "Drumstick Drum
+    Grid".
+- `utils/guiplayer`: debe convertirse en `drumstick-guiplayer-py`.
+  - UI PyQt6 completa para reproducir SMF/WRK con salida ALSA.
+  - Reusar `drumstick_py.file` y `drumstick_py.rt`.
+  - Usarlo como aplicacion de referencia comparativa frente a dmidiplayer.
+- `utils/vpiano`: debe convertirse en `drumstick-vpiano-py`.
+  - UI PyQt6 completa de piano virtual.
+  - Reusar `drumstick_py.widgets.PianoKeyboard` y ampliar el widget hasta tener
+    interaccion por mouse/teclado.
+  - Reusar `drumstick_py.rt` para entrada/salida MIDI realtime.
+
+Estas tres utilidades no son opcionales: forman parte del objetivo final del
+port del ecosistema Drumstick a Python.
+
+Prioridad CLI y diagnostico:
 
 - `utils/playsmf`
 - `utils/dumpsmf`
@@ -777,12 +852,18 @@ Prioridad despues de dmidiplayer:
 - `utils/dumpwrk`
 - `utils/sysinfo`
 - `utils/metronome`
-- `utils/vpiano`
-- `utils/drumgrid`
-- `utils/guiplayer`
 
 Cada utilidad debe tener su propio paquete o modulo dentro de
 `drumstick_py/utils`.
+
+Criterios de salida:
+
+- Cada utilidad grafica abre desde arbol fuente con su script local.
+- Cada utilidad grafica puede usar salida dummy para pruebas y ALSA real para
+  pruebas manuales.
+- `drumgrid`, `guiplayer` y `vpiano` tienen pruebas de importacion/arranque
+  offscreen.
+- El README explica como ejecutar cada utilidad Python.
 
 ## Fase 9: pruebas
 
@@ -838,8 +919,12 @@ Tareas:
 4. Convertir/cargar `.ui` y conectar acciones reales.
 5. Portar canales, lyrics, playlist, loop, pianola y ritmo.
 6. Portar preferencias, conexiones, ayuda y traducciones.
-7. Portar utilidades Drumstick restantes.
-8. Preparar empaquetado e instalacion.
+7. Portar las utilidades graficas de Drumstick:
+   - `drumstick-guiplayer-py`
+   - `drumstick-vpiano-py`
+   - `drumstick-drumgrid-py`
+8. Portar utilidades CLI Drumstick restantes.
+9. Preparar empaquetado e instalacion.
 
 ## Archivos Python creados hasta ahora
 
