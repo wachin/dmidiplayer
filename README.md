@@ -1,104 +1,105 @@
 # dmidiplayer PyQt6 port
 
-Este repositorio contiene una conversion progresiva de Drumstick/dmidiplayer a
-Qt/Python con PyQt6. El codigo C++ original se conserva como referencia y la
-version Python vive en paquetes paralelos dentro del mismo arbol:
+This repository contains an ongoing port of Drumstick/dmidiplayer to Qt/Python
+with PyQt6. The original C++ code is kept as a reference, and the Python version
+lives in parallel packages inside the same source tree:
 
 - `drumstick/drumstick_py`
 - `dmidiplayer/dmidiplayer_py`
 
-## Entorno de pruebas actual
+## Current Test Environment
 
-Las pruebas manuales se estan haciendo en MX Linux 23.
+Manual testing is currently being done on MX Linux 23.
 
-En ese sistema se instalo el kernel RT disponible en los mismos repositorios de
-MX Linux 23 y se configuro junto con los paquetes indicados para esta migracion,
-incluyendo PyQt6, ALSA y utilidades MIDI.
+On that system, the RT kernel available from the MX Linux 23 repositories was
+installed and configured together with the packages used during this migration,
+including PyQt6, ALSA, and MIDI utilities.
 
-Para escuchar la salida MIDI real se instalo tambien:
+For real MIDI playback, the test system also has:
 
 - QjackCtl
 - QSynth
 - `fluid-soundfont-gm`
 
-La fuente de sonido usada para las pruebas es `FluidR3.sf2`, instalada por el
-paquete `fluid-soundfont-gm`. Esta fuente se cargo en QSynth desde la
-configuracion `Soundfonts`.
+The soundfont used for testing is `FluidR3.sf2`, installed by the
+`fluid-soundfont-gm` package. It is loaded in QSynth through the `Soundfonts`
+configuration page.
 
-Con QjackCtl activo y QSynth abierto, dmidiplayer PyQt6 puede enviar eventos por
-ALSA sequencer hacia QSynth. La aplicacion tambien incluye un selector de
-destinos MIDI ALSA para conectar la salida directamente desde la interfaz.
+With QjackCtl running and QSynth open, dmidiplayer PyQt6 can send MIDI events
+through ALSA sequencer to QSynth. The application also includes an ALSA MIDI
+destination selector so the output can be connected directly from the UI.
 
-## Dependencias
+## Dependencies
 
-Dependencias necesarias hasta el momento en MX Linux 23/Debian 12:
+Dependencies needed so far on MX Linux 23 / Debian 12:
 
 ```bash
 sudo apt install python3-pyqt6 python3-alsaaudio alsa-utils
 ```
 
-Para escuchar MIDI con buena calidad usando QSynth/FluidSynth:
+For good-quality MIDI playback through QSynth/FluidSynth:
 
 ```bash
 sudo apt install qjackctl qsynth fluidsynth fluid-soundfont-gm
 ```
 
-Paquetes usados o previstos durante la migracion:
+Packages used or expected during the migration:
 
 ```bash
 sudo apt install uchardet pandoc pyqt6-dev-tools qt6-tools-dev-tools qttools5-dev-tools qtchooser linguist-qt6
 ```
 
-Para ejecutar las pruebas actuales no hace falta `pytest`; se usa `unittest`,
-incluido con Python. Mas adelante pueden ser utiles:
+The current tests use Python `unittest`, so `pytest` is not required yet. Later
+these packages may be useful:
 
 ```bash
 sudo apt install python3-pytest python3-pytestqt
 ```
 
-Notas:
+Notes:
 
-- `alsa-utils` aporta `aconnect`, util para comprobar puertos MIDI ALSA.
-- `python3-alsaaudio` se usa solo para diagnostico PCM/tarjetas; la salida MIDI
-  ALSA sequencer se implementa con `ctypes` sobre `libasound.so.2`.
-- Para que ALSA sequencer funcione debe existir `/dev/snd/seq`. Si `aconnect
-  -lo` falla con `open /dev/snd/seq failed`, normalmente hay que cargar el
-  modulo `snd-seq`.
-- `fluid-soundfont-gm` instala `FluidR3.sf2`, que se puede cargar en QSynth
-  desde `Soundfonts`.
-- `pyqt6-dev-tools` aporta `pylupdate6` para extraer cadenas traducibles desde
-  el codigo Python.
-- `qt6-tools-dev-tools` / `qttools5-dev-tools` y `qtchooser` aportan Qt
-  Linguist y `lrelease`/`lupdate`, segun la configuracion de Qt disponible en
-  el sistema.
-- En MX Linux tambien esta disponible `linguist-qt6`, que aporta Qt Linguist
-  para editar visualmente archivos `.ts`.
+- `alsa-utils` provides `aconnect`, which is useful for inspecting ALSA MIDI
+  ports.
+- `python3-alsaaudio` is used only for PCM/card diagnostics. ALSA sequencer MIDI
+  output is implemented with `ctypes` over `libasound.so.2`.
+- ALSA sequencer requires `/dev/snd/seq`. If `aconnect -lo` fails with
+  `open /dev/snd/seq failed`, the `snd-seq` kernel module usually needs to be
+  loaded.
+- `fluid-soundfont-gm` installs `FluidR3.sf2`, which can be loaded in QSynth
+  from `Soundfonts`.
+- `pyqt6-dev-tools` provides `pylupdate6` to extract translatable strings from
+  Python code.
+- `qt6-tools-dev-tools` / `qttools5-dev-tools` and `qtchooser` provide Qt
+  Linguist and `lrelease`/`lupdate`, depending on the local Qt setup.
+- MX Linux also provides `linguist-qt6`, which installs Qt Linguist for visually
+  editing `.ts` files.
 
-## Internacionalizacion
+## Internationalization
 
-El idioma fuente de la interfaz es ingles. La aplicacion carga traducciones Qt
-compiladas (`.qm`) desde:
+The source language of the UI is English. The application loads compiled Qt
+translations (`.qm`) from:
 
 ```text
 dmidiplayer/dmidiplayer_py/translations/
 ```
 
-Por defecto se usa ingles:
+English is used by default:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
-Para pedir otro idioma:
+To request another language:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py --language es dmidiplayer/examples/test.mid
 ./dmidiplayer/dmidiplayer-py --language system dmidiplayer/examples/test.mid
 ```
 
-Si el archivo `.qm` del idioma pedido no existe, la aplicacion vuelve a ingles.
+If the requested `.qm` file does not exist, the application falls back to
+English.
 
-Flujo para traducir con Qt Linguist:
+Translation workflow with Qt Linguist:
 
 ```bash
 pylupdate6 dmidiplayer/dmidiplayer_py --ts dmidiplayer/dmidiplayer_py/translations/dmidiplayer_py_es.ts
@@ -106,38 +107,38 @@ linguist dmidiplayer/dmidiplayer_py/translations/dmidiplayer_py_es.ts
 lrelease dmidiplayer/dmidiplayer_py/translations/dmidiplayer_py_es.ts -qm dmidiplayer/dmidiplayer_py/translations/dmidiplayer_py_es.qm
 ```
 
-Despues de guardar y compilar el `.qm`, ejecutar:
+After saving and compiling the `.qm`, run:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py --language es dmidiplayer/examples/test.mid
 ```
 
-## Como probar
+## How To Test
 
-Para probar, usar uno de los `.mid` de `dmidiplayer/examples`, por ejemplo:
+Use one of the `.mid` files under `dmidiplayer/examples`, for example:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
-o también:
+Another useful example:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/mozart_diesirae.mid
 ```
 
-Tambien se pueden pasar varios archivos. La lista queda como una playlist
-temporal y los botones `Previous` / `Next` permiten navegarla:
+Several files can also be passed at once. They become a temporary playlist, and
+`Previous` / `Next` navigate through it:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid dmidiplayer/examples/haendel_hallelujah.mid
 ```
 
-y aparecerá la ventana y sonando el programa:
+The application window should open and playback should be available:
 
 ![](vx_images/01-dmidiplayer_port-qt_py.png)
 
-Tambien puedes probar con otros:
+Other examples:
 
 ```bash
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/Schubert_Standchen.mid
@@ -145,47 +146,47 @@ Tambien puedes probar con otros:
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/mozart_aveverum.mid
 ```
 
-Ejecuta esos comandos desde la raiz del proyecto:
+Run these commands from the repository root:
 
 ```bash
-cd /home/wachin/Dev/dmidiplayer-port-qt_py
+cd /home/wachin/Dev/dmidiplayer
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
-Si QSynth ya esta abierto, la app intentara conectarse automaticamente a un
-destino que parezca QSynth/FluidSynth. Si no lo hace, usa el selector `Destino
-MIDI`, pulsa `Refrescar` y luego `Conectar`.
+If QSynth is already open, the app tries to connect automatically to a
+destination that looks like QSynth/FluidSynth. If it does not, use the `MIDI
+destination` selector, press `Refresh`, and then press `Connect`.
 
-Debajo del slider de posicion hay controles iniciales repartidos en dos filas:
-una para `Pitch`, `Tempo`, `Volume` y navegacion por compases, y otra para el
-loop basico por compases.
-`Pitch` permite transponer entre -12 y +12 semitonos, sin alterar el canal de
-percusion GM 10. `Tempo` permite reproducir entre 50% y 200% de la velocidad
-original. `Volume` envia MIDI CC7 a los canales y escala cambios CC7 del
-archivo entre 0% y 200%. `Loop` permite repetir el rango entre `Start` y `End`
-usando numeros de compas. La toolbar superior queda reservada para acciones
-principales como abrir, navegar la playlist, reproducir, pausar y detener. La
-linea bajo el slider muestra tiempo actual/total, BPM efectivo y compas
-actual/total. Los botones `Bar -` y `Bar +` saltan al inicio del compas
-anterior o siguiente.
+Below the position slider there are initial controls split across two rows: one
+for `Pitch`, `Tempo`, `Volume`, and bar navigation, and another for the basic
+bar-based loop.
 
-## Configuracion
+`Pitch` transposes between -12 and +12 semitones without changing the GM
+percussion channel 10. `Tempo` plays between 50% and 200% of the original speed.
+`Volume` sends MIDI CC7 to channels and scales CC7 events from the file between
+0% and 200%. `Loop` repeats the range between `Start bar` and `End bar`. The top
+toolbar is reserved for primary actions such as open, playlist navigation, play,
+pause, and stop. The line below the slider shows current/total time, effective
+BPM, and current/total bar. `Bar -` and `Bar +` jump to the beginning of the
+previous or next bar.
 
-La aplicacion guarda su configuracion en la ubicacion de configuracion indicada
-por Qt (`QStandardPaths.AppConfigLocation`).
+## Configuration
 
-En Linux normalmente sera una ruta equivalente a:
+The application stores its configuration in the location selected by Qt
+(`QStandardPaths.AppConfigLocation`).
+
+On Linux this is normally equivalent to:
 
 ```text
 ~/.config/dmidiplayer/dmidiplayer-py/settings.ini
 ```
 
-En Windows corresponde a la carpeta AppData del usuario, normalmente bajo
-`%AppData%` o la ubicacion equivalente que Qt seleccione. Actualmente se guarda
-la ultima carpeta visitada por el dialogo `Open MIDI`, para que la siguiente
-vez el selector de archivos abra directamente en esa ubicacion.
+On Windows it corresponds to the user's AppData location, normally under
+`%AppData%` or the equivalent path selected by Qt. The app currently stores the
+last folder visited by the `Open MIDI` dialog, so the next file picker starts
+there.
 
-## Verificacion rapida
+## Quick Verification
 
 ```bash
 ./dmidiplayer/dmidiplayer-py --help
