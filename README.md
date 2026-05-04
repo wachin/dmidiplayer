@@ -120,6 +120,12 @@ Para probar, usar uno de los `.mid` de `dmidiplayer/examples`, por ejemplo:
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
+o también:
+
+```bash
+./dmidiplayer/dmidiplayer-py dmidiplayer/examples/mozart_diesirae.mid
+```
+
 Tambien se pueden pasar varios archivos. La lista queda como una playlist
 temporal y los botones `Previous` / `Next` permiten navegarla:
 
