@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-03.
+Last updated: 2026-05-04.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -356,6 +356,11 @@ removing or replacing the original C++ code.
   - `tests/test_i18n.py`
   - `tests/test_settings.py`
   - `tests/test_app_playlist.py`
+- Parser coverage added after the initial handoff:
+  - format 1 multi-track event merging;
+  - running status events and malformed running-status error reporting;
+  - SysEx `0xF0` and `0xF7` events;
+  - time signature, key signature, lyrics, and marker metadata.
 - `README.md`: testing notes for MX Linux 23, RT kernel, QjackCtl, QSynth, and
   `FluidR3.sf2`.
 - `drumstick-ecosystem.webp`: diagram used in this Roadmap to document the full
@@ -498,12 +503,13 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
 
 Recommended priority:
 
-1. Extend `drumstick_py.file` tests:
-   - format 1 multi-track files;
-   - running status;
-   - SysEx;
-   - multiple tempo changes;
-   - time signature, key signature, lyrics, and markers.
+1. Extend `drumstick_py.file` tests further:
+   - parser error cases around truncated chunks and invalid variable-length
+     quantities;
+   - SMPTE division timing;
+   - tempo and time-signature maps with mid-song changes;
+   - RIFF MIDI fixtures once `rmid.cpp` is ported;
+   - Cakewalk WRK fixtures once `qwrk.cpp` is ported.
 2. Improve `drumstick_py.rt`:
    - show active connections and disconnect/reconnect destinations;
    - connect by a more flexible name search from preferences;
