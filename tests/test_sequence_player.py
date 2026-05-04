@@ -94,6 +94,23 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertIsNotNone(shifted)
         self.assertEqual(shifted.data, bytes([62, 100]))
 
+    def test_pitch_shift_change_turns_off_current_notes(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        player.set_pitch_shift(-2)
+
+        self.assertEqual(output.all_notes_off_count, 1)
+
+    def test_pitch_shift_same_value_does_not_repeat_all_notes_off(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        player.set_pitch_shift(-2)
+        player.set_pitch_shift(-2)
+
+        self.assertEqual(output.all_notes_off_count, 1)
+
     def test_pitch_shift_skips_percussion_channel(self) -> None:
         player = SequencePlayer(OutputStub())
         player.set_pitch_shift(2)

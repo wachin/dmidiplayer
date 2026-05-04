@@ -125,7 +125,11 @@ class SequencePlayer(QObject):
         return self._pitch_shift
 
     def set_pitch_shift(self, semitones: int) -> None:
-        self._pitch_shift = max(-12, min(12, semitones))
+        semitones = max(-12, min(12, semitones))
+        if semitones == self._pitch_shift:
+            return
+        self.output.all_notes_off()
+        self._pitch_shift = semitones
 
     @property
     def volume_percent(self) -> int:
