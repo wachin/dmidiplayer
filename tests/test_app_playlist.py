@@ -107,6 +107,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.loop_start.minimum(), 1)
                 self.assertEqual(window.loop_start.maximum(), 2)
                 self.assertEqual(window.loop_end.value(), 2)
+                self.assertEqual(window.jump_bar.maximum(), 2)
 
                 window.loop_start.setValue(2)
                 window.loop_end.setValue(2)
@@ -130,6 +131,22 @@ class AppPlaylistTest(unittest.TestCase):
 
                 window.previous_bar()
                 self.assertEqual(window.player._position, 0)
+
+    def test_jump_to_bar_seeks_to_requested_bar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "two-bars.mid")
+            write_two_bar_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                window.jump_bar.setValue(2)
+                window.jump_to_bar()
+
+                self.assertEqual(window.player._position, 1920)
 
 
 if __name__ == "__main__":

@@ -158,8 +158,8 @@ destination that looks like QSynth/FluidSynth. If it does not, use the `MIDI
 destination` selector, press `Refresh`, and then press `Connect`.
 
 Below the position slider there are initial controls split across two rows: one
-for `Pitch`, `Tempo`, `Volume`, and bar navigation, and another for the basic
-bar-based loop.
+for `Pitch`, `Tempo`, `Volume`, and bar navigation, and another for direct
+bar jump plus the basic bar-based loop.
 
 `Pitch` transposes between -12 and +12 semitones without changing the GM
 percussion channel 10. `Tempo` plays between 50% and 200% of the original speed.
@@ -168,7 +168,7 @@ percussion channel 10. `Tempo` plays between 50% and 200% of the original speed.
 toolbar is reserved for primary actions such as open, playlist navigation, play,
 pause, and stop. The line below the slider shows current/total time, effective
 BPM, and current/total bar. `Bar -` and `Bar +` jump to the beginning of the
-previous or next bar.
+previous or next bar. `Jump bar` plus `Go` seeks directly to the requested bar.
 
 ## Configuration
 

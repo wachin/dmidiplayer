@@ -65,6 +65,7 @@ class MainWindow(QMainWindow):
         self.loop_check.toggled.connect(self._toggle_loop)
         self.loop_start = self._spinbox(1, 1, 1, self._update_loop_range)
         self.loop_end = self._spinbox(1, 1, 1, self._update_loop_range)
+        self.jump_bar = self._spinbox(1, 1, 1, self._jump_bar_value_changed)
         self._updating_position = False
 
         self._build_toolbar()
@@ -137,6 +138,9 @@ class MainWindow(QMainWindow):
         loop_row = QWidget()
         loop_layout = QHBoxLayout(loop_row)
         loop_layout.setContentsMargins(0, 0, 0, 0)
+        loop_layout.addWidget(QLabel(self.tr("Jump bar:")))
+        loop_layout.addWidget(self.jump_bar)
+        loop_layout.addWidget(self._button(self.tr("Go"), self.jump_to_bar))
         loop_layout.addWidget(self.loop_check)
         loop_layout.addWidget(QLabel(self.tr("Start bar:")))
         loop_layout.addWidget(self.loop_start)
@@ -354,15 +358,40 @@ class MainWindow(QMainWindow):
             return
         current_bar = sequence.bar_number_at_tick(self.position.value())
         target_bar = max(1, min(sequence.bar_count, current_bar + delta))
+        self._seek_to_bar(target_bar)
+
+    def jump_to_bar(self) -> None:
+        self._seek_to_bar(self.jump_bar.value())
+
+    def _seek_to_bar(self, bar_number: int) -> None:
+        sequence = self.player.sequence
+        if sequence.midi is None:
+            return
+        target_bar = max(1, min(sequence.bar_count, bar_number))
+        if target_bar != self.jump_bar.value():
+            with QSignalBlocker(self.jump_bar):
+                self.jump_bar.setValue(target_bar)
         self.player.seek(sequence.tick_for_bar(target_bar))
         self.keyboard.clear()
 
+    def _jump_bar_value_changed(self, value: int) -> None:
+        if self.player.sequence.midi is None:
+            return
+        self.statusBar().showMessage(self.tr("Ready to jump to bar {bar}").format(bar=value), 2000)
+
     def _reset_loop_controls(self) -> None:
-        if self.loop_check is None or self.loop_start is None or self.loop_end is None:
+        if self.loop_check is None or self.loop_start is None or self.loop_end is None or self.jump_bar is None:
             return
         bar_count = max(1, self.player.sequence.bar_count)
-        with QSignalBlocker(self.loop_check), QSignalBlocker(self.loop_start), QSignalBlocker(self.loop_end):
+        with (
+            QSignalBlocker(self.loop_check),
+            QSignalBlocker(self.loop_start),
+            QSignalBlocker(self.loop_end),
+            QSignalBlocker(self.jump_bar),
+        ):
             self.loop_check.setChecked(False)
+            self.jump_bar.setRange(1, bar_count)
+            self.jump_bar.setValue(1)
             self.loop_start.setRange(1, bar_count)
             self.loop_end.setRange(1, bar_count)
             self.loop_start.setValue(1)

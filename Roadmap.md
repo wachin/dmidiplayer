@@ -340,7 +340,8 @@ removing or replacing the original C++ code.
 - `dmidiplayer/dmidiplayer_py/`
   - `app.py`: initial PyQt6 window with list, controls, position slider,
     keyboard, ALSA destination selector, compact toolbar, two-row musical
-    controls, time/BPM/bar display, bar navigation, and bar-based loop controls.
+    controls, time/BPM/bar display, previous/next bar navigation, direct bar
+    jump, and bar-based loop controls.
   - `i18n.py`: Qt `.qm` translation loading with English as source language.
   - `settings.py`: persistent configuration through
     `QStandardPaths.AppConfigLocation` and `QSettings`.
@@ -375,6 +376,7 @@ Functional state:
 - The UI shows current/total time, effective BPM, and current/total bar. BPM
   respects MIDI tempo changes and the selected tempo percentage.
 - The UI has initial `Bar -` and `Bar +` actions for previous/next bar seek.
+- The UI has a `Jump bar` control with `Go` to seek directly to a specific bar.
 - The list works as a temporary playlist:
   - multiple files can be loaded from the command line or file dialog;
   - `Previous` and `Next` navigate the list;
@@ -512,8 +514,8 @@ Recommended priority:
    - load `guiplayer.ui`;
    - connect basic actions to the Python `SequencePlayer`.
 4. Translate `dmidiplayer_py_es.ts` in Qt Linguist and compile `.qm`.
-5. Add direct jump to a specific bar number.
-6. Port the full loop dialog when the C++ UI starts being loaded.
+5. Port the full loop dialog when the C++ UI starts being loaded.
+6. Start the connections dialog or playlist dialog from the original C++ UI.
 
 Do not repeat:
 
@@ -844,7 +846,7 @@ Exit criteria:
 
 Status: started. Current tests cover parser basics, ALSA event conversion,
 sequence player behavior, i18n fallback, settings persistence, playlist UI,
-time/BPM display, bar navigation, and bar-based loop controls.
+time/BPM display, bar navigation, direct bar jump, and bar-based loop controls.
 
 Minimum tests to keep expanding:
 
@@ -944,6 +946,6 @@ Tasks:
   look like `~/.config/dmidiplayer/dmidiplayer-py/settings.ini` and Windows uses
   AppData/equivalent.
 - The current toolbar is minimal: open, previous, play, pause, stop, next.
-- Tone/tempo/volume/bar navigation/loop/MIDI destination controls live in
-  compact rows inside the main panel to avoid overloading the toolbar or making
-  the window unnecessarily wide.
+- Tone/tempo/volume/bar navigation/direct bar jump/loop/MIDI destination
+  controls live in compact rows inside the main panel to avoid overloading the
+  toolbar or making the window unnecessarily wide.
