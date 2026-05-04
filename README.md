@@ -157,7 +157,7 @@ destino que parezca QSynth/FluidSynth. Si no lo hace, usa el selector `Destino
 MIDI`, pulsa `Refrescar` y luego `Conectar`.
 
 Debajo del slider de posicion hay controles iniciales de `Pitch`, `Tempo` y
-`Volume`, ademas de un loop basico por ticks.
+`Volume`, ademas de un loop basico por compases.
 `Pitch` permite transponer entre -12 y +12 semitonos, sin alterar el canal de
 percusion GM 10. `Tempo` permite reproducir entre 50% y 200% de la velocidad
 original. `Volume` envia MIDI CC7 a los canales y escala cambios CC7 del
@@ -165,7 +165,8 @@ archivo entre 0% y 200%. `Loop` permite repetir el rango entre `Start` y `End`
 usando numeros de compas. La toolbar superior queda reservada para acciones
 principales como abrir, navegar la playlist, reproducir, pausar y detener. La
 linea bajo el slider muestra tiempo actual/total, BPM efectivo y compas
-actual/total.
+actual/total. Los botones `Bar -` y `Bar +` saltan al inicio del compas
+anterior o siguiente.
 
 ## Configuracion
 

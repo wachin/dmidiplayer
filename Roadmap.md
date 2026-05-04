@@ -390,6 +390,8 @@ Estado funcional:
   activa.
 - La UI muestra tiempo actual/total, BPM efectivo y compas actual/total; el BPM
   respeta cambios de tempo del archivo y el porcentaje de tempo seleccionado.
+- La UI tiene acciones iniciales `Bar -` y `Bar +` para saltar al compas
+  anterior o siguiente.
 - La lista funciona como playlist temporal:
   - se pueden cargar varios archivos por linea de comandos o dialogo;
   - `Previous` y `Next` navegan la lista;
@@ -533,7 +535,7 @@ Prioridad recomendada para continuar:
    - cargar `guiplayer.ui`;
    - conectar acciones basicas contra el `SequencePlayer` Python.
 4. Traducir `dmidiplayer_py_es.ts` en Qt Linguist y compilar `.qm`.
-5. Agregar acciones de avanzar/retroceder por compas y salto a compas.
+5. Agregar salto directo a un numero de compas concreto.
 6. Portar el dialogo completo de loop cuando se empiece a cargar la UI C++.
 
 No repetir:

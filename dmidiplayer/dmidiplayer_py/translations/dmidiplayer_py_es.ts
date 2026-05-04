@@ -14,7 +14,7 @@
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="367" />
+      <location filename="../app.py" line="385" />
       <location filename="../app.py" line="56" />
       <source>00:00 / 00:00 - 120 BPM - Bar 1/1</source>
       <translation type="unfinished" />
@@ -85,123 +85,138 @@
       <translation type="unfinished" />
     </message>
     <message>
+      <location filename="../app.py" line="127" />
+      <source>Bar:</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
       <location filename="../app.py" line="128" />
+      <source>Bar -</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../app.py" line="129" />
+      <source>Bar +</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../app.py" line="131" />
       <source>Start bar:</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="130" />
+      <location filename="../app.py" line="133" />
       <source>End bar:</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="139" />
+      <location filename="../app.py" line="142" />
       <source>MIDI destination:</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="141" />
+      <location filename="../app.py" line="144" />
       <source>Refresh</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="142" />
+      <location filename="../app.py" line="145" />
       <source>Connect</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="165" />
+      <location filename="../app.py" line="168" />
       <source> Cards detected by python3-alsaaudio: {count}.</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="170" />
+      <location filename="../app.py" line="173" />
       <source>ALSA is not available, using dummy output: {error}.{suffix}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="193" />
-      <location filename="../app.py" line="187" />
+      <location filename="../app.py" line="196" />
+      <location filename="../app.py" line="190" />
       <source>No ALSA destinations</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="195" />
+      <location filename="../app.py" line="198" />
       <source>No ALSA MIDI destinations were found. Open QSynth and press Refresh.</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="222" />
+      <location filename="../app.py" line="225" />
       <source>No ALSA MIDI destination selected</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="228" />
+      <location filename="../app.py" line="231" />
       <source>The dummy output does not support ALSA connections</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="233" />
+      <location filename="../app.py" line="236" />
       <source>MIDI connection</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="235" />
+      <location filename="../app.py" line="238" />
       <source>Connected to {name}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="237" />
+      <location filename="../app.py" line="240" />
       <source>MIDI output: {output} -&gt; {destination}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="246" />
+      <location filename="../app.py" line="249" />
       <source>Open MIDI</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="248" />
+      <location filename="../app.py" line="251" />
       <source>MIDI (*.mid *.midi *.kar);;All files (*)</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="266" />
+      <location filename="../app.py" line="269" />
       <source>Error</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="273" />
+      <location filename="../app.py" line="276" />
       <source>{title} - format {format}, {tracks} track(s), {ticks} ticks, {seconds:.1f} s</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="281" />
+      <location filename="../app.py" line="284" />
       <source>File loaded</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="375" />
+      <location filename="../app.py" line="393" />
       <source>{current} / {total} - {bpm:.0f} BPM - Bar {bar}/{bar_count}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="394" />
+      <location filename="../app.py" line="412" />
       <source>{kind} channel={channel} data={data}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="408" />
+      <location filename="../app.py" line="426" />
       <source>End of sequence</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="412" />
+      <location filename="../app.py" line="430" />
       <source>MIDI output error: {message}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="414" />
+      <location filename="../app.py" line="432" />
       <source>MIDI output</source>
       <translation type="unfinished" />
     </message>

@@ -124,6 +124,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(self.tr("Volume:")))
         layout.addWidget(self.volume_control)
         layout.addWidget(self._button("100%", lambda: self.volume_control.setValue(100)))
+        layout.addWidget(QLabel(self.tr("Bar:")))
+        layout.addWidget(self._button(self.tr("Bar -"), self.previous_bar))
+        layout.addWidget(self._button(self.tr("Bar +"), self.next_bar))
         layout.addWidget(self.loop_check)
         layout.addWidget(QLabel(self.tr("Start bar:")))
         layout.addWidget(self.loop_start)
@@ -324,6 +327,21 @@ class MainWindow(QMainWindow):
         if self._updating_position:
             return
         self.player.seek(self.position.value())
+        self.keyboard.clear()
+
+    def previous_bar(self) -> None:
+        self._seek_to_bar_delta(-1)
+
+    def next_bar(self) -> None:
+        self._seek_to_bar_delta(1)
+
+    def _seek_to_bar_delta(self, delta: int) -> None:
+        sequence = self.player.sequence
+        if sequence.midi is None:
+            return
+        current_bar = sequence.bar_number_at_tick(self.position.value())
+        target_bar = max(1, min(sequence.bar_count, current_bar + delta))
+        self.player.seek(sequence.tick_for_bar(target_bar))
         self.keyboard.clear()
 
     def _reset_loop_controls(self) -> None:

@@ -114,6 +114,23 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.player._loop_start_tick, 1920)
                 self.assertEqual(window.player._loop_end_tick, 3840)
 
+    def test_bar_navigation_seeks_to_neighboring_bar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "two-bars.mid")
+            write_two_bar_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                window.next_bar()
+                self.assertEqual(window.player._position, 1920)
+
+                window.previous_bar()
+                self.assertEqual(window.player._position, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
