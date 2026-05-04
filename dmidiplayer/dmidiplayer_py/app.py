@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.connection_combo, 1)
         layout.addWidget(self._button(self.tr("Refresh"), self._refresh_midi_connections))
         layout.addWidget(self._button(self.tr("Connect"), self._connect_selected_midi_output))
+        layout.addWidget(self._button(self.tr("Disconnect"), self._disconnect_midi_output))
         return row
 
     def _spinbox(self, minimum: int, maximum: int, value: int, slot: object, suffix: str = "") -> QSpinBox:
@@ -200,6 +201,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self.output, "connections"):
             self.connection_combo.addItem("Dummy output")
             self.connection_combo.setEnabled(False)
+            self._update_midi_output_label()
             return
         try:
             connections = self.output.connections()
@@ -207,6 +209,7 @@ class MainWindow(QMainWindow):
             self.connection_combo.addItem(self.tr("No ALSA destinations"))
             self.connection_combo.setEnabled(False)
             self.statusBar().showMessage(str(exc), 10000)
+            self._update_midi_output_label()
             return
         self.connection_combo.setEnabled(bool(connections))
         if not connections:
@@ -215,6 +218,7 @@ class MainWindow(QMainWindow):
                 self.tr("No ALSA MIDI destinations were found. Open QSynth and press Refresh."),
                 10000,
             )
+            self._update_midi_output_label()
             return
         for connection in connections:
             self.connection_combo.addItem(connection.name, connection)
@@ -253,10 +257,32 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, self.tr("MIDI connection"), str(exc))
             return
         self.statusBar().showMessage(self.tr("Connected to {name}").format(name=connection.name), 10000)
+        self._update_midi_output_label()
+
+    def _disconnect_midi_output(self) -> None:
+        if not hasattr(self.output, "disconnect_all"):
+            self.statusBar().showMessage(self.tr("The dummy output has no ALSA connections"), 5000)
+            return
+        try:
+            self.output.disconnect_all()
+        except MidiOutputError as exc:
+            QMessageBox.warning(self, self.tr("MIDI connection"), str(exc))
+            return
+        self.statusBar().showMessage(self.tr("Disconnected MIDI destinations"), 5000)
+        self._update_midi_output_label()
+
+    def _update_midi_output_label(self) -> None:
+        if not hasattr(self.output, "connected_connections"):
+            self.event_label.setText(self.tr("MIDI output: {name}").format(name=self.output.name))
+            return
+        connections = self.output.connected_connections()
+        if not connections:
+            self.event_label.setText(self.tr("MIDI output: {name}").format(name=self.output.name))
+            return
         self.event_label.setText(
             self.tr("MIDI output: {output} -> {destination}").format(
                 output=self.output.name,
-                destination=connection.name,
+                destination=", ".join(connection.name for connection in connections),
             )
         )
 

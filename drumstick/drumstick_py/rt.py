@@ -185,6 +185,8 @@ class _AlsaLib:
         lib.snd_seq_delete_simple_port.restype = ctypes.c_int
         lib.snd_seq_connect_to.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
         lib.snd_seq_connect_to.restype = ctypes.c_int
+        lib.snd_seq_disconnect_to.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+        lib.snd_seq_disconnect_to.restype = ctypes.c_int
         lib.snd_seq_event_output_direct.argtypes = [ctypes.c_void_p, ctypes.POINTER(_SndSeqEvent)]
         lib.snd_seq_event_output_direct.restype = ctypes.c_int
         lib.snd_seq_sync_output_queue.argtypes = [ctypes.c_void_p]
@@ -237,7 +239,7 @@ class AlsaSequencerOutput(QObject):
         self._seq = ctypes.c_void_p()
         self._port = -1
         self._client = -1
-        self._connected: set[tuple[int, int]] = set()
+        self._connected: dict[tuple[int, int], MidiConnection] = {}
         self._open()
 
     def _open(self) -> None:
@@ -275,7 +277,30 @@ class AlsaSequencerOutput(QObject):
         result = self._alsa.lib.snd_seq_connect_to(self._seq, self._port, connection.client, connection.port)
         if result < 0 and result != -16:
             raise MidiOutputError(f"No se pudo conectar a {connection.name}: {self._alsa.error(result)}")
-        self._connected.add(key)
+        self._connected[key] = connection
+
+    def disconnect_from(self, connection: "MidiConnection | str") -> None:
+        if isinstance(connection, str):
+            candidates = [port for port in self.connected_connections() if port.matches(connection)]
+            if not candidates:
+                raise MidiOutputError(f"No hay una conexion ALSA activa con: {connection}")
+            connection = candidates[0]
+        if connection.client is None or connection.port is None:
+            raise MidiOutputError(f"Puerto ALSA invalido: {connection.name}")
+        key = (connection.client, connection.port)
+        if key not in self._connected:
+            return
+        result = self._alsa.lib.snd_seq_disconnect_to(self._seq, self._port, connection.client, connection.port)
+        if result < 0 and result != -2:
+            raise MidiOutputError(f"No se pudo desconectar de {connection.name}: {self._alsa.error(result)}")
+        self._connected.pop(key, None)
+
+    def disconnect_all(self) -> None:
+        for connection in list(self._connected.values()):
+            self.disconnect_from(connection)
+
+    def connected_connections(self) -> list["MidiConnection"]:
+        return list(self._connected.values())
 
     def close(self) -> None:
         if self._seq:

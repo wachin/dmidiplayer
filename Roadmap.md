@@ -361,6 +361,10 @@ removing or replacing the original C++ code.
   - running status events and malformed running-status error reporting;
   - SysEx `0xF0` and `0xF7` events;
   - time signature, key signature, lyrics, and marker metadata.
+- ALSA connection handling added after the initial handoff:
+  - active output connections are tracked by `AlsaSequencerOutput`;
+  - the UI can disconnect active ALSA destinations;
+  - `snd_seq_event_t` layout is covered by a small ctypes test.
 - `README.md`: testing notes for MX Linux 23, RT kernel, QjackCtl, QSynth, and
   `FluidR3.sf2`.
 - `drumstick-ecosystem.webp`: diagram used in this Roadmap to document the full
@@ -511,10 +515,11 @@ Recommended priority:
    - RIFF MIDI fixtures once `rmid.cpp` is ported;
    - Cakewalk WRK fixtures once `qwrk.cpp` is ported.
 2. Improve `drumstick_py.rt`:
-   - show active connections and disconnect/reconnect destinations;
+   - query active ALSA subscriptions from the backend instead of only tracking
+     connections made during this process;
    - connect by a more flexible name search from preferences;
    - expose ALSA errors without excessive stderr noise;
-   - verify `snd_seq_event_t` size/layout with a small test.
+   - add reconnect-to-last-destination preferences once settings are expanded.
 3. Start real UI conversion:
    - decide between `pyuic6` and `PyQt6.uic.loadUi`;
    - load `guiplayer.ui`;
