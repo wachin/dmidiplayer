@@ -305,7 +305,8 @@ cada proyecto, sin borrar ni sustituir el C++ original.
 - `dmidiplayer/dmidiplayer_py/`
   - `app.py`: ventana PyQt6 inicial con lista, controles, posicion, teclado y
     selector de destino MIDI ALSA; toolbar reducida a acciones principales y
-    controles musicales movidos al panel principal; indicador de tiempo y BPM.
+    controles musicales movidos al panel principal; indicador de tiempo, BPM y
+    compas actual.
   - `i18n.py`: carga de traducciones Qt `.qm` con ingles como idioma fuente.
   - `settings.py`: configuracion persistente mediante
     `QStandardPaths.AppConfigLocation` y `QSettings`.
@@ -339,8 +340,8 @@ Estado funcional:
 - El slider de posicion permite seek basico por tick; al moverlo se detienen
   notas activas y se continua desde la nueva posicion si la reproduccion estaba
   activa.
-- La UI muestra tiempo actual/total y BPM efectivo; el BPM respeta cambios de
-  tempo del archivo y el porcentaje de tempo seleccionado.
+- La UI muestra tiempo actual/total, BPM efectivo y compas actual/total; el BPM
+  respeta cambios de tempo del archivo y el porcentaje de tempo seleccionado.
 - La lista funciona como playlist temporal:
   - se pueden cargar varios archivos por linea de comandos o dialogo;
   - `Previous` y `Next` navegan la lista;
@@ -434,8 +435,9 @@ hardware MIDI, QSynth u otro sintetizador ALSA.
 
 ## Limitaciones conocidas
 
-- El parser SMF inicial ya calcula tempo y duracion real para SMF PPQ, pero aun
-  necesita mas pruebas de borde y comparacion contra Drumstick C++.
+- El parser SMF inicial ya calcula tempo, duracion real y compases para SMF
+  PPQ, pero aun necesita mas pruebas de borde y comparacion contra Drumstick
+  C++.
 - El scheduler de `dmidiplayer_py.player` ya usa tiempos reales, seek basico y
   loop por ticks; tambien aplica escala de tempo. Sigue dependiendo de `QTimer`
   y aun no implementa loop por compases ni compensacion avanzada de latencia.
@@ -477,8 +479,9 @@ Prioridad recomendada para continuar:
    - cargar `guiplayer.ui`;
    - conectar acciones basicas contra el `SequencePlayer` Python.
 4. Traducir `dmidiplayer_py_es.ts` en Qt Linguist y compilar `.qm`.
-5. Agregar lectura musical de compases y mostrar posicion por compas.
-6. Convertir loop por ticks a loop por compases.
+5. Convertir los controles `Loop`, `Start` y `End` para trabajar por compases
+   usando `tick_for_bar()`.
+6. Agregar acciones de avanzar/retroceder por compas y salto a compas.
 
 No repetir:
 

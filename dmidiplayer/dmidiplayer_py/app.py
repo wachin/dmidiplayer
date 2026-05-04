@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self.position.setTracking(False)
         self.position.setEnabled(False)
         self.position.sliderReleased.connect(self._seek_to_slider)
-        self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM"))
+        self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.keyboard = PianoKeyboard()
         self.event_label = QLabel(self.tr("MIDI output: {name}").format(name=self.output.name))
         self.connection_combo = QComboBox()
@@ -354,16 +354,20 @@ class MainWindow(QMainWindow):
     def _update_time_label(self, tick: int, maximum: int) -> None:
         midi = self.player.sequence.midi
         if midi is None:
-            self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM"))
+            self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
             return
         current_us = self.player.sequence.tick_to_microseconds(tick)
         total_us = self.player.sequence.tick_to_microseconds(maximum)
         bpm = self.player.sequence.bpm_at_tick(tick) * self.player.tempo_percent / 100
+        bar = self.player.sequence.bar_number_at_tick(tick)
+        bar_count = self.player.sequence.bar_count
         self.time_label.setText(
-            self.tr("{current} / {total} - {bpm:.0f} BPM").format(
+            self.tr("{current} / {total} - {bpm:.0f} BPM - Bar {bar}/{bar_count}").format(
                 current=self._format_time(current_us),
                 total=self._format_time(total_us),
                 bpm=bpm,
+                bar=bar,
+                bar_count=bar_count,
             )
         )
 

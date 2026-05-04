@@ -89,6 +89,29 @@ class SmfParserTest(unittest.TestCase):
         self.assertEqual(midi.tempo_at_tick(480), 1_000_000)
         self.assertEqual(midi.bpm_at_tick(480), 60.0)
 
+    def test_reports_bar_numbers_from_time_signature(self) -> None:
+        header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x58\x04\x03\x02\x18\x08",
+                varlen(2880),
+                b"\xff\x2f\x00",
+            ]
+        )
+        data = header + chunk(b"MTrk", track)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "bars.mid")
+            path.write_bytes(data)
+            midi = read_smf(path)
+
+        self.assertEqual(midi.bar_count, 2)
+        self.assertEqual(midi.bar_number_at_tick(0), 1)
+        self.assertEqual(midi.bar_number_at_tick(1439), 1)
+        self.assertEqual(midi.bar_number_at_tick(1440), 2)
+        self.assertEqual(midi.tick_for_bar(2), 1440)
+
 
 if __name__ == "__main__":
     unittest.main()

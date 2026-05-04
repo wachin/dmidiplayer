@@ -88,6 +88,7 @@ class MidiFile:
     _key_signatures_cache: list[KeySignature] | None = field(default=None, init=False, repr=False)
     _text_events_cache: list[TextEvent] | None = field(default=None, init=False, repr=False)
     _length_microseconds_cache: int | None = field(default=None, init=False, repr=False)
+    _bar_count_cache: int | None = field(default=None, init=False, repr=False)
     _title_cache: str | None = field(default=None, init=False, repr=False)
 
     @property
@@ -244,6 +245,61 @@ class MidiFile:
             return 120.0
         return 60_000_000 / tempo
 
+    @property
+    def bar_count(self) -> int:
+        if self._bar_count_cache is None:
+            self._bar_count_cache = self._bar_number_for_tick(self.length_ticks, round_up=True)
+        return self._bar_count_cache
+
+    def bar_number_at_tick(self, tick: int) -> int:
+        return min(self.bar_count, self._bar_number_for_tick(tick, round_up=False))
+
+    def tick_for_bar(self, bar_number: int) -> int:
+        target = max(1, bar_number) - 1
+        segment_start = 0
+        ticks_per_bar = self._ticks_per_bar(self._initial_time_signature())
+        for signature in self._time_signature_changes_after_zero():
+            segment_bars = max(0, (signature.tick - segment_start) // ticks_per_bar)
+            if target < segment_bars:
+                return min(self.length_ticks, segment_start + target * ticks_per_bar)
+            target -= segment_bars
+            segment_start = signature.tick
+            ticks_per_bar = self._ticks_per_bar(signature)
+        return min(self.length_ticks, segment_start + target * ticks_per_bar)
+
+    def _bar_number_for_tick(self, tick: int, round_up: bool) -> int:
+        tick = max(0, tick)
+        bar_index = 0
+        segment_start = 0
+        ticks_per_bar = self._ticks_per_bar(self._initial_time_signature())
+        for signature in self._time_signature_changes_after_zero():
+            if signature.tick >= tick:
+                break
+            segment_ticks = max(0, signature.tick - segment_start)
+            bar_index += _divide_ticks_by_bar(segment_ticks, ticks_per_bar, round_up=False)
+            segment_start = signature.tick
+            ticks_per_bar = self._ticks_per_bar(signature)
+        segment_ticks = max(0, tick - segment_start)
+        bar_index += _divide_ticks_by_bar(segment_ticks, ticks_per_bar, round_up=round_up)
+        return max(1, bar_index + 1 if not round_up else bar_index)
+
+    def _time_signature_changes_after_zero(self) -> list[TimeSignature]:
+        return [signature for signature in self.time_signatures if signature.tick > 0]
+
+    def _initial_time_signature(self) -> TimeSignature:
+        initial = _default_time_signature()
+        for signature in self.time_signatures:
+            if signature.tick > 0:
+                break
+            initial = signature
+        return initial
+
+    def _ticks_per_bar(self, signature: TimeSignature) -> int:
+        if self.division & 0x8000:
+            return max(1, self.division & 0xFF)
+        ticks = (self.division * signature.numerator * 4) // signature.denominator
+        return max(1, ticks)
+
 
 class _Reader:
     def __init__(self, data: bytes) -> None:
@@ -359,6 +415,18 @@ def _dedupe_tempo_changes(changes: list[TempoChange]) -> list[TempoChange]:
         else:
             result.append(change)
     return result
+
+
+def _default_time_signature() -> TimeSignature:
+    return TimeSignature(0, 4, 4, 24, 8)
+
+
+def _divide_ticks_by_bar(ticks: int, ticks_per_bar: int, round_up: bool) -> int:
+    if ticks <= 0:
+        return 0
+    if round_up:
+        return (ticks + ticks_per_bar - 1) // ticks_per_bar
+    return ticks // ticks_per_bar
 
 
 def _smpte_tick_to_microseconds(division: int, tick: int) -> int:

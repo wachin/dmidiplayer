@@ -158,7 +158,8 @@ original. `Volume` envia MIDI CC7 a los canales y escala cambios CC7 del
 archivo entre 0% y 200%. `Loop` permite repetir el rango entre `Start` y `End`
 usando posiciones en ticks MIDI. La toolbar superior queda reservada para
 acciones principales como abrir, navegar la playlist, reproducir, pausar y
-detener. La linea bajo el slider muestra tiempo actual/total y BPM efectivo.
+detener. La linea bajo el slider muestra tiempo actual/total, BPM efectivo y
+compas actual/total.
 
 ## Configuracion
 

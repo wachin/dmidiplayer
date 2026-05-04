@@ -16,7 +16,7 @@
     <message>
       <location filename="../app.py" line="357" />
       <location filename="../app.py" line="56" />
-      <source>00:00 / 00:00 - 120 BPM</source>
+      <source>00:00 / 00:00 - 120 BPM - Bar 1/1</source>
       <translation type="unfinished" />
     </message>
     <message>
@@ -181,27 +181,27 @@
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="363" />
-      <source>{current} / {total} - {bpm:.0f} BPM</source>
+      <location filename="../app.py" line="365" />
+      <source>{current} / {total} - {bpm:.0f} BPM - Bar {bar}/{bar_count}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="380" />
+      <location filename="../app.py" line="384" />
       <source>{kind} channel={channel} data={data}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="394" />
+      <location filename="../app.py" line="398" />
       <source>End of sequence</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="398" />
+      <location filename="../app.py" line="402" />
       <source>MIDI output error: {message}</source>
       <translation type="unfinished" />
     </message>
     <message>
-      <location filename="../app.py" line="400" />
+      <location filename="../app.py" line="404" />
       <source>MIDI output</source>
       <translation type="unfinished" />
     </message>

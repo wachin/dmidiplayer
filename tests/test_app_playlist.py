@@ -72,9 +72,9 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
 
-                self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM")
+                self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM - Bar 1/1")
                 window._update_position(480, 480)
-                self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM")
+                self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM - Bar 1/1")
 
 
 if __name__ == "__main__":

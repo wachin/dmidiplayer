@@ -47,3 +47,13 @@ class Sequence(QObject):
 
     def bpm_at_tick(self, tick: int) -> float:
         return 120.0 if self.midi is None else self.midi.bpm_at_tick(tick)
+
+    @property
+    def bar_count(self) -> int:
+        return 1 if self.midi is None else self.midi.bar_count
+
+    def bar_number_at_tick(self, tick: int) -> int:
+        return 1 if self.midi is None else self.midi.bar_number_at_tick(tick)
+
+    def tick_for_bar(self, bar_number: int) -> int:
+        return 0 if self.midi is None else self.midi.tick_for_bar(bar_number)
