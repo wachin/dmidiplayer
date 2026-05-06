@@ -320,6 +320,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
+            self.assertIsNotNone(window.findChild(type(window.repeat_playlist_action), "repeat_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
@@ -584,6 +585,46 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
 
                 self.assertEqual(window.windowTitle(), "solo.mid - dmidiplayer PyQt6")
+
+    def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.next_file()
+                window.repeat_playlist_action.setChecked(True)
+
+                window.player.finished.emit()
+
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - dmidiplayer PyQt6")
+
+    def test_end_of_sequence_message_remains_when_repeat_playlist_is_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.next_file()
+                window.repeat_playlist_action.setChecked(False)
+
+                window.player.finished.emit()
+
+                self.assertEqual(window.playlist.currentRow(), 1)
+                self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
 
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"

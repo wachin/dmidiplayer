@@ -165,6 +165,9 @@ class MainWindow(QMainWindow):
         self.next_bar_action.setObjectName("next_bar_action")
         self.next_bar_action.setShortcut(QKeySequence("Alt+Right"))
         self.next_bar_action.triggered.connect(self.next_bar)
+        self.repeat_playlist_action = QAction(self.tr("Repeat Playlist"), self)
+        self.repeat_playlist_action.setObjectName("repeat_playlist_action")
+        self.repeat_playlist_action.setCheckable(True)
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
@@ -238,6 +241,8 @@ class MainWindow(QMainWindow):
         playback_menu.addSeparator()
         playback_menu.addAction(self.previous_bar_action)
         playback_menu.addAction(self.next_bar_action)
+        playback_menu.addSeparator()
+        playback_menu.addAction(self.repeat_playlist_action)
 
         view_menu = self.menuBar().addMenu(self.tr("View"))
         view_menu.setObjectName("view_menu")
@@ -867,6 +872,8 @@ class MainWindow(QMainWindow):
 
     def _finished(self) -> None:
         if self.auto_advance_playlist and self._load_playlist_row(self.playlist.currentRow() + 1, autoplay=True):
+            return
+        if self.repeat_playlist_action.isChecked() and self._load_playlist_row(0, autoplay=True):
             return
         self.event_label.setText(self.tr("End of sequence"))
         self.statusBar().showMessage(self.tr("End of sequence"))
