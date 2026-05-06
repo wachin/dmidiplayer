@@ -41,6 +41,23 @@ def read_temp_smf(data: bytes, name: str = "test.mid"):
 
 
 class SmfParserTest(unittest.TestCase):
+    def test_rejects_invalid_header(self) -> None:
+        with self.assertRaisesRegex(MidiFileError, "Not a Standard MIDI File"):
+            read_temp_smf(b"not midi", "not-midi.mid")
+
+    def test_rejects_truncated_track_chunk(self) -> None:
+        header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
+        data = header + b"MTrk" + struct.pack(">I", 10) + b"\x00\xff\x2f\x00"
+
+        with self.assertRaisesRegex(MidiFileError, "Unexpected end of file"):
+            read_temp_smf(data, "truncated.mid")
+
+    def test_rejects_invalid_variable_length_quantity(self) -> None:
+        track = bytes([0x81, 0x81, 0x81, 0x81, 0x00, 0xFF, 0x2F, 0x00])
+
+        with self.assertRaisesRegex(MidiFileError, "Invalid variable-length quantity"):
+            read_temp_smf(smf_data(0, 480, [track]), "bad-varlen.mid")
+
     def test_reads_tempo_metadata_and_note_events(self) -> None:
         track = b"".join(
             [
@@ -88,6 +105,27 @@ class SmfParserTest(unittest.TestCase):
         self.assertEqual(midi.tempo_at_tick(0), 500_000)
         self.assertEqual(midi.tempo_at_tick(480), 1_000_000)
         self.assertEqual(midi.bpm_at_tick(480), 60.0)
+        self.assertEqual(midi.length_microseconds, 1_500_000)
+        self.assertEqual(midi.microseconds_to_tick(750_000), 600)
+
+    def test_uses_smpte_division_for_timing(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(50),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(0, 0xE728, [track]), "smpte.mid")
+
+        self.assertEqual(midi.length_ticks, 50)
+        self.assertEqual(midi.length_microseconds, 50_000)
+        self.assertEqual(midi.tick_to_microseconds(25), 25_000)
+        self.assertEqual(midi.microseconds_to_tick(25_000), 25)
+        self.assertEqual(midi.tempo_at_tick(50), 500_000)
 
     def test_reports_bar_numbers_from_time_signature(self) -> None:
         track = b"".join(
@@ -105,6 +143,30 @@ class SmfParserTest(unittest.TestCase):
         self.assertEqual(midi.bar_number_at_tick(1439), 1)
         self.assertEqual(midi.bar_number_at_tick(1440), 2)
         self.assertEqual(midi.tick_for_bar(2), 1440)
+
+    def test_reports_bar_numbers_across_time_signature_changes(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x58\x04\x04\x02\x18\x08",
+                varlen(3840),
+                b"\xff\x58\x04\x03\x02\x18\x08",
+                varlen(2880),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(0, 480, [track]), "changing-bars.mid")
+
+        self.assertEqual(midi.bar_count, 4)
+        self.assertEqual(midi.bar_number_at_tick(0), 1)
+        self.assertEqual(midi.bar_number_at_tick(1919), 1)
+        self.assertEqual(midi.bar_number_at_tick(1920), 2)
+        self.assertEqual(midi.bar_number_at_tick(3840), 3)
+        self.assertEqual(midi.bar_number_at_tick(5280), 4)
+        self.assertEqual(midi.tick_for_bar(1), 0)
+        self.assertEqual(midi.tick_for_bar(2), 1920)
+        self.assertEqual(midi.tick_for_bar(3), 3840)
+        self.assertEqual(midi.tick_for_bar(4), 5280)
 
     def test_reads_format_one_events_from_all_tracks_in_tick_order(self) -> None:
         conductor_track = b"".join(

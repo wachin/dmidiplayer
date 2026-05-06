@@ -508,10 +508,10 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
 Recommended priority:
 
 1. [ ] Extend `drumstick_py.file` tests further:
-   - [ ] parser error cases around truncated chunks and invalid variable-length
+   - [x] parser error cases around truncated chunks and invalid variable-length
      quantities;
-   - [ ] SMPTE division timing;
-   - [ ] tempo and time-signature maps with mid-song changes;
+   - [x] SMPTE division timing;
+   - [x] tempo and time-signature maps with mid-song changes;
    - [ ] RIFF MIDI fixtures once `rmid.cpp` is ported;
    - [ ] Cakewalk WRK fixtures once `qwrk.cpp` is ported.
 2. [ ] Improve `drumstick_py.rt`:
@@ -622,7 +622,7 @@ Tasks:
   - [x] text, lyrics, markers, cue points;
   - [x] full SysEx;
   - [x] running status basic support;
-  - [ ] running status edge-case tests;
+  - [x] running status edge-case tests;
   - [x] real duration in microseconds with tempo changes;
   - [x] bar count and bar/tick conversion.
 - [ ] Add SMF writer if any utility requires it.
@@ -863,7 +863,7 @@ time/BPM display, bar navigation, direct bar jump, and bar-based loop controls.
 Minimum tests to keep expanding:
 
 - [ ] Parser SMF:
-  - [ ] invalid header;
+  - [x] invalid header;
   - [x] meta event;
   - [x] running status;
   - [x] SysEx;
