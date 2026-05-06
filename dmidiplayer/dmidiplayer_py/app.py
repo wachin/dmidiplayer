@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self._updating_position = False
 
         self._build_actions()
+        self._update_action_state()
         self._build_toolbar()
         self._build_menu_bar()
         self._build_layout()
@@ -132,6 +133,16 @@ class MainWindow(QMainWindow):
         self.next_bar_action.setObjectName("next_bar_action")
         self.next_bar_action.setShortcut(QKeySequence("Alt+Right"))
         self.next_bar_action.triggered.connect(self.next_bar)
+
+    def _update_action_state(self) -> None:
+        has_file = self.player.sequence.midi is not None
+        current_row = self.playlist.currentRow()
+        self.play_action.setEnabled(has_file)
+        self.pause_action.setEnabled(has_file)
+        self.previous_bar_action.setEnabled(has_file)
+        self.next_bar_action.setEnabled(has_file)
+        self.previous_action.setEnabled(current_row > 0)
+        self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
 
     def _build_toolbar(self) -> None:
         self.playback_toolbar = QToolBar(self.tr("Playback"), self)
@@ -458,6 +469,7 @@ class MainWindow(QMainWindow):
         path = Path(file_name)
         if self._is_supported_file(path):
             self.playlist.addItem(str(path))
+            self._update_action_state()
 
     def _is_supported_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
@@ -489,6 +501,7 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
+        self._update_action_state()
 
     def previous_file(self) -> None:
         row = self.playlist.currentRow()
@@ -516,6 +529,7 @@ class MainWindow(QMainWindow):
         for row in range(self.playlist.count()):
             if self.playlist.item(row).text() == file_name:
                 self.playlist.setCurrentRow(row)
+                self._update_action_state()
                 return
 
     def _update_position(self, tick: int, maximum: int) -> None:
@@ -656,6 +670,7 @@ class MainWindow(QMainWindow):
             return
         self.event_label.setText(self.tr("End of sequence"))
         self.keyboard.clear()
+        self._update_action_state()
 
     def _output_error(self, message: str) -> None:
         self.event_label.setText(self.tr("MIDI output error: {message}").format(message=message))

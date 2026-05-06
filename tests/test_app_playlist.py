@@ -399,6 +399,46 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.output.all_notes_off_count, 1)
 
+    def test_playback_actions_are_disabled_until_file_load(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertFalse(window.play_action.isEnabled())
+            self.assertFalse(window.pause_action.isEnabled())
+            self.assertFalse(window.previous_action.isEnabled())
+            self.assertFalse(window.next_action.isEnabled())
+            self.assertFalse(window.previous_bar_action.isEnabled())
+            self.assertFalse(window.next_bar_action.isEnabled())
+            self.assertTrue(window.stop_action.isEnabled())
+
+    def test_playback_actions_update_after_file_load_and_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+
+                self.assertTrue(window.play_action.isEnabled())
+                self.assertTrue(window.pause_action.isEnabled())
+                self.assertFalse(window.previous_action.isEnabled())
+                self.assertTrue(window.next_action.isEnabled())
+                self.assertTrue(window.previous_bar_action.isEnabled())
+                self.assertTrue(window.next_bar_action.isEnabled())
+
+                window.next_file()
+
+                self.assertTrue(window.previous_action.isEnabled())
+                self.assertFalse(window.next_action.isEnabled())
+
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
         with (
