@@ -279,6 +279,8 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
+            self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
+            self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
 
     def test_successful_load_adds_recent_file_menu_entry(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -340,6 +342,51 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.statusBar().isHidden())
             window.statusbar_action.setChecked(True)
             self.assertFalse(window.statusBar().isHidden())
+
+    def test_view_menu_toggles_keyboard(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.keyboard_action.setChecked(False)
+            self.assertTrue(window.keyboard.isHidden())
+            window.keyboard_action.setChecked(True)
+            self.assertFalse(window.keyboard.isHidden())
+
+    def test_playback_actions_have_keyboard_shortcuts(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.open_action.shortcut().toString(), "Ctrl+O")
+            self.assertEqual(window.play_action.shortcut().toString(), "Space")
+            self.assertEqual(window.pause_action.shortcut().toString(), "P")
+            self.assertEqual(window.stop_action.shortcut().toString(), "Esc")
+            self.assertEqual(window.previous_action.shortcut().toString(), "Ctrl+Left")
+            self.assertEqual(window.next_action.shortcut().toString(), "Ctrl+Right")
+            self.assertEqual(window.previous_bar_action.shortcut().toString(), "Alt+Left")
+            self.assertEqual(window.next_bar_action.shortcut().toString(), "Alt+Right")
+
+    def test_bar_navigation_actions_seek_to_neighboring_bar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "two-bars.mid")
+            write_two_bar_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                window.next_bar_action.trigger()
+                self.assertEqual(window.player._position, 1920)
+
+                window.previous_bar_action.trigger()
+                self.assertEqual(window.player._position, 0)
 
     def test_stop_menu_action_turns_off_notes(self) -> None:
         with (

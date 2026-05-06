@@ -578,7 +578,7 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
   - [x] Add toolbar visibility toggle.
   - [x] Add status bar visibility toggle.
-  - [ ] Add keyboard visibility toggle.
+  - [x] Add keyboard visibility toggle.
   - [ ] Add rhythm view visibility toggle.
 - [ ] Add Tools menu actions for MIDI connections and future preferences.
 - [ ] Add Help menu actions for About and local help.
@@ -592,7 +592,7 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Add remove-selected and clear-playlist actions.
 - [ ] Add repeat playlist and shuffle toggles.
 - [x] Save and restore main window size and position.
-- [ ] Add keyboard shortcuts for open, play/pause, stop, next/previous, and
+- [x] Add keyboard shortcuts for open, play/pause, stop, next/previous, and
   seek by bar.
 
 ### Playlist Files
