@@ -580,7 +580,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Add status bar visibility toggle.
   - [x] Add keyboard visibility toggle.
   - [ ] Add rhythm view visibility toggle.
-- [ ] Add Tools menu actions for MIDI connections and future preferences.
+- [x] Add Tools menu actions for MIDI connections and future preferences.
 - [ ] Add Help menu actions for About and local help.
 - [ ] Promote toolbar buttons to shared `QAction` instances everywhere.
 - [x] Add enabled/disabled menu state when no file is loaded.

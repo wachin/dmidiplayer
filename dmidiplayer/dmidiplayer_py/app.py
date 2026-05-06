@@ -108,6 +108,15 @@ class MainWindow(QMainWindow):
         self.clear_recent_action = QAction(self.tr("Clear Recent"), self)
         self.clear_recent_action.setObjectName("clear_recent_action")
         self.clear_recent_action.triggered.connect(self._clear_recent_files)
+        self.refresh_midi_action = QAction(self.tr("Refresh MIDI Destinations"), self)
+        self.refresh_midi_action.setObjectName("refresh_midi_action")
+        self.refresh_midi_action.triggered.connect(self._refresh_midi_connections)
+        self.connect_midi_action = QAction(self.tr("Connect MIDI Destination"), self)
+        self.connect_midi_action.setObjectName("connect_midi_action")
+        self.connect_midi_action.triggered.connect(self._connect_selected_midi_output)
+        self.disconnect_midi_action = QAction(self.tr("Disconnect MIDI Destinations"), self)
+        self.disconnect_midi_action.setObjectName("disconnect_midi_action")
+        self.disconnect_midi_action.triggered.connect(self._disconnect_midi_output)
 
         self.previous_action = QAction(self.tr("Previous"), self)
         self.previous_action.setObjectName("previous_action")
@@ -227,6 +236,9 @@ class MainWindow(QMainWindow):
 
         tools_menu = self.menuBar().addMenu(self.tr("Tools"))
         tools_menu.setObjectName("tools_menu")
+        tools_menu.addAction(self.refresh_midi_action)
+        tools_menu.addAction(self.connect_midi_action)
+        tools_menu.addAction(self.disconnect_midi_action)
 
         help_menu = self.menuBar().addMenu(self.tr("Help"))
         help_menu.setObjectName("help_menu")

@@ -281,6 +281,9 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
+            self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
+            self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
+            self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
 
     def test_successful_load_adds_recent_file_menu_entry(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -523,6 +526,26 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.output.connected_connections()[-1].name, "129:0 Hardware Synth: MIDI")
             self.assertEqual(FakeSettings.midi_destination_value, "129:0 Hardware Synth: MIDI")
+
+    def test_tools_menu_midi_actions_drive_connection_flow(self) -> None:
+        FakeSettings.midi_destination_value = ""
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.connection_combo.count(), 2)
+
+            window.refresh_midi_action.trigger()
+            self.assertEqual(window.connection_combo.count(), 2)
+
+            window.connection_combo.setCurrentIndex(1)
+            window.connect_midi_action.trigger()
+            self.assertEqual(window.output.connected_connections()[-1].name, "129:0 Hardware Synth: MIDI")
+
+            window.disconnect_midi_action.trigger()
+            self.assertEqual(window.output.connected_connections(), [])
 
     def test_close_stops_player_and_closes_output(self) -> None:
         FakeSettings.midi_destination_value = ""
