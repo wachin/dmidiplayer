@@ -97,7 +97,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] List MIDI destinations and connect/disconnect from the UI.
 - [x] Support dummy output for automated tests.
 - [ ] Send GM/GS/XG reset SysEx before playback when configured.
-- [ ] Run `all_notes_off` when stopping, pausing, changing files, closing, seeking,
+- [x] Run `all_notes_off` when stopping, pausing, changing files, closing, seeking,
   or changing loop.
 - [x] MIDI output failures must be recoverable UI errors, not process aborts.
 
@@ -222,7 +222,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Show the playlist file name in the window title.
 - [x] Navigate manually with Next and Previous.
 - [x] Create a temporary playlist when opening multiple command-line files.
-- [ ] Create a temporary playlist when dragging/dropping files into the window.
+- [x] Create a temporary playlist when dragging/dropping files into the window.
 - [ ] Remember the last opened or saved playlist.
 - [x] Do not save playlists automatically unless explicitly requested.
 - [ ] Use plain text playlist files, one file per line.
@@ -235,7 +235,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Recent files menu, remembering up to ten entries.
 - [x] Open files passed on the command line.
 - [ ] Integrate with file managers through "Open With...".
-- [ ] Support drag and drop into the main window.
+- [x] Support drag and drop into the main window.
 
 ### Preferences
 
@@ -319,7 +319,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Preferences and song settings survive across sessions.
 - [x] Automated tests cover parser, scheduler, dummy output, basic ALSA conversion,
   and critical UI flows.
-- [ ] The application never leaves stuck notes after stop, seek, close, or MIDI
+- [x] The application never leaves stuck notes after stop, seek, close, or MIDI
   output failure.
 - [ ] `drumgrid`, `guiplayer`, and `vpiano` also exist as complete PyQt6
   applications and reuse `drumstick_py` instead of duplicating MIDI logic.
@@ -528,6 +528,96 @@ Recommended priority:
 5. [ ] Port the full loop dialog when the C++ UI starts being loaded.
 6. [ ] Start the connections dialog or playlist dialog from the original C++ UI.
 
+## Expanded Pending Task Backlog
+
+This backlog is intentionally granular so future sessions can take larger,
+clearer bites instead of rediscovering the next small step.
+
+### Parser And File Formats
+
+- [ ] Compare parser timing and metadata against C++ Drumstick for
+  `examples/test.mid`.
+- [ ] Compare parser timing and metadata against C++ Drumstick for
+  `examples/mozart_diesirae.mid`.
+- [ ] Add a karaoke `.kar` fixture with lyric meta events split across tracks.
+- [ ] Preserve original track numbers for meta text and channel events.
+- [ ] Preserve track names and instrument names as structured metadata.
+- [ ] Parse RIFF MIDI container headers and delegate embedded SMF data to
+  `read_smf()`.
+- [ ] Add invalid RIFF MIDI tests for missing `RMID` and missing `data` chunks.
+- [ ] Study `qwrk.cpp` and define the minimum WRK event model needed by
+  dmidiplayer.
+- [ ] Add WRK parser skeleton with explicit unsupported-feature errors.
+- [ ] Add encoding detection tests with Latin-1 karaoke text.
+- [ ] Add user-selectable lyrics/text encoding to the sequence model.
+
+### Playback Engine
+
+- [ ] Track active notes per channel in `SequencePlayer`.
+- [ ] Send note-off for active notes before seek instead of relying only on
+  controller all-notes-off.
+- [ ] Reset pitch, tempo, and volume when loading a new file if song settings
+  are not active.
+- [ ] Add preference-backed percussion channel instead of hardcoding channel 10.
+- [ ] Add per-channel mute filtering in `_playable_event()`.
+- [ ] Add per-channel solo filtering with configurable reduction.
+- [ ] Add per-channel volume scaling before global volume scaling.
+- [ ] Suppress program changes on locked channels.
+- [ ] Add GM/GS/XG reset SysEx actions before playback.
+- [ ] Add latency/late-event counters for scheduler diagnostics.
+
+### Main Window UX
+
+- [ ] Build a real menu bar: File, Playback, View, Tools, Help.
+- [ ] Add File -> Open, Open Recent, Clear Recent, Exit.
+- [ ] Add Playback -> Play, Pause, Stop, Previous, Next.
+- [ ] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
+- [ ] Add status bar state messages for loading, playing, paused, stopped, and
+  errors.
+- [ ] Keep the window title synchronized with the current song and playlist.
+- [ ] Prevent duplicate playlist rows for the same file unless explicitly
+  requested.
+- [ ] Add remove-selected and clear-playlist actions.
+- [ ] Add repeat playlist and shuffle toggles.
+- [ ] Save and restore main window size and position.
+- [ ] Add keyboard shortcuts for open, play/pause, stop, next/previous, and
+  seek by bar.
+
+### Playlist Files
+
+- [ ] Create a playlist model separate from `QListWidget`.
+- [ ] Open `.lst` playlist files with relative path resolution.
+- [ ] Save `.lst` playlist files using paths relative to the playlist location
+  when possible.
+- [ ] Add Save Playlist and Save Playlist As actions.
+- [ ] Remember the last playlist path in settings.
+- [ ] Show unsaved playlist state in the window title.
+- [ ] Add tests for absolute and relative playlist entries.
+
+### Dialogs And Original UI
+
+- [ ] Decide `pyuic6` generated classes versus `PyQt6.uic.loadUi` for each
+  original `.ui` file.
+- [ ] Load `guiplayer.ui` in a scratch module and document blockers.
+- [ ] Port `connections.ui` as a standalone dialog.
+- [ ] Port `loopdialog.ui` and connect it to current loop state.
+- [ ] Port `playlist.ui` with open/save controls.
+- [ ] Port `prefsdialog.ui` with settings read/write only, before wiring every
+  behavior.
+- [ ] Port `playerabout.ui` and wire Help -> About.
+- [ ] Port `toolbareditdialog.ui` after menu/action names stabilize.
+
+### Tests And Tooling
+
+- [ ] Add import/offscreen startup tests for the main window without ALSA.
+- [ ] Add UI tests for toolbar play/pause/stop state transitions.
+- [ ] Add drag/drop event tests using real `QDropEvent` when practical.
+- [ ] Add tests for recent files and playlist persistence.
+- [ ] Add tests for per-channel mute/solo/volume once channel controls exist.
+- [ ] Add tests that close the app while playback is active.
+- [ ] Add README instructions for running only fast tests versus manual ALSA
+  tests.
+
 Do not repeat:
 
 - [x] Do not look for `python3-alsaaudio` bindings for MIDI sequencer. This was
@@ -680,7 +770,7 @@ Exit criteria:
 
 - [x] dmidiplayer Python can send notes to a visible ALSA port.
 - [ ] dmidiplayer Python can use FluidSynth if available.
-- [ ] `all_notes_off` works on stop, pause, close, and file change.
+- [x] `all_notes_off` works on stop, pause, close, and file change.
 
 ## [ ] Phase 4: Drumstick Widgets
 
@@ -780,7 +870,7 @@ Tasks:
 - [ ] Convert `.qrc` to Python resources or resolve icons from local paths.
 - [ ] Reuse existing icons in `dmidiplayer/icons`.
 - [ ] Port menus, toolbars, and actions.
-- [ ] Implement drag and drop.
+- [x] Implement drag and drop.
 - [ ] Implement connections dialog using `BackendManager`.
 - [ ] Implement full preferences.
 - [ ] Implement playlist with repeat and shuffle.
@@ -792,7 +882,7 @@ Exit criteria:
 
 - [ ] Python UI allows the same main flows as C++.
 - [x] No main buttons remain connected to placeholders in the minimal UI.
-- [ ] The app closes without leaving stuck notes.
+- [x] The app closes without leaving stuck notes.
 
 ## [ ] Phase 7: Translations And Documentation
 

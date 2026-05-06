@@ -72,6 +72,7 @@ class SequencePlayer(QObject):
     def pause(self) -> None:
         self._position_us = self._elapsed_microseconds()
         self._timer.stop()
+        self.output.all_notes_off()
         self._playing = False
         self.stopped.emit()
 

@@ -49,6 +49,7 @@ class FakeAlsaOutput(OutputStub):
     def __init__(self) -> None:
         super().__init__()
         self.name = "Fake ALSA"
+        self.close_count = 0
         self.connected: list[MidiConnection] = []
         self.available_connections = [
             MidiConnection(driver="alsa", name="128:0 QSynth: MIDI", client=128, port=0),
@@ -67,6 +68,9 @@ class FakeAlsaOutput(OutputStub):
 
     def disconnect_all(self) -> None:
         self.connected.clear()
+
+    def close(self) -> None:
+        self.close_count += 1
 
 
 class FakeAlsaBackendManager:
@@ -193,6 +197,43 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.player._position, 1920)
 
+    def test_open_paths_adds_supported_files_and_loads_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.kar")
+            ignored = Path(tmpdir, "notes.txt")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            ignored.write_text("not midi")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                opened = window.open_paths([ignored, first, second], remember_folder=True)
+
+                self.assertEqual(opened, [first, second])
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertIn("first", window.title_label.text())
+                self.assertEqual(window.settings.folder, first.parent)
+
+    def test_open_paths_ignores_unsupported_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ignored = Path(tmpdir, "notes.txt")
+            ignored.write_text("not midi")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+
+                self.assertEqual(window.open_paths([ignored], remember_folder=True), [])
+                self.assertEqual(window.playlist.count(), 0)
+                self.assertIsNone(window.settings.folder)
+
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
         with (
@@ -217,6 +258,18 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.output.connected_connections()[-1].name, "129:0 Hardware Synth: MIDI")
             self.assertEqual(FakeSettings.midi_destination_value, "129:0 Hardware Synth: MIDI")
+
+    def test_close_stops_player_and_closes_output(self) -> None:
+        FakeSettings.midi_destination_value = ""
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            window.close()
+
+            self.assertEqual(window.output.all_notes_off_count, 1)
+            self.assertEqual(window.output.close_count, 1)
 
 
 if __name__ == "__main__":

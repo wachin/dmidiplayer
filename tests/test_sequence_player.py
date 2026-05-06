@@ -84,6 +84,16 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player._index, 2)
         self.assertGreaterEqual(output.all_notes_off_count, 1)
 
+    def test_pause_turns_off_current_notes(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player._playing = True
+
+        player.pause()
+
+        self.assertFalse(player._playing)
+        self.assertEqual(output.all_notes_off_count, 1)
+
     def test_pitch_shift_transposes_note_events(self) -> None:
         player = SequencePlayer(OutputStub())
         player.set_pitch_shift(2)

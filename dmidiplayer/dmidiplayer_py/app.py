@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QSignalBlocker, Qt
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -30,11 +30,15 @@ from .player import SequencePlayer
 from .settings import AppSettings
 
 
+MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
+
+
 class MainWindow(QMainWindow):
     def __init__(self, start_files: list[str]) -> None:
         super().__init__()
         self.setWindowTitle(self.tr("dmidiplayer PyQt6"))
         self.resize(900, 520)
+        self.setAcceptDrops(True)
         self.settings = AppSettings()
         self.manager = BackendManager(self)
         self.output = self._create_midi_output()
@@ -306,17 +310,26 @@ class MainWindow(QMainWindow):
             str(self.settings.last_folder(Path.home())),
             self.tr("MIDI (*.mid *.midi *.kar);;All files (*)"),
         )
-        if files:
-            self.settings.set_last_folder(Path(files[0]).parent)
-        for file_name in files:
-            self.add_file(file_name)
-        if files:
-            self.load_file(files[0])
+        self.open_paths([Path(file_name) for file_name in files], remember_folder=True)
+
+    def open_paths(self, paths: list[Path], remember_folder: bool = False) -> list[Path]:
+        files = [path for path in paths if self._is_supported_file(path)]
+        if not files:
+            return []
+        if remember_folder:
+            self.settings.set_last_folder(files[0].parent)
+        for path in files:
+            self.add_file(str(path))
+        self.load_file(str(files[0]))
+        return files
 
     def add_file(self, file_name: str) -> None:
         path = Path(file_name)
-        if path.exists():
+        if self._is_supported_file(path):
             self.playlist.addItem(str(path))
+
+    def _is_supported_file(self, path: Path) -> bool:
+        return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
 
     def load_file(self, file_name: str) -> None:
         try:
@@ -511,6 +524,29 @@ class MainWindow(QMainWindow):
         self.event_label.setText(self.tr("MIDI output error: {message}").format(message=message))
         self.statusBar().showMessage(message, 10000)
         QMessageBox.warning(self, self.tr("MIDI output"), message)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self.player.stop()
+        if hasattr(self.output, "close"):
+            self.output.close()
+        super().closeEvent(event)
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if any(self._is_supported_file(Path(url.toLocalFile())) for url in event.mimeData().urls() if url.isLocalFile()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        files = [
+            Path(url.toLocalFile())
+            for url in event.mimeData().urls()
+            if url.isLocalFile()
+        ]
+        if self.open_paths(files, remember_folder=True):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
 
 def main(argv: list[str] | None = None) -> int:
