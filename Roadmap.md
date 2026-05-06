@@ -232,7 +232,7 @@ Drumstick documentation. It is the target list for the whole migration.
 ### File Opening And Recent Files
 
 - [x] Open files from menu/toolbar.
-- [ ] Recent files menu, remembering up to ten entries.
+- [x] Recent files menu, remembering up to ten entries.
 - [x] Open files passed on the command line.
 - [ ] Integrate with file managers through "Open With...".
 - [x] Support drag and drop into the main window.
@@ -569,11 +569,11 @@ clearer bites instead of rediscovering the next small step.
 ### Main Window UX
 
 - [x] Build a real menu bar: File, Playback, View, Tools, Help.
-- [ ] Add File -> Open, Open Recent, Clear Recent, Exit.
+- [x] Add File -> Open, Open Recent, Clear Recent, Exit.
   - [x] Add File -> Open.
   - [x] Add File -> Exit.
-  - [ ] Add File -> Open Recent submenu.
-  - [ ] Add File -> Clear Recent.
+  - [x] Add File -> Open Recent submenu.
+  - [x] Add File -> Clear Recent.
 - [x] Add Playback -> Play, Pause, Stop, Previous, Next.
 - [ ] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
   - [x] Add toolbar visibility toggle.
@@ -625,6 +625,8 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Add UI tests for toolbar play/pause/stop state transitions.
 - [ ] Add drag/drop event tests using real `QDropEvent` when practical.
 - [ ] Add tests for recent files and playlist persistence.
+  - [x] Add recent files persistence tests.
+  - [ ] Add playlist persistence tests.
 - [ ] Add tests for per-channel mute/solo/volume once channel controls exist.
 - [ ] Add tests that close the app while playback is active.
 - [ ] Add README instructions for running only fast tests versus manual ALSA
@@ -837,8 +839,8 @@ Original C++ files to cover:
   - [ ] portable mode `--portable` and `--file`.
 - [ ] `instrumentset.*`
   - [ ] load instrument and bank names.
-- [ ] `recentfileshelper.*`
-  - [ ] save and populate recent files menu.
+- [x] `recentfileshelper.*`
+  - [x] save and populate recent files menu.
 
 Exit criteria:
 

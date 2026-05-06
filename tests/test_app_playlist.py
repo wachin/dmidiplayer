@@ -30,6 +30,7 @@ class FakeSettings:
     def __init__(self) -> None:
         self.folder: Path | None = None
         self.saved_midi_destination = ""
+        self.recent: list[Path] = []
 
     def last_folder(self, fallback: Path) -> Path:
         return self.folder or fallback
@@ -43,6 +44,17 @@ class FakeSettings:
     def set_midi_destination(self, destination: str) -> None:
         self.saved_midi_destination = destination
         type(self).midi_destination_value = destination
+
+    def recent_files(self) -> list[Path]:
+        return list(self.recent)
+
+    def add_recent_file(self, file_name: str | Path) -> None:
+        path = Path(file_name)
+        self.recent = [item for item in self.recent if item != path]
+        self.recent.insert(0, path)
+
+    def clear_recent_files(self) -> None:
+        self.recent.clear()
 
 
 class FakeAlsaOutput(OutputStub):
@@ -246,6 +258,55 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
+
+    def test_successful_load_adds_recent_file_menu_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "recent.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_file(str(path))
+
+                self.assertEqual(window.settings.recent_files(), [path])
+                self.assertEqual(window.recent_files_menu.actions()[0].text(), str(path))
+                self.assertTrue(window.clear_recent_action.isEnabled())
+
+    def test_clear_recent_files_action_updates_menu(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "recent.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_file(str(path))
+                window.clear_recent_action.trigger()
+
+                self.assertEqual(window.settings.recent_files(), [])
+                self.assertEqual(window.recent_files_menu.actions()[0].text(), "No recent files")
+                self.assertFalse(window.clear_recent_action.isEnabled())
+
+    def test_recent_file_action_loads_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "recent.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.settings.add_recent_file(path)
+                window._refresh_recent_files_menu()
+                window.recent_files_menu.actions()[0].trigger()
+
+                self.assertIn("recent", window.title_label.text())
 
     def test_view_menu_toggles_status_bar(self) -> None:
         with (

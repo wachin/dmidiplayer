@@ -31,6 +31,51 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertEqual(settings.last_folder(fallback), fallback)
 
+    def test_recent_files_are_saved_most_recent_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            first.write_text("")
+            second.write_text("")
+
+            settings = AppSettings(base_dir)
+            settings.add_recent_file(first)
+            settings.add_recent_file(second)
+            settings.add_recent_file(first)
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.recent_files(), [first, second])
+
+    def test_recent_files_keep_last_ten_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+            files = []
+            for index in range(12):
+                path = Path(tmpdir, f"song-{index}.mid")
+                path.write_text("")
+                files.append(path)
+
+            settings = AppSettings(base_dir)
+            for path in files:
+                settings.add_recent_file(path)
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.recent_files(), list(reversed(files[-10:])))
+
+    def test_clear_recent_files_removes_saved_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+            path = Path(tmpdir, "song.mid")
+            path.write_text("")
+
+            settings = AppSettings(base_dir)
+            settings.add_recent_file(path)
+            settings.clear_recent_files()
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.recent_files(), [])
+
     def test_midi_destination_is_saved(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir, "appdata")

@@ -92,6 +92,9 @@ class MainWindow(QMainWindow):
         self.exit_action.setObjectName("exit_action")
         self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
         self.exit_action.triggered.connect(self.close)
+        self.clear_recent_action = QAction(self.tr("Clear Recent"), self)
+        self.clear_recent_action.setObjectName("clear_recent_action")
+        self.clear_recent_action.triggered.connect(self._clear_recent_files)
 
         self.previous_action = QAction(self.tr("Previous"), self)
         self.previous_action.setObjectName("previous_action")
@@ -128,6 +131,9 @@ class MainWindow(QMainWindow):
         file_menu = self.menuBar().addMenu(self.tr("File"))
         file_menu.setObjectName("file_menu")
         file_menu.addAction(self.open_action)
+        self.recent_files_menu = file_menu.addMenu(self.tr("Open Recent"))
+        self.recent_files_menu.setObjectName("recent_files_menu")
+        self._refresh_recent_files_menu()
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action)
 
@@ -160,6 +166,24 @@ class MainWindow(QMainWindow):
 
         help_menu = self.menuBar().addMenu(self.tr("Help"))
         help_menu.setObjectName("help_menu")
+
+    def _refresh_recent_files_menu(self) -> None:
+        self.recent_files_menu.clear()
+        recent_files = [path for path in self.settings.recent_files() if self._is_supported_file(path)]
+        if not recent_files:
+            placeholder = self.recent_files_menu.addAction(self.tr("No recent files"))
+            placeholder.setEnabled(False)
+        else:
+            for path in recent_files:
+                action = self.recent_files_menu.addAction(str(path))
+                action.triggered.connect(lambda checked=False, file_name=str(path): self.load_file(file_name))
+        self.recent_files_menu.addSeparator()
+        self.clear_recent_action.setEnabled(bool(recent_files))
+        self.recent_files_menu.addAction(self.clear_recent_action)
+
+    def _clear_recent_files(self) -> None:
+        self.settings.clear_recent_files()
+        self._refresh_recent_files_menu()
 
     def _build_layout(self) -> None:
         central = QWidget()
@@ -419,6 +443,8 @@ class MainWindow(QMainWindow):
         self._select_playlist_file(file_name)
         self._update_time_label(0, midi.length_ticks)
         self.keyboard.clear()
+        self.settings.add_recent_file(file_name)
+        self._refresh_recent_files_menu()
 
     def previous_file(self) -> None:
         row = self.playlist.currentRow()
