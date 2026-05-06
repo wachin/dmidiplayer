@@ -107,8 +107,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Fast forward and rewind by bar.
 - [x] Jump to a specific bar number.
 - [x] Move the position with a slider.
-- [ ] Auto-play after loading a file when the preference is enabled.
-- [ ] Show current state in the status bar: playing, stopped, paused, loading,
+- [x] Auto-play after loading a file when the preference is enabled.
+- [x] Show current state in the status bar: playing, stopped, paused, loading,
   error, etc.
 - [x] Auto-advance to the next playlist item when the preference is enabled.
 
@@ -226,8 +226,9 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Remember the last opened or saved playlist.
 - [x] Do not save playlists automatically unless explicitly requested.
 - [x] Use plain text playlist files, one file per line.
-- [ ] Support absolute paths and paths relative to the `.lst` file.
-- [ ] Include an initial playlist with examples or allow starting with an empty list.
+- [x] Support absolute paths and paths relative to the `.lst` file.
+- [x] Allow starting with an empty playlist.
+- [ ] Include an initial playlist with examples.
 
 ### File Opening And Recent Files
 
@@ -243,8 +244,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] General tab:
   - [x] percussion channel, default 10, persisted in settings;
   - [ ] solo volume reduction percentage, default 50%;
-  - [ ] auto-play on load;
-  - [ ] playlist auto-advance;
+  - [x] auto-play on load;
+  - [x] playlist auto-advance;
   - [ ] auto-load/save song settings;
   - [ ] sticky window borders, if kept for Windows;
   - [ ] force dark mode where applicable;

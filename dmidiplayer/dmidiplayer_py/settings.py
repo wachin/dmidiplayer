@@ -82,6 +82,20 @@ class AppSettings:
         self._settings.setValue("general/percussion_channel", max(1, min(16, channel)))
         self._settings.sync()
 
+    def auto_play_on_load(self) -> bool:
+        return self._settings.value("playback/auto_play_on_load", False, bool)
+
+    def set_auto_play_on_load(self, enabled: bool) -> None:
+        self._settings.setValue("playback/auto_play_on_load", bool(enabled))
+        self._settings.sync()
+
+    def playlist_auto_advance(self) -> bool:
+        return self._settings.value("playback/playlist_auto_advance", True, bool)
+
+    def set_playlist_auto_advance(self, enabled: bool) -> None:
+        self._settings.setValue("playback/playlist_auto_advance", bool(enabled))
+        self._settings.sync()
+
     def playlist_path(self) -> Path | None:
         value = self._settings.value("playlist/path", "", str)
         if not value:

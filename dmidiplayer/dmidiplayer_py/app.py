@@ -59,7 +59,8 @@ class MainWindow(QMainWindow):
         self.player.eventPlayed.connect(self._event_played)
         self.player.outputError.connect(self._output_error)
         self.player.finished.connect(self._finished)
-        self.auto_advance_playlist = True
+        self.auto_play_on_load = self.settings.auto_play_on_load()
+        self.auto_advance_playlist = self.settings.playlist_auto_advance()
         self._pause_requested = False
         self._current_file: str | None = None
         self._current_playlist_path: Path | None = None
@@ -200,6 +201,16 @@ class MainWindow(QMainWindow):
         self.shuffle_playlist_action = QAction(self.tr("Shuffle Playlist"), self)
         self.shuffle_playlist_action.setObjectName("shuffle_playlist_action")
         self.shuffle_playlist_action.setCheckable(True)
+        self.auto_play_on_load_action = QAction(self.tr("Auto-Play On Load"), self)
+        self.auto_play_on_load_action.setObjectName("auto_play_on_load_action")
+        self.auto_play_on_load_action.setCheckable(True)
+        self.auto_play_on_load_action.setChecked(self.auto_play_on_load)
+        self.auto_play_on_load_action.toggled.connect(self._toggle_auto_play_on_load)
+        self.auto_advance_playlist_action = QAction(self.tr("Playlist Auto-Advance"), self)
+        self.auto_advance_playlist_action.setObjectName("auto_advance_playlist_action")
+        self.auto_advance_playlist_action.setCheckable(True)
+        self.auto_advance_playlist_action.setChecked(self.auto_advance_playlist)
+        self.auto_advance_playlist_action.toggled.connect(self._toggle_auto_advance_playlist)
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
@@ -295,6 +306,9 @@ class MainWindow(QMainWindow):
         playback_menu.addSeparator()
         playback_menu.addAction(self.repeat_playlist_action)
         playback_menu.addAction(self.shuffle_playlist_action)
+        playback_menu.addSeparator()
+        playback_menu.addAction(self.auto_play_on_load_action)
+        playback_menu.addAction(self.auto_advance_playlist_action)
 
         view_menu = self.menuBar().addMenu(self.tr("View"))
         view_menu.setObjectName("view_menu")
@@ -367,6 +381,14 @@ class MainWindow(QMainWindow):
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(status_message, 5000)
+
+    def _toggle_auto_play_on_load(self, enabled: bool) -> None:
+        self.auto_play_on_load = enabled
+        self.settings.set_auto_play_on_load(enabled)
+
+    def _toggle_auto_advance_playlist(self, enabled: bool) -> None:
+        self.auto_advance_playlist = enabled
+        self.settings.set_playlist_auto_advance(enabled)
 
     def _playlist_dialog_folder(self) -> Path:
         saved_playlist = self.settings.playlist_path()
@@ -827,7 +849,7 @@ class MainWindow(QMainWindow):
     def _is_supported_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
 
-    def load_file(self, file_name: str) -> None:
+    def load_file(self, file_name: str, autoplay: bool | None = None) -> None:
         self.statusBar().showMessage(self.tr("Loading {name}").format(name=Path(file_name).name))
         try:
             self.player.load_file(file_name)
@@ -860,6 +882,9 @@ class MainWindow(QMainWindow):
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))
+        should_autoplay = self.auto_play_on_load if autoplay is None else autoplay
+        if should_autoplay:
+            self.play()
 
     def previous_file(self) -> None:
         row = self.playlist.currentRow()
@@ -897,9 +922,7 @@ class MainWindow(QMainWindow):
             return False
         item = self.playlist.item(row)
         self.playlist.setCurrentRow(row)
-        self.load_file(item.text())
-        if autoplay:
-            self.player.play()
+        self.load_file(item.text(), autoplay=autoplay)
         return True
 
     def _select_playlist_file(self, file_name: str) -> None:

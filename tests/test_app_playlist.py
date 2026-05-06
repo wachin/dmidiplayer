@@ -27,6 +27,8 @@ class FakeBackendManager:
 class FakeSettings:
     midi_destination_value = ""
     percussion_channel_value = 10
+    auto_play_on_load_value = False
+    playlist_auto_advance_value = True
     playlist_path_value: Path | None = None
     window_geometry_value: tuple[int, int, int, int] | None = None
 
@@ -72,6 +74,18 @@ class FakeSettings:
 
     def set_percussion_channel(self, channel: int) -> None:
         type(self).percussion_channel_value = channel
+
+    def auto_play_on_load(self) -> bool:
+        return type(self).auto_play_on_load_value
+
+    def set_auto_play_on_load(self, enabled: bool) -> None:
+        type(self).auto_play_on_load_value = enabled
+
+    def playlist_auto_advance(self) -> bool:
+        return type(self).playlist_auto_advance_value
+
+    def set_playlist_auto_advance(self, enabled: bool) -> None:
+        type(self).playlist_auto_advance_value = enabled
 
     def playlist_path(self) -> Path | None:
         return type(self).playlist_path_value
@@ -143,6 +157,8 @@ class AppPlaylistTest(unittest.TestCase):
     def setUp(self) -> None:
         FakeSettings.midi_destination_value = ""
         FakeSettings.percussion_channel_value = 10
+        FakeSettings.auto_play_on_load_value = False
+        FakeSettings.playlist_auto_advance_value = True
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
 
@@ -337,6 +353,10 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.reset_volume_action), "reset_volume_action"))
             self.assertIsNotNone(window.findChild(type(window.repeat_playlist_action), "repeat_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.shuffle_playlist_action), "shuffle_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.auto_play_on_load_action), "auto_play_on_load_action"))
+            self.assertIsNotNone(
+                window.findChild(type(window.auto_advance_playlist_action), "auto_advance_playlist_action")
+            )
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
@@ -692,6 +712,57 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.windowTitle(), "first.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
 
+    def test_load_playlist_file_keeps_absolute_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path = Path(tmpdir, "absolute.lst")
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                loaded = window.load_playlist_file(playlist_path)
+
+                self.assertEqual(loaded, [first, second])
+                self.assertEqual(window.playlist.item(0).text(), str(first))
+                self.assertEqual(window.playlist.item(1).text(), str(second))
+
+    def test_auto_play_on_load_preference_starts_playback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "auto.mid")
+            write_simple_midi(path)
+            FakeSettings.auto_play_on_load_value = True
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_file(str(path))
+
+                self.assertTrue(window.player._playing)
+                self.assertEqual(window.statusBar().currentMessage(), "Playing")
+
+    def test_playback_preference_actions_persist_in_settings(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.auto_play_on_load_action.setChecked(True)
+            window.auto_advance_playlist_action.setChecked(False)
+
+            self.assertTrue(FakeSettings.auto_play_on_load_value)
+            self.assertFalse(FakeSettings.playlist_auto_advance_value)
+            self.assertTrue(window.auto_play_on_load)
+            self.assertFalse(window.auto_advance_playlist)
+
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")
@@ -711,6 +782,25 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.playlist.currentRow(), 0)
                 self.assertEqual(window.windowTitle(), "first.mid [1/2] - dmidiplayer PyQt6")
+
+    def test_playlist_auto_advance_preference_can_disable_end_of_song_navigation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.auto_advance_playlist_action.setChecked(False)
+
+                window.player.finished.emit()
+
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
 
     def test_end_of_sequence_message_remains_when_repeat_playlist_is_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
