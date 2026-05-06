@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSettings, QStandardPaths
 
+WindowGeometry = tuple[int, int, int, int]
+
 
 class AppSettings:
     RECENT_FILES_LIMIT = 10
@@ -51,6 +53,24 @@ class AppSettings:
 
     def clear_recent_files(self) -> None:
         self._settings.remove("files/recent")
+        self._settings.sync()
+
+    def window_geometry(self) -> WindowGeometry | None:
+        width = self._settings.value("window/width", 0, int)
+        height = self._settings.value("window/height", 0, int)
+        x = self._settings.value("window/x", 0, int)
+        y = self._settings.value("window/y", 0, int)
+        if width <= 0 or height <= 0:
+            return None
+        return (x, y, width, height)
+
+    def set_window_geometry(self, x: int, y: int, width: int, height: int) -> None:
+        if width <= 0 or height <= 0:
+            return
+        self._settings.setValue("window/x", x)
+        self._settings.setValue("window/y", y)
+        self._settings.setValue("window/width", width)
+        self._settings.setValue("window/height", height)
         self._settings.sync()
 
     def midi_destination(self) -> str:

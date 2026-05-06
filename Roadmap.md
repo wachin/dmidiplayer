@@ -591,7 +591,7 @@ clearer bites instead of rediscovering the next small step.
   requested.
 - [ ] Add remove-selected and clear-playlist actions.
 - [ ] Add repeat playlist and shuffle toggles.
-- [ ] Save and restore main window size and position.
+- [x] Save and restore main window size and position.
 - [ ] Add keyboard shortcuts for open, play/pause, stop, next/previous, and
   seek by bar.
 

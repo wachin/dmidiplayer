@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
         self.resize(900, 520)
         self.setAcceptDrops(True)
         self.settings = AppSettings()
+        self._restore_window_geometry()
         self.manager = BackendManager(self)
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
@@ -184,6 +185,18 @@ class MainWindow(QMainWindow):
     def _clear_recent_files(self) -> None:
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
+
+    def _restore_window_geometry(self) -> None:
+        geometry = self.settings.window_geometry()
+        if geometry is None:
+            return
+        x, y, width, height = geometry
+        self.resize(width, height)
+        self.move(x, y)
+
+    def _save_window_geometry(self) -> None:
+        geometry = self.frameGeometry()
+        self.settings.set_window_geometry(geometry.x(), geometry.y(), self.width(), self.height())
 
     def _build_layout(self) -> None:
         central = QWidget()
@@ -615,6 +628,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, self.tr("MIDI output"), message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_window_geometry()
         self.player.stop()
         if hasattr(self.output, "close"):
             self.output.close()

@@ -76,6 +76,26 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertEqual(restored.recent_files(), [])
 
+    def test_window_geometry_is_saved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_window_geometry(10, 20, 900, 520)
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.window_geometry(), (10, 20, 900, 520))
+
+    def test_invalid_window_geometry_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_window_geometry(10, 20, 0, 520)
+            restored = AppSettings(base_dir)
+
+            self.assertIsNone(restored.window_geometry())
+
     def test_midi_destination_is_saved(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir, "appdata")

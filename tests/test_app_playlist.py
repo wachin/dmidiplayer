@@ -26,11 +26,13 @@ class FakeBackendManager:
 
 class FakeSettings:
     midi_destination_value = ""
+    window_geometry_value: tuple[int, int, int, int] | None = None
 
     def __init__(self) -> None:
         self.folder: Path | None = None
         self.saved_midi_destination = ""
         self.recent: list[Path] = []
+        self.saved_window_geometry: tuple[int, int, int, int] | None = None
 
     def last_folder(self, fallback: Path) -> Path:
         return self.folder or fallback
@@ -55,6 +57,13 @@ class FakeSettings:
 
     def clear_recent_files(self) -> None:
         self.recent.clear()
+
+    def window_geometry(self) -> tuple[int, int, int, int] | None:
+        return type(self).window_geometry_value
+
+    def set_window_geometry(self, x: int, y: int, width: int, height: int) -> None:
+        self.saved_window_geometry = (x, y, width, height)
+        type(self).window_geometry_value = self.saved_window_geometry
 
 
 class FakeAlsaOutput(OutputStub):
@@ -358,6 +367,7 @@ class AppPlaylistTest(unittest.TestCase):
 
     def test_close_stops_player_and_closes_output(self) -> None:
         FakeSettings.midi_destination_value = ""
+        FakeSettings.window_geometry_value = None
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
@@ -367,6 +377,30 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.output.all_notes_off_count, 1)
             self.assertEqual(window.output.close_count, 1)
+
+    def test_window_geometry_is_restored_from_settings(self) -> None:
+        FakeSettings.window_geometry_value = (40, 50, 640, 360)
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.width(), 640)
+            self.assertEqual(window.height(), 360)
+
+    def test_window_geometry_is_saved_on_close(self) -> None:
+        FakeSettings.window_geometry_value = None
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            window.resize(700, 420)
+            window.close()
+
+            self.assertIsNotNone(window.settings.saved_window_geometry)
+            self.assertEqual(window.settings.saved_window_geometry[2:], (700, 420))
 
 
 if __name__ == "__main__":
