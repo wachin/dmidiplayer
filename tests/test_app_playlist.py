@@ -284,6 +284,8 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
+            self.assertIsNotNone(window.findChild(type(window.help_contents_action), "help_contents_action"))
+            self.assertIsNotNone(window.findChild(type(window.about_action), "about_action"))
 
     def test_successful_load_adds_recent_file_menu_entry(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -546,6 +548,37 @@ class AppPlaylistTest(unittest.TestCase):
 
             window.disconnect_midi_action.trigger()
             self.assertEqual(window.output.connected_connections(), [])
+
+    def test_help_doc_path_falls_back_to_existing_local_file(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            path = window._help_doc_path()
+
+            self.assertTrue(path.exists())
+            self.assertEqual(path.name, "index.md")
+
+    def test_about_and_help_actions_open_dialogs(self) -> None:
+        dialogs: list[str] = []
+
+        def fake_exec(dialog: object) -> int:
+            dialogs.append(getattr(dialog, "windowTitle")())
+            return 0
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("PyQt6.QtWidgets.QDialog.exec", fake_exec),
+        ):
+            window = MainWindow([])
+            window.about_action.trigger()
+            window.help_contents_action.trigger()
+
+            self.assertEqual(dialogs, ["About", "Help Contents"])
+            self.assertIn("Python/PyQt6 port", window._about_html())
 
     def test_close_stops_player_and_closes_output(self) -> None:
         FakeSettings.midi_destination_value = ""

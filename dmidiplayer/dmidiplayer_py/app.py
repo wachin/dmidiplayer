@@ -4,12 +4,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QSignalBlocker, Qt
+from PyQt6.QtCore import QLocale, QSignalBlocker, Qt
 from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QIcon, QKeySequence
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -19,6 +21,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSlider,
     QSpinBox,
+    QTextBrowser,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -32,6 +35,7 @@ from .settings import AppSettings
 
 MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
 APP_TITLE = "dmidiplayer PyQt6"
+HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
 
 
 class MainWindow(QMainWindow):
@@ -117,6 +121,12 @@ class MainWindow(QMainWindow):
         self.disconnect_midi_action = QAction(self.tr("Disconnect MIDI Destinations"), self)
         self.disconnect_midi_action.setObjectName("disconnect_midi_action")
         self.disconnect_midi_action.triggered.connect(self._disconnect_midi_output)
+        self.help_contents_action = QAction(self.tr("Help Contents"), self)
+        self.help_contents_action.setObjectName("help_contents_action")
+        self.help_contents_action.triggered.connect(self._show_help_contents)
+        self.about_action = QAction(self.tr("About"), self)
+        self.about_action.setObjectName("about_action")
+        self.about_action.triggered.connect(self._show_about_dialog)
 
         self.previous_action = QAction(self.tr("Previous"), self)
         self.previous_action.setObjectName("previous_action")
@@ -242,6 +252,8 @@ class MainWindow(QMainWindow):
 
         help_menu = self.menuBar().addMenu(self.tr("Help"))
         help_menu.setObjectName("help_menu")
+        help_menu.addAction(self.help_contents_action)
+        help_menu.addAction(self.about_action)
 
     def _refresh_recent_files_menu(self) -> None:
         self.recent_files_menu.clear()
@@ -260,6 +272,64 @@ class MainWindow(QMainWindow):
     def _clear_recent_files(self) -> None:
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
+
+    def _help_doc_path(self) -> Path:
+        locale_name = QLocale.system().name()
+        language = locale_name.split("_", 1)[0].casefold()
+        candidates = [locale_name.casefold(), language, "en"]
+        for candidate in candidates:
+            path = HELP_DOCS_DIR / candidate / "index.md"
+            if path.exists():
+                return path
+        return HELP_DOCS_DIR / "en" / "index.md"
+
+    def _about_html(self) -> str:
+        return self.tr(
+            """
+            <h2>{app}</h2>
+            <p>Python/PyQt6 port of the Drumstick multiplatform MIDI file player.</p>
+            <p>Copyright © 2006-2024 Pedro Lopez-Cabanillas.</p>
+            <p>Distributed under the GNU General Public License version 3 or later.</p>
+            """
+        ).format(app=self.tr(APP_TITLE)).strip()
+
+    def _show_about_dialog(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("About"))
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser(dialog)
+        browser.setOpenExternalLinks(True)
+        browser.setHtml(self._about_html())
+        layout.addWidget(browser)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=dialog)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.resize(480, 320)
+        dialog.exec()
+
+    def _show_help_contents(self) -> None:
+        path = self._help_doc_path()
+        try:
+            markdown = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            self.statusBar().showMessage(self.tr("Unable to load help: {error}").format(error=exc), 10000)
+            QMessageBox.warning(self, self.tr("Help"), str(exc))
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Help Contents"))
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser(dialog)
+        browser.setOpenExternalLinks(True)
+        browser.setMarkdown(markdown)
+        layout.addWidget(browser)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=dialog)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.resize(760, 560)
+        self.statusBar().showMessage(self.tr("Loaded help from {name}").format(name=path.name), 5000)
+        dialog.exec()
 
     def play(self) -> None:
         self._pause_requested = False
