@@ -212,6 +212,17 @@ class MainWindow(QMainWindow):
         self.remove_selected_action.setObjectName("remove_selected_action")
         self.remove_selected_action.setShortcut(QKeySequence.StandardKey.Delete)
         self.remove_selected_action.triggered.connect(self._remove_selected_playlist_item)
+        self.move_up_action = QAction(self.tr("Move Up"), self)
+        self.move_up_action.setObjectName("move_up_action")
+        self.move_up_action.setShortcut(QKeySequence("Alt+Up"))
+        self.move_up_action.triggered.connect(lambda: self._move_selected_playlist_item(-1))
+        self.move_down_action = QAction(self.tr("Move Down"), self)
+        self.move_down_action.setObjectName("move_down_action")
+        self.move_down_action.setShortcut(QKeySequence("Alt+Down"))
+        self.move_down_action.triggered.connect(lambda: self._move_selected_playlist_item(1))
+        self.sort_playlist_action = QAction(self.tr("Sort Playlist"), self)
+        self.sort_playlist_action.setObjectName("sort_playlist_action")
+        self.sort_playlist_action.triggered.connect(self._sort_playlist)
         self.clear_playlist_action = QAction(self.tr("Clear Playlist"), self)
         self.clear_playlist_action.setObjectName("clear_playlist_action")
         self.clear_playlist_action.triggered.connect(self._clear_playlist)
@@ -290,6 +301,9 @@ class MainWindow(QMainWindow):
         self.previous_action.setEnabled(current_row > 0)
         self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
         self.remove_selected_action.setEnabled(current_row >= 0)
+        self.move_up_action.setEnabled(current_row > 0)
+        self.move_down_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
+        self.sort_playlist_action.setEnabled(self.playlist.count() > 1)
         self.clear_playlist_action.setEnabled(self.playlist.count() > 0)
         self.save_playlist_action.setEnabled(self.playlist.count() > 0)
         self.save_playlist_as_action.setEnabled(self.playlist.count() > 0)
@@ -351,6 +365,10 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.save_playlist_action)
         file_menu.addAction(self.save_playlist_as_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.move_up_action)
+        file_menu.addAction(self.move_down_action)
+        file_menu.addAction(self.sort_playlist_action)
         file_menu.addSeparator()
         file_menu.addAction(self.remove_selected_action)
         file_menu.addAction(self.clear_playlist_action)
@@ -491,6 +509,42 @@ class MainWindow(QMainWindow):
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(self.tr("Removed {name} from playlist").format(name=Path(removed_file).name), 5000)
+
+    def _move_selected_playlist_item(self, delta: int) -> None:
+        row = self.playlist.currentRow()
+        target_row = row + delta
+        if row < 0 or target_row < 0 or target_row >= self.playlist.count():
+            return
+        item = self.playlist.takeItem(row)
+        if item is None:
+            return
+        self.playlist.insertItem(target_row, item)
+        self.playlist.setCurrentRow(target_row)
+        self._mark_playlist_modified()
+        self._update_action_state()
+        self._update_window_title()
+        self.statusBar().showMessage(
+            self.tr("Moved {name} in playlist").format(name=Path(item.text()).name),
+            5000,
+        )
+
+    def _sort_playlist(self) -> None:
+        if self.playlist.count() < 2:
+            return
+        selected_path = None
+        current_item = self.playlist.currentItem()
+        if current_item is not None:
+            selected_path = current_item.text()
+        paths = sorted((self.playlist.item(row).text() for row in range(self.playlist.count())), key=str.casefold)
+        self.playlist.clear()
+        for path in paths:
+            self.playlist.addItem(path)
+        if selected_path is not None:
+            self._select_playlist_file(selected_path)
+        self._mark_playlist_modified()
+        self._update_action_state()
+        self._update_window_title()
+        self.statusBar().showMessage(self.tr("Playlist sorted"), 5000)
 
     def _clear_playlist(self) -> None:
         if self.playlist.count() == 0:

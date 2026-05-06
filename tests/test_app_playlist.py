@@ -365,6 +365,9 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
+            self.assertIsNotNone(window.findChild(type(window.move_up_action), "move_up_action"))
+            self.assertIsNotNone(window.findChild(type(window.move_down_action), "move_down_action"))
+            self.assertIsNotNone(window.findChild(type(window.sort_playlist_action), "sort_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.remove_selected_action), "remove_selected_action"))
             self.assertIsNotNone(window.findChild(type(window.clear_playlist_action), "clear_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.help_contents_action), "help_contents_action"))
@@ -459,6 +462,8 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.previous_bar_action.shortcut().toString(), "Alt+Left")
             self.assertEqual(window.next_bar_action.shortcut().toString(), "Alt+Right")
             self.assertEqual(window.jump_bar_action.shortcut().toString(), "Ctrl+J")
+            self.assertEqual(window.move_up_action.shortcut().toString(), "Alt+Up")
+            self.assertEqual(window.move_down_action.shortcut().toString(), "Alt+Down")
 
     def test_shared_actions_drive_reset_controls_and_jump(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -578,6 +583,88 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertTrue(window.previous_action.isEnabled())
                 self.assertFalse(window.next_action.isEnabled())
+                self.assertTrue(window.move_up_action.isEnabled())
+                self.assertFalse(window.move_down_action.isEnabled())
+
+    def test_playlist_reorder_actions_are_disabled_until_selection_allows_them(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                self.assertFalse(window.move_up_action.isEnabled())
+                self.assertFalse(window.move_down_action.isEnabled())
+                self.assertFalse(window.sort_playlist_action.isEnabled())
+
+                window.open_paths([first, second], remember_folder=True)
+                self.assertFalse(window.move_up_action.isEnabled())
+                self.assertTrue(window.move_down_action.isEnabled())
+                self.assertTrue(window.sort_playlist_action.isEnabled())
+
+                window.next_file()
+                self.assertTrue(window.move_up_action.isEnabled())
+                self.assertFalse(window.move_down_action.isEnabled())
+
+    def test_move_selected_playlist_item_updates_order_and_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+            playlist_path = Path(tmpdir, "setlist.lst")
+            playlist_path.write_text(f"{first}\n{second}\n{third}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_playlist_file(playlist_path)
+                window.next_file()
+
+                window.move_up_action.trigger()
+
+                self.assertEqual(window.playlist.item(0).text(), str(second))
+                self.assertEqual(window.playlist.item(1).text(), str(first))
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "second.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
+
+    def test_sort_playlist_action_orders_rows_alphabetically_and_keeps_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            zulu = Path(tmpdir, "zulu.mid")
+            bravo = Path(tmpdir, "bravo.mid")
+            alpha = Path(tmpdir, "alpha.mid")
+            write_simple_midi(zulu)
+            write_simple_midi(bravo)
+            write_simple_midi(alpha)
+            playlist_path = Path(tmpdir, "setlist.lst")
+            playlist_path.write_text(f"{zulu}\n{bravo}\n{alpha}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_playlist_file(playlist_path)
+                window.load_file(str(bravo))
+
+                window.sort_playlist_action.trigger()
+
+                self.assertEqual(
+                    [window.playlist.item(row).text() for row in range(window.playlist.count())],
+                    [str(alpha), str(bravo), str(zulu)],
+                )
+                self.assertEqual(window.playlist.currentRow(), 1)
+                self.assertEqual(window.windowTitle(), "bravo.mid [2/3] - *setlist.lst - dmidiplayer PyQt6")
+                self.assertEqual(window.statusBar().currentMessage(), "Playlist sorted")
 
     def test_playlist_remove_selected_action_loads_neighbor_when_current_song_is_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
