@@ -315,6 +315,70 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.count(), 0)
                 self.assertIsNone(window.settings.folder)
 
+    def test_open_paths_loads_playlist_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            playlist_path = Path(tmpdir, "setlist.lst")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                opened = window.open_paths([playlist_path], remember_folder=True)
+
+                self.assertEqual(opened, [playlist_path])
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - setlist.lst - dmidiplayer PyQt6")
+                self.assertEqual(window.settings.folder, playlist_path.parent)
+
+    def test_open_paths_loads_playlist_then_appends_explicit_midi_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            playlist_path = Path(tmpdir, "setlist.lst")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                opened = window.open_paths([playlist_path, third], remember_folder=True)
+
+                self.assertEqual(opened, [playlist_path, third])
+                self.assertEqual(window.playlist.count(), 3)
+                self.assertEqual(window.playlist.item(2).text(), str(third))
+                self.assertEqual(window.windowTitle(), "first.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
+
+    def test_startup_argument_can_be_playlist_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            playlist_path = Path(tmpdir, "setlist.lst")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(playlist_path)])
+
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - setlist.lst - dmidiplayer PyQt6")
+
     def test_add_file_reuses_existing_playlist_row_instead_of_duplicating(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")

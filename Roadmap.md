@@ -223,6 +223,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] Add and remove playlist entries.
   - [x] Reorder playlist entries up and down.
   - [x] Sort playlist entries alphabetically.
+  - [x] Open `.lst` playlists from shared file-opening paths, including startup arguments.
 - [x] Show the playlist file name in the window title.
 - [x] Navigate manually with Next and Previous.
 - [x] Create a temporary playlist when opening multiple command-line files.
@@ -239,6 +240,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Open files from menu/toolbar.
 - [x] Recent files menu, remembering up to ten entries.
 - [x] Open files passed on the command line.
+- [x] Open `.lst` playlists passed on the command line.
 - [ ] Integrate with file managers through "Open With...".
 - [x] Support drag and drop into the main window.
 

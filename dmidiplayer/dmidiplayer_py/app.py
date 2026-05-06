@@ -39,6 +39,7 @@ from .settings import AppSettings
 
 
 MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
+PLAYLIST_FILE_SUFFIXES = {".lst"}
 APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
 
@@ -166,10 +167,8 @@ class MainWindow(QMainWindow):
         self._build_menu_bar()
         self._build_layout()
         self._refresh_midi_connections(autoconnect=True)
-        for file_name in start_files:
-            self.add_file(file_name)
         if start_files:
-            self.load_file(start_files[0])
+            self.open_paths([Path(file_name) for file_name in start_files], remember_folder=False)
 
     def _build_actions(self) -> None:
         self.open_action = QAction(QIcon.fromTheme("document-open"), self.tr("Open"), self)
@@ -953,22 +952,37 @@ class MainWindow(QMainWindow):
     def open_files(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            self.tr("Open MIDI"),
+            self.tr("Open Files"),
             str(self.settings.last_folder(Path.home())),
-            self.tr("MIDI (*.mid *.midi *.kar);;All files (*)"),
+            self.tr("MIDI and playlists (*.mid *.midi *.kar *.lst);;MIDI (*.mid *.midi *.kar);;Playlists (*.lst);;All files (*)"),
         )
         self.open_paths([Path(file_name) for file_name in files], remember_folder=True)
 
     def open_paths(self, paths: list[Path], remember_folder: bool = False) -> list[Path]:
-        files = [path for path in paths if self._is_supported_file(path)]
-        if not files:
+        openable_paths = [path for path in paths if self._is_openable_path(path)]
+        if not openable_paths:
             return []
         if remember_folder:
-            self.settings.set_last_folder(files[0].parent)
-        for path in files:
+            self.settings.set_last_folder(openable_paths[0].parent)
+
+        playlist_paths = [path for path in openable_paths if self._is_playlist_file(path)]
+        midi_paths = [path for path in openable_paths if self._is_supported_file(path)]
+        opened: list[Path] = []
+
+        if playlist_paths:
+            self.load_playlist_file(playlist_paths[0])
+            opened.append(playlist_paths[0])
+
+        for path in midi_paths:
             self.add_file(str(path))
-        self.load_file(str(files[0]))
-        return files
+            opened.append(path)
+
+        if midi_paths and self.player.sequence.midi is None:
+            self.load_file(str(midi_paths[0]))
+        elif not playlist_paths and midi_paths:
+            self.load_file(str(midi_paths[0]))
+
+        return opened
 
     def add_file(self, file_name: str, mark_modified: bool = True) -> bool:
         path = Path(file_name)
@@ -987,6 +1001,12 @@ class MainWindow(QMainWindow):
 
     def _is_supported_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
+
+    def _is_playlist_file(self, path: Path) -> bool:
+        return path.exists() and path.is_file() and path.suffix.casefold() in PLAYLIST_FILE_SUFFIXES
+
+    def _is_openable_path(self, path: Path) -> bool:
+        return self._is_supported_file(path) or self._is_playlist_file(path)
 
     def load_file(self, file_name: str, autoplay: bool | None = None) -> None:
         self.statusBar().showMessage(self.tr("Loading {name}").format(name=Path(file_name).name))
@@ -1227,7 +1247,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        if any(self._is_supported_file(Path(url.toLocalFile())) for url in event.mimeData().urls() if url.isLocalFile()):
+        if any(self._is_openable_path(Path(url.toLocalFile())) for url in event.mimeData().urls() if url.isLocalFile()):
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -1246,7 +1266,7 @@ class MainWindow(QMainWindow):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="dmidiplayer PyQt6 port")
-    parser.add_argument("files", nargs="*", help="SMF/KAR files")
+    parser.add_argument("files", nargs="*", help="SMF/KAR files or .lst playlists")
     parser.add_argument(
         "--language",
         default="en",
