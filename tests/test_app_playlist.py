@@ -9,9 +9,10 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QDialog
 
 from drumstick_py import MidiConnection
-from dmidiplayer_py.app import MainWindow
+from dmidiplayer_py.app import MainWindow, PreferencesDialog
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
 
@@ -25,6 +26,9 @@ class FakeBackendManager:
 
 
 class FakeSettings:
+    DEFAULT_PERCUSSION_CHANNEL = 10
+    DEFAULT_AUTO_PLAY_ON_LOAD = False
+    DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     midi_destination_value = ""
     percussion_channel_value = 10
     auto_play_on_load_value = False
@@ -357,6 +361,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(
                 window.findChild(type(window.auto_advance_playlist_action), "auto_advance_playlist_action")
             )
+            self.assertIsNotNone(window.findChild(type(window.preferences_action), "preferences_action"))
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
@@ -763,6 +768,47 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
 
+    def test_preferences_dialog_loads_current_settings_and_restores_defaults(self) -> None:
+        FakeSettings.percussion_channel_value = 3
+        FakeSettings.auto_play_on_load_value = True
+        FakeSettings.playlist_auto_advance_value = False
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            dialog = window._create_preferences_dialog()
+
+            self.assertIsInstance(dialog, PreferencesDialog)
+            self.assertEqual(dialog.tabs.tabText(0), "General")
+            self.assertEqual(dialog.general_percussion_channel.value(), 3)
+            self.assertTrue(dialog.general_auto_play_on_load.isChecked())
+            self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
+
+            dialog.restore_defaults()
+
+            self.assertEqual(dialog.general_percussion_channel.value(), 10)
+            self.assertFalse(dialog.general_auto_play_on_load.isChecked())
+            self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
+
+    def test_preferences_dialog_applies_values_to_window_and_settings(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window._apply_preferences(12, True, False)
+
+            self.assertEqual(window.player.percussion_channel, 12)
+            self.assertEqual(window.percussion_channel_control.value(), 12)
+            self.assertTrue(window.auto_play_on_load)
+            self.assertFalse(window.auto_advance_playlist)
+            self.assertEqual(FakeSettings.percussion_channel_value, 12)
+            self.assertTrue(FakeSettings.auto_play_on_load_value)
+            self.assertFalse(FakeSettings.playlist_auto_advance_value)
+            self.assertEqual(window.statusBar().currentMessage(), "Preferences updated")
+
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")
@@ -942,6 +988,23 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(dialogs, ["About", "Help Contents"])
             self.assertIn("Python/PyQt6 port", window._about_html())
+
+    def test_preferences_action_opens_dialog(self) -> None:
+        dialogs: list[str] = []
+
+        def fake_exec(dialog: object) -> int:
+            dialogs.append(getattr(dialog, "windowTitle")())
+            return int(QDialog.DialogCode.Accepted)
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.PreferencesDialog.exec", fake_exec),
+        ):
+            window = MainWindow([])
+            window.preferences_action.trigger()
+
+            self.assertEqual(dialogs, ["Preferences"])
 
     def test_close_stops_player_and_closes_output(self) -> None:
         FakeSettings.midi_destination_value = ""

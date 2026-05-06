@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -23,6 +24,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSlider,
     QSpinBox,
+    QTabWidget,
     QTextBrowser,
     QToolButton,
     QToolBar,
@@ -39,6 +41,68 @@ from .settings import AppSettings
 MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
 APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
+
+
+class PreferencesDialog(QDialog):
+    def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
+        super().__init__(parent)
+        self._settings = settings
+        self.setWindowTitle(self.tr("Preferences"))
+
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget(self)
+        self.tabs.setObjectName("preferences_tabs")
+        layout.addWidget(self.tabs)
+
+        general_tab = QWidget(self.tabs)
+        general_tab.setObjectName("general_preferences_tab")
+        general_form = QFormLayout(general_tab)
+        self.general_percussion_channel = QSpinBox(general_tab)
+        self.general_percussion_channel.setObjectName("general_percussion_channel")
+        self.general_percussion_channel.setRange(1, 16)
+        general_form.addRow(self.tr("Percussion channel:"), self.general_percussion_channel)
+
+        self.general_auto_play_on_load = QCheckBox(self.tr("Auto-play after loading a file"), general_tab)
+        self.general_auto_play_on_load.setObjectName("general_auto_play_on_load")
+        general_form.addRow("", self.general_auto_play_on_load)
+
+        self.general_playlist_auto_advance = QCheckBox(self.tr("Auto-advance to the next playlist item"), general_tab)
+        self.general_playlist_auto_advance.setObjectName("general_playlist_auto_advance")
+        general_form.addRow("", self.general_playlist_auto_advance)
+        self.tabs.addTab(general_tab, self.tr("General"))
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.RestoreDefaults,
+            parent=self,
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        restore_button = self.buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults)
+        if restore_button is not None:
+            restore_button.clicked.connect(self.restore_defaults)
+        layout.addWidget(self.buttons)
+
+        self.load_from_settings()
+        self.resize(420, 220)
+
+    def load_from_settings(self) -> None:
+        self.general_percussion_channel.setValue(self._settings.percussion_channel())
+        self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
+        self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
+
+    def restore_defaults(self) -> None:
+        self.general_percussion_channel.setValue(AppSettings.DEFAULT_PERCUSSION_CHANNEL)
+        self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
+        self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
+
+    def preferences(self) -> tuple[int, bool, bool]:
+        return (
+            self.general_percussion_channel.value(),
+            self.general_auto_play_on_load.isChecked(),
+            self.general_playlist_auto_advance.isChecked(),
+        )
 
 
 class MainWindow(QMainWindow):
@@ -140,6 +204,10 @@ class MainWindow(QMainWindow):
         self.disconnect_midi_action = QAction(self.tr("Disconnect MIDI Destinations"), self)
         self.disconnect_midi_action.setObjectName("disconnect_midi_action")
         self.disconnect_midi_action.triggered.connect(self._disconnect_midi_output)
+        self.preferences_action = QAction(self.tr("Preferences"), self)
+        self.preferences_action.setObjectName("preferences_action")
+        self.preferences_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        self.preferences_action.triggered.connect(self.show_preferences)
         self.remove_selected_action = QAction(self.tr("Remove Selected"), self)
         self.remove_selected_action.setObjectName("remove_selected_action")
         self.remove_selected_action.setShortcut(QKeySequence.StandardKey.Delete)
@@ -331,6 +399,8 @@ class MainWindow(QMainWindow):
 
         tools_menu = self.menuBar().addMenu(self.tr("Tools"))
         tools_menu.setObjectName("tools_menu")
+        tools_menu.addAction(self.preferences_action)
+        tools_menu.addSeparator()
         tools_menu.addAction(self.refresh_midi_action)
         tools_menu.addAction(self.connect_midi_action)
         tools_menu.addAction(self.disconnect_midi_action)
@@ -566,6 +636,21 @@ class MainWindow(QMainWindow):
         dialog.resize(760, 560)
         self.statusBar().showMessage(self.tr("Loaded help from {name}").format(name=path.name), 5000)
         dialog.exec()
+
+    def _create_preferences_dialog(self) -> PreferencesDialog:
+        return PreferencesDialog(self, self.settings)
+
+    def _apply_preferences(self, percussion_channel: int, auto_play_on_load: bool, playlist_auto_advance: bool) -> None:
+        self.percussion_channel_control.setValue(percussion_channel)
+        self.auto_play_on_load_action.setChecked(auto_play_on_load)
+        self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
+        self.statusBar().showMessage(self.tr("Preferences updated"), 5000)
+
+    def show_preferences(self) -> None:
+        dialog = self._create_preferences_dialog()
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        self._apply_preferences(*dialog.preferences())
 
     def play(self) -> None:
         self._pause_requested = False

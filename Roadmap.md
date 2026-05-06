@@ -240,7 +240,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Preferences
 
-- [ ] Preferences dialog with Restore Defaults button.
+- [x] Preferences dialog with Restore Defaults button.
 - [ ] General tab:
   - [x] percussion channel, default 10, persisted in settings;
   - [ ] solo volume reduction percentage, default 50%;

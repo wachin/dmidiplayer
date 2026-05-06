@@ -13,6 +13,8 @@ WindowGeometry = tuple[int, int, int, int]
 class AppSettings:
     RECENT_FILES_LIMIT = 10
     DEFAULT_PERCUSSION_CHANNEL = 10
+    DEFAULT_AUTO_PLAY_ON_LOAD = False
+    DEFAULT_PLAYLIST_AUTO_ADVANCE = True
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -83,14 +85,18 @@ class AppSettings:
         self._settings.sync()
 
     def auto_play_on_load(self) -> bool:
-        return self._settings.value("playback/auto_play_on_load", False, bool)
+        return self._settings.value("playback/auto_play_on_load", self.DEFAULT_AUTO_PLAY_ON_LOAD, bool)
 
     def set_auto_play_on_load(self, enabled: bool) -> None:
         self._settings.setValue("playback/auto_play_on_load", bool(enabled))
         self._settings.sync()
 
     def playlist_auto_advance(self) -> bool:
-        return self._settings.value("playback/playlist_auto_advance", True, bool)
+        return self._settings.value(
+            "playback/playlist_auto_advance",
+            self.DEFAULT_PLAYLIST_AUTO_ADVANCE,
+            bool,
+        )
 
     def set_playlist_auto_advance(self, enabled: bool) -> None:
         self._settings.setValue("playback/playlist_auto_advance", bool(enabled))
