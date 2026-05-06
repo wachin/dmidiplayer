@@ -589,7 +589,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Keep the window title synchronized with the current song and playlist.
 - [ ] Prevent duplicate playlist rows for the same file unless explicitly
   requested.
-- [ ] Add remove-selected and clear-playlist actions.
+- [x] Add remove-selected and clear-playlist actions.
 - [ ] Add repeat playlist and shuffle toggles.
 - [x] Save and restore main window size and position.
 - [x] Add keyboard shortcuts for open, play/pause, stop, next/previous, and

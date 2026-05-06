@@ -19,6 +19,10 @@ class Sequence(QObject):
         self.midi = read_smf(file_name)
         self.loaded.emit()
 
+    def clear(self) -> None:
+        self.midi = None
+        self.loaded.emit()
+
     @property
     def events(self) -> list[MidiEvent]:
         return [] if self.midi is None else self.midi.events

@@ -94,6 +94,21 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertFalse(player._playing)
         self.assertEqual(output.all_notes_off_count, 1)
 
+    def test_clear_resets_loaded_sequence(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player.clear()
+
+        self.assertIsNone(player.sequence.midi)
+        self.assertEqual(player._events, [])
+        self.assertEqual(player._position, 0)
+
     def test_pitch_shift_transposes_note_events(self) -> None:
         player = SequencePlayer(OutputStub())
         player.set_pitch_shift(2)

@@ -58,9 +58,11 @@ class MainWindow(QMainWindow):
         self.player.finished.connect(self._finished)
         self.auto_advance_playlist = True
         self._pause_requested = False
+        self._current_file: str | None = None
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
+        self.playlist.currentRowChanged.connect(self._playlist_selection_changed)
         self.title_label = QLabel(self.tr("No file loaded"))
         self.title_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.position = QSlider(Qt.Orientation.Horizontal)
@@ -121,6 +123,13 @@ class MainWindow(QMainWindow):
         self.disconnect_midi_action = QAction(self.tr("Disconnect MIDI Destinations"), self)
         self.disconnect_midi_action.setObjectName("disconnect_midi_action")
         self.disconnect_midi_action.triggered.connect(self._disconnect_midi_output)
+        self.remove_selected_action = QAction(self.tr("Remove Selected"), self)
+        self.remove_selected_action.setObjectName("remove_selected_action")
+        self.remove_selected_action.setShortcut(QKeySequence.StandardKey.Delete)
+        self.remove_selected_action.triggered.connect(self._remove_selected_playlist_item)
+        self.clear_playlist_action = QAction(self.tr("Clear Playlist"), self)
+        self.clear_playlist_action.setObjectName("clear_playlist_action")
+        self.clear_playlist_action.triggered.connect(self._clear_playlist)
         self.help_contents_action = QAction(self.tr("Help Contents"), self)
         self.help_contents_action.setObjectName("help_contents_action")
         self.help_contents_action.triggered.connect(self._show_help_contents)
@@ -166,6 +175,8 @@ class MainWindow(QMainWindow):
         self.next_bar_action.setEnabled(has_file)
         self.previous_action.setEnabled(current_row > 0)
         self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
+        self.remove_selected_action.setEnabled(current_row >= 0)
+        self.clear_playlist_action.setEnabled(self.playlist.count() > 0)
 
     def _update_window_title(self) -> None:
         midi = self.player.sequence.midi
@@ -208,6 +219,9 @@ class MainWindow(QMainWindow):
         self.recent_files_menu = file_menu.addMenu(self.tr("Open Recent"))
         self.recent_files_menu.setObjectName("recent_files_menu")
         self._refresh_recent_files_menu()
+        file_menu.addSeparator()
+        file_menu.addAction(self.remove_selected_action)
+        file_menu.addAction(self.clear_playlist_action)
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action)
 
@@ -272,6 +286,54 @@ class MainWindow(QMainWindow):
     def _clear_recent_files(self) -> None:
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
+
+    def _playlist_selection_changed(self, row: int) -> None:
+        self._update_action_state()
+        if row < 0 or self.player.sequence.midi is None or self.playlist.count() <= 1:
+            return
+        self._update_window_title()
+
+    def _reset_loaded_file_state(self, status_message: str) -> None:
+        self._current_file = None
+        self.position.setEnabled(False)
+        self.title_label.setText(self.tr("No file loaded"))
+        self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
+        self.event_label.setText(self.tr("No file loaded"))
+        self.keyboard.clear()
+        self._update_midi_output_label()
+        self._update_action_state()
+        self._update_window_title()
+        self.statusBar().showMessage(status_message, 5000)
+
+    def _remove_selected_playlist_item(self) -> None:
+        row = self.playlist.currentRow()
+        if row < 0:
+            return
+        item = self.playlist.takeItem(row)
+        if item is None:
+            return
+        removed_file = item.text()
+        del item
+        if self.playlist.count() == 0:
+            self.player.clear()
+            self._reset_loaded_file_state(self.tr("Playlist cleared"))
+            return
+        self.playlist.setCurrentRow(min(row, self.playlist.count() - 1))
+        if removed_file == self._current_file:
+            current_item = self.playlist.currentItem()
+            if current_item is not None:
+                self.load_file(current_item.text())
+            return
+        self._update_action_state()
+        self._update_window_title()
+        self.statusBar().showMessage(self.tr("Removed {name} from playlist").format(name=Path(removed_file).name), 5000)
+
+    def _clear_playlist(self) -> None:
+        if self.playlist.count() == 0:
+            return
+        self.playlist.clear()
+        self.player.clear()
+        self._reset_loaded_file_state(self.tr("Playlist cleared"))
 
     def _help_doc_path(self) -> Path:
         locale_name = QLocale.system().name()
@@ -628,6 +690,7 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
+        self._current_file = file_name
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))

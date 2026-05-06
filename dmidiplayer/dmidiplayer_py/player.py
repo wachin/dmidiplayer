@@ -55,6 +55,19 @@ class SequencePlayer(QObject):
         self._loop_end_tick = self.sequence.length_ticks
         self.positionChanged.emit(self._position, self.sequence.length_ticks)
 
+    def clear(self) -> None:
+        self.stop()
+        self.sequence.clear()
+        self._events = []
+        self._event_times_us = []
+        self._index = 0
+        self._position = 0
+        self._position_us = 0
+        self._base_position_us = 0
+        self._loop_start_tick = 0
+        self._loop_end_tick = 0
+        self.positionChanged.emit(0, 0)
+
     def play(self) -> None:
         if not self._events:
             return

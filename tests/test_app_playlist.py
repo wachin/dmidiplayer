@@ -284,6 +284,8 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
+            self.assertIsNotNone(window.findChild(type(window.remove_selected_action), "remove_selected_action"))
+            self.assertIsNotNone(window.findChild(type(window.clear_playlist_action), "clear_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.help_contents_action), "help_contents_action"))
             self.assertIsNotNone(window.findChild(type(window.about_action), "about_action"))
 
@@ -469,6 +471,46 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertTrue(window.previous_action.isEnabled())
                 self.assertFalse(window.next_action.isEnabled())
+
+    def test_playlist_remove_selected_action_loads_neighbor_when_current_song_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+
+                window.remove_selected_action.trigger()
+
+                self.assertEqual(window.playlist.count(), 1)
+                self.assertEqual(window.playlist.currentItem().text(), str(second))
+                self.assertEqual(window.windowTitle(), "second.mid - dmidiplayer PyQt6")
+
+    def test_playlist_clear_action_resets_loaded_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "solo.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                window.clear_playlist_action.trigger()
+
+                self.assertEqual(window.playlist.count(), 0)
+                self.assertEqual(window.windowTitle(), "dmidiplayer PyQt6")
+                self.assertEqual(window.title_label.text(), "No file loaded")
+                self.assertFalse(window.position.isEnabled())
+                self.assertFalse(window.play_action.isEnabled())
+                self.assertFalse(window.clear_playlist_action.isEnabled())
+                self.assertEqual(window.statusBar().currentMessage(), "Playlist cleared")
 
     def test_window_title_tracks_current_song_and_playlist_position(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
