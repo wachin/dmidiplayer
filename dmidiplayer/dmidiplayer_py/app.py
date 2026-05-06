@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import random
 import sys
 from pathlib import Path
 
@@ -168,6 +169,9 @@ class MainWindow(QMainWindow):
         self.repeat_playlist_action = QAction(self.tr("Repeat Playlist"), self)
         self.repeat_playlist_action.setObjectName("repeat_playlist_action")
         self.repeat_playlist_action.setCheckable(True)
+        self.shuffle_playlist_action = QAction(self.tr("Shuffle Playlist"), self)
+        self.shuffle_playlist_action.setObjectName("shuffle_playlist_action")
+        self.shuffle_playlist_action.setCheckable(True)
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
@@ -243,6 +247,7 @@ class MainWindow(QMainWindow):
         playback_menu.addAction(self.next_bar_action)
         playback_menu.addSeparator()
         playback_menu.addAction(self.repeat_playlist_action)
+        playback_menu.addAction(self.shuffle_playlist_action)
 
         view_menu = self.menuBar().addMenu(self.tr("View"))
         view_menu.setObjectName("view_menu")
@@ -496,9 +501,9 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(QLabel(self.tr("MIDI destination:")))
         layout.addWidget(self.connection_combo, 1)
-        layout.addWidget(self._button(self.tr("Refresh"), self._refresh_midi_connections))
-        layout.addWidget(self._button(self.tr("Connect"), self._connect_selected_midi_output))
-        layout.addWidget(self._button(self.tr("Disconnect"), self._disconnect_midi_output))
+        layout.addWidget(self._button(self.tr("Refresh"), self.refresh_midi_action.trigger))
+        layout.addWidget(self._button(self.tr("Connect"), self.connect_midi_action.trigger))
+        layout.addWidget(self._button(self.tr("Disconnect"), self.disconnect_midi_action.trigger))
         return row
 
     def _spinbox(self, minimum: int, maximum: int, value: int, slot: object, suffix: str = "") -> QSpinBox:
@@ -714,10 +719,29 @@ class MainWindow(QMainWindow):
         self._load_playlist_row(max(0, row - 1))
 
     def next_file(self) -> None:
+        row = self._next_playlist_row()
+        if row is None:
+            return
+        self._load_playlist_row(row)
+
+    def _next_playlist_row(self) -> int | None:
+        count = self.playlist.count()
+        if count == 0:
+            return None
         row = self.playlist.currentRow()
         if row < 0:
             row = 0
-        self._load_playlist_row(min(self.playlist.count() - 1, row + 1))
+        if self.shuffle_playlist_action.isChecked():
+            if count == 1:
+                return row
+            candidates = [candidate for candidate in range(count) if candidate != row]
+            return random.choice(candidates)
+        next_row = row + 1
+        if next_row < count:
+            return next_row
+        if self.repeat_playlist_action.isChecked():
+            return 0
+        return None
 
     def _load_playlist_row(self, row: int, autoplay: bool = False) -> bool:
         if row < 0 or row >= self.playlist.count():
@@ -871,9 +895,8 @@ class MainWindow(QMainWindow):
             self.keyboard.note_off(data[0])
 
     def _finished(self) -> None:
-        if self.auto_advance_playlist and self._load_playlist_row(self.playlist.currentRow() + 1, autoplay=True):
-            return
-        if self.repeat_playlist_action.isChecked() and self._load_playlist_row(0, autoplay=True):
+        next_row = self._next_playlist_row() if self.auto_advance_playlist else None
+        if next_row is not None and self._load_playlist_row(next_row, autoplay=True):
             return
         self.event_label.setText(self.tr("End of sequence"))
         self.statusBar().showMessage(self.tr("End of sequence"))

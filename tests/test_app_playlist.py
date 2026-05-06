@@ -321,6 +321,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
             self.assertIsNotNone(window.findChild(type(window.repeat_playlist_action), "repeat_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.shuffle_playlist_action), "shuffle_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.connect_midi_action), "connect_midi_action"))
             self.assertIsNotNone(window.findChild(type(window.disconnect_midi_action), "disconnect_midi_action"))
@@ -625,6 +626,51 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.playlist.currentRow(), 1)
                 self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
+
+    def test_shuffle_playlist_changes_manual_next_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.random.choice", return_value=2),
+            ):
+                window = MainWindow([str(first), str(second), str(third)])
+                window.shuffle_playlist_action.setChecked(True)
+
+                window.next_file()
+
+                self.assertEqual(window.playlist.currentRow(), 2)
+                self.assertEqual(window.windowTitle(), "third.mid [3/3] - dmidiplayer PyQt6")
+
+    def test_shuffle_playlist_changes_auto_advance_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.random.choice", return_value=0),
+            ):
+                window = MainWindow([str(first), str(second), str(third)])
+                window.next_file()
+                window.shuffle_playlist_action.setChecked(True)
+
+                window.player.finished.emit()
+
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "first.mid [1/3] - dmidiplayer PyQt6")
 
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
