@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -106,6 +107,64 @@ class PreferencesDialog(QDialog):
         )
 
 
+class RhythmView(QWidget):
+    MAX_BEATS = 12
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("rhythm_view")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self.summary_label = QLabel(self.tr("Rhythm: 4/4 - Bar 1 Beat 1 - 120 BPM"), self)
+        self.summary_label.setObjectName("rhythm_summary_label")
+        layout.addWidget(self.summary_label)
+
+        beats_row = QWidget(self)
+        beats_row.setObjectName("rhythm_beats_row")
+        beats_layout = QHBoxLayout(beats_row)
+        beats_layout.setContentsMargins(0, 0, 0, 0)
+        beats_layout.setSpacing(4)
+        self.beat_labels: list[QLabel] = []
+        for index in range(self.MAX_BEATS):
+            label = QLabel(str(index + 1), beats_row)
+            label.setObjectName(f"rhythm_beat_{index + 1}")
+            label.setMinimumWidth(24)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setFrameShape(QFrame.Shape.Box)
+            beats_layout.addWidget(label)
+            self.beat_labels.append(label)
+        beats_layout.addStretch(1)
+        layout.addWidget(beats_row)
+
+        self.update_state(4, 4, 1, 1, 120.0)
+
+    def update_state(self, numerator: int, denominator: int, bar: int, beat: int, bpm: float) -> None:
+        visible_beats = max(1, min(self.MAX_BEATS, numerator))
+        current_beat = max(1, min(visible_beats, beat))
+        self.summary_label.setText(
+            self.tr("Rhythm: {numerator}/{denominator} - Bar {bar} Beat {beat} - {bpm:.0f} BPM").format(
+                numerator=numerator,
+                denominator=denominator,
+                bar=bar,
+                beat=current_beat,
+                bpm=bpm,
+            )
+        )
+        for index, label in enumerate(self.beat_labels):
+            beat_number = index + 1
+            is_visible = beat_number <= visible_beats
+            label.setVisible(is_visible)
+            if not is_visible:
+                continue
+            marker = "X" if beat_number == current_beat else "-"
+            label.setText(f"{beat_number}:{marker}")
+
+    def clear(self) -> None:
+        self.update_state(4, 4, 1, 1, 120.0)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, start_files: list[str]) -> None:
         super().__init__()
@@ -141,6 +200,7 @@ class MainWindow(QMainWindow):
         self.position.setEnabled(False)
         self.position.sliderReleased.connect(self._seek_to_slider)
         self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
+        self.rhythm_view = RhythmView()
         self.keyboard = PianoKeyboard()
         self.event_label = QLabel(self.tr("MIDI output: {name}").format(name=self.output.name))
         self.connection_combo = QComboBox()
@@ -413,6 +473,12 @@ class MainWindow(QMainWindow):
         self.keyboard_action.setChecked(True)
         self.keyboard_action.toggled.connect(self.keyboard.setVisible)
         view_menu.addAction(self.keyboard_action)
+        self.rhythm_action = QAction(self.tr("Rhythm"), self)
+        self.rhythm_action.setObjectName("toggle_rhythm_action")
+        self.rhythm_action.setCheckable(True)
+        self.rhythm_action.setChecked(True)
+        self.rhythm_action.toggled.connect(self.rhythm_view.setVisible)
+        view_menu.addAction(self.rhythm_action)
 
         tools_menu = self.menuBar().addMenu(self.tr("Tools"))
         tools_menu.setObjectName("tools_menu")
@@ -463,6 +529,7 @@ class MainWindow(QMainWindow):
         self.title_label.setText(self.tr("No file loaded"))
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.event_label.setText(self.tr("No file loaded"))
+        self.rhythm_view.clear()
         self.keyboard.clear()
         self._update_midi_output_label()
         self._update_action_state()
@@ -748,6 +815,7 @@ class MainWindow(QMainWindow):
         right.addWidget(self.position)
         right.addWidget(self.time_label)
         right.addWidget(self._build_playback_settings())
+        right.addWidget(self.rhythm_view)
         right.addWidget(self._build_midi_destination_row())
         right.addWidget(self.keyboard)
         right.addWidget(self.event_label)
@@ -1194,6 +1262,11 @@ class MainWindow(QMainWindow):
         bpm = self.player.sequence.bpm_at_tick(tick) * self.player.tempo_percent / 100
         bar = self.player.sequence.bar_number_at_tick(tick)
         bar_count = self.player.sequence.bar_count
+        numerator, denominator = self.player.sequence.time_signature_at_tick(tick)
+        bar_start_tick = self.player.sequence.tick_for_bar(bar)
+        ticks_per_beat = max(1, (self.player.sequence.division * 4) // denominator)
+        beat = ((max(tick, bar_start_tick) - bar_start_tick) // ticks_per_beat) + 1
+        self.rhythm_view.update_state(numerator, denominator, bar, beat, bpm)
         self.time_label.setText(
             self.tr("{current} / {total} - {bpm:.0f} BPM - Bar {bar}/{bar_count}").format(
                 current=self._format_time(current_us),

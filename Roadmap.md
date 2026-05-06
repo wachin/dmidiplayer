@@ -211,9 +211,9 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Rhythm View
 
-- [ ] Port the embedded Rhythm view in the main window.
-- [ ] Allow showing/hiding it from the View menu.
-- [ ] Synchronize it with playback, tempo, and bars.
+- [x] Port the embedded Rhythm view in the main window.
+- [x] Allow showing/hiding it from the View menu.
+- [x] Synchronize it with playback, tempo, and bars.
 
 ### Playlists And Repertoire
 
@@ -297,7 +297,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Embedded views that can be shown/hidden:
   - [x] toolbar;
   - [x] status bar;
-  - [ ] Rhythm.
+  - [x] Rhythm.
 - [ ] Keep existing icons and internal theme where needed.
 - [ ] Port Help and About window.
 - [ ] Port translations, especially English and Spanish.

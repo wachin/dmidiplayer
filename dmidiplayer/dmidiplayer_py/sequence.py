@@ -61,3 +61,15 @@ class Sequence(QObject):
 
     def tick_for_bar(self, bar_number: int) -> int:
         return 0 if self.midi is None else self.midi.tick_for_bar(bar_number)
+
+    def time_signature_at_tick(self, tick: int) -> tuple[int, int]:
+        if self.midi is None:
+            return (4, 4)
+        numerator = 4
+        denominator = 4
+        for signature in self.midi.time_signatures:
+            if signature.tick > tick:
+                break
+            numerator = signature.numerator
+            denominator = signature.denominator
+        return (numerator, denominator)

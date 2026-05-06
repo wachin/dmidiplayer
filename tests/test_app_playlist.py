@@ -203,6 +203,27 @@ class AppPlaylistTest(unittest.TestCase):
                 window._update_position(480, 480)
                 self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM - Bar 1/1")
 
+    def test_rhythm_view_updates_with_bar_and_beat(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                self.assertEqual(window.rhythm_view.summary_label.text(), "Rhythm: 4/4 - Bar 1 Beat 1 - 120 BPM")
+                self.assertEqual(window.rhythm_view.beat_labels[0].text(), "1:X")
+                self.assertEqual(window.rhythm_view.beat_labels[1].text(), "2:-")
+
+                window._update_position(480, 480)
+
+                self.assertEqual(window.rhythm_view.summary_label.text(), "Rhythm: 4/4 - Bar 1 Beat 2 - 120 BPM")
+                self.assertEqual(window.rhythm_view.beat_labels[0].text(), "1:-")
+                self.assertEqual(window.rhythm_view.beat_labels[1].text(), "2:X")
+
     def test_loop_controls_use_bar_numbers(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "two-bars.mid")
@@ -414,6 +435,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
+            self.assertIsNotNone(window.findChild(type(window.rhythm_action), "toggle_rhythm_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
             self.assertIsNotNone(window.findChild(type(window.jump_bar_action), "jump_bar_action"))
             self.assertIsNotNone(window.findChild(type(window.reset_pitch_action), "reset_pitch_action"))
@@ -509,6 +531,18 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.keyboard.isHidden())
             window.keyboard_action.setChecked(True)
             self.assertFalse(window.keyboard.isHidden())
+
+    def test_view_menu_toggles_rhythm_panel(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.rhythm_action.setChecked(False)
+            self.assertTrue(window.rhythm_view.isHidden())
+            window.rhythm_action.setChecked(True)
+            self.assertFalse(window.rhythm_view.isHidden())
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (
