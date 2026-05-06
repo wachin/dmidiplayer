@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         self.manager = BackendManager(self)
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
+        self.player.set_percussion_channel(self.settings.percussion_channel())
         self.player.positionChanged.connect(self._update_position)
         self.player.eventPlayed.connect(self._event_played)
         self.player.outputError.connect(self._output_error)
@@ -64,6 +65,12 @@ class MainWindow(QMainWindow):
         self.connection_combo = QComboBox()
         self.connection_combo.setMinimumWidth(260)
         self.pitch_control = self._spinbox(-12, 12, 0, self.player.set_pitch_shift)
+        self.percussion_channel_control = self._spinbox(
+            1,
+            16,
+            self.player.percussion_channel,
+            self._set_percussion_channel,
+        )
         self.tempo_control = self._spinbox(50, 200, 100, self._set_tempo_percent, "%")
         self.volume_control = self._spinbox(0, 200, 100, self.player.set_volume_percent, "%")
         self.loop_check = QCheckBox(self.tr("Loop"))
@@ -228,6 +235,8 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(QLabel(self.tr("Pitch:")))
         controls_layout.addWidget(self.pitch_control)
         controls_layout.addWidget(self._button("0", lambda: self.pitch_control.setValue(0)))
+        controls_layout.addWidget(QLabel(self.tr("Drums:")))
+        controls_layout.addWidget(self.percussion_channel_control)
         controls_layout.addWidget(QLabel(self.tr("Tempo:")))
         controls_layout.addWidget(self.tempo_control)
         controls_layout.addWidget(self._button("100%", lambda: self.tempo_control.setValue(100)))
@@ -574,6 +583,10 @@ class MainWindow(QMainWindow):
     def _set_tempo_percent(self, value: int) -> None:
         self.player.set_tempo_percent(value)
         self._update_time_label(self.position.value(), self.position.maximum())
+
+    def _set_percussion_channel(self, value: int) -> None:
+        self.player.set_percussion_channel(value)
+        self.settings.set_percussion_channel(self.player.percussion_channel)
 
     def _update_time_label(self, tick: int, maximum: int) -> None:
         midi = self.player.sequence.midi

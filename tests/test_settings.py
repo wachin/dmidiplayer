@@ -96,6 +96,26 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertIsNone(restored.window_geometry())
 
+    def test_percussion_channel_defaults_to_general_midi_channel_10(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = AppSettings(Path(tmpdir, "appdata"))
+
+            self.assertEqual(settings.percussion_channel(), 10)
+
+    def test_percussion_channel_is_saved_and_clamped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_percussion_channel(2)
+            self.assertEqual(AppSettings(base_dir).percussion_channel(), 2)
+
+            settings.set_percussion_channel(30)
+            self.assertEqual(AppSettings(base_dir).percussion_channel(), 16)
+
+            settings.set_percussion_channel(0)
+            self.assertEqual(AppSettings(base_dir).percussion_channel(), 1)
+
     def test_midi_destination_is_saved(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir, "appdata")

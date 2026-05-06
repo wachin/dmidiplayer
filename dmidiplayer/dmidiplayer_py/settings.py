@@ -12,6 +12,7 @@ WindowGeometry = tuple[int, int, int, int]
 
 class AppSettings:
     RECENT_FILES_LIMIT = 10
+    DEFAULT_PERCUSSION_CHANNEL = 10
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -71,6 +72,14 @@ class AppSettings:
         self._settings.setValue("window/y", y)
         self._settings.setValue("window/width", width)
         self._settings.setValue("window/height", height)
+        self._settings.sync()
+
+    def percussion_channel(self) -> int:
+        value = self._settings.value("general/percussion_channel", self.DEFAULT_PERCUSSION_CHANNEL, int)
+        return max(1, min(16, value))
+
+    def set_percussion_channel(self, channel: int) -> None:
+        self._settings.setValue("general/percussion_channel", max(1, min(16, channel)))
         self._settings.sync()
 
     def midi_destination(self) -> str:

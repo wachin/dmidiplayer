@@ -26,6 +26,7 @@ class FakeBackendManager:
 
 class FakeSettings:
     midi_destination_value = ""
+    percussion_channel_value = 10
     window_geometry_value: tuple[int, int, int, int] | None = None
 
     def __init__(self) -> None:
@@ -64,6 +65,12 @@ class FakeSettings:
     def set_window_geometry(self, x: int, y: int, width: int, height: int) -> None:
         self.saved_window_geometry = (x, y, width, height)
         type(self).window_geometry_value = self.saved_window_geometry
+
+    def percussion_channel(self) -> int:
+        return type(self).percussion_channel_value
+
+    def set_percussion_channel(self, channel: int) -> None:
+        type(self).percussion_channel_value = channel
 
 
 class FakeAlsaOutput(OutputStub):
@@ -125,6 +132,11 @@ class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        FakeSettings.midi_destination_value = ""
+        FakeSettings.percussion_channel_value = 10
+        FakeSettings.window_geometry_value = None
 
     def test_next_and_previous_select_playlist_items(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -401,6 +413,22 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertIsNotNone(window.settings.saved_window_geometry)
             self.assertEqual(window.settings.saved_window_geometry[2:], (700, 420))
+
+    def test_percussion_channel_setting_initializes_and_persists_control(self) -> None:
+        FakeSettings.percussion_channel_value = 2
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.player.percussion_channel, 2)
+            self.assertEqual(window.percussion_channel_control.value(), 2)
+
+            window.percussion_channel_control.setValue(11)
+
+            self.assertEqual(window.player.percussion_channel, 11)
+            self.assertEqual(FakeSettings.percussion_channel_value, 11)
 
 
 if __name__ == "__main__":

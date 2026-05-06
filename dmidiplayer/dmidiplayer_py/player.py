@@ -133,6 +133,17 @@ class SequencePlayer(QObject):
         self._pitch_shift = semitones
 
     @property
+    def percussion_channel(self) -> int:
+        return self._percussion_channel + 1
+
+    def set_percussion_channel(self, channel: int) -> None:
+        channel_index = max(1, min(16, channel)) - 1
+        if channel_index == self._percussion_channel:
+            return
+        self.output.all_notes_off()
+        self._percussion_channel = channel_index
+
+    @property
     def volume_percent(self) -> int:
         return self._volume_percent
 

@@ -130,6 +130,29 @@ class SequencePlayerTest(unittest.TestCase):
 
         self.assertIs(shifted, event)
 
+    def test_percussion_channel_can_be_changed(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player.set_pitch_shift(2)
+        player.set_percussion_channel(1)
+
+        percussion_event = MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100]))
+        melodic_event = MidiEvent(tick=0, kind="note_on", channel=9, data=bytes([60, 100]))
+
+        self.assertEqual(player.percussion_channel, 1)
+        self.assertIs(player._playable_event(percussion_event), percussion_event)
+        self.assertEqual(player._playable_event(melodic_event).data, bytes([62, 100]))
+        self.assertGreaterEqual(output.all_notes_off_count, 1)
+
+    def test_percussion_channel_is_clamped(self) -> None:
+        player = SequencePlayer(OutputStub())
+
+        player.set_percussion_channel(20)
+        self.assertEqual(player.percussion_channel, 16)
+
+        player.set_percussion_channel(0)
+        self.assertEqual(player.percussion_channel, 1)
+
     def test_pitch_shift_drops_notes_outside_midi_range(self) -> None:
         player = SequencePlayer(OutputStub())
         player.set_pitch_shift(12)

@@ -241,7 +241,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [ ] Preferences dialog with Restore Defaults button.
 - [ ] General tab:
-  - [x] percussion channel, default 10, currently hardcoded;
+  - [x] percussion channel, default 10, persisted in settings;
   - [ ] solo volume reduction percentage, default 50%;
   - [ ] auto-play on load;
   - [ ] playlist auto-advance;
@@ -558,7 +558,7 @@ clearer bites instead of rediscovering the next small step.
   controller all-notes-off.
 - [ ] Reset pitch, tempo, and volume when loading a new file if song settings
   are not active.
-- [ ] Add preference-backed percussion channel instead of hardcoding channel 10.
+- [x] Add preference-backed percussion channel instead of hardcoding channel 10.
 - [ ] Add per-channel mute filtering in `_playable_event()`.
 - [ ] Add per-channel solo filtering with configurable reduction.
 - [ ] Add per-channel volume scaling before global volume scaling.
