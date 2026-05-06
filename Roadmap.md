@@ -584,7 +584,7 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Add Help menu actions for About and local help.
 - [ ] Promote toolbar buttons to shared `QAction` instances everywhere.
 - [x] Add enabled/disabled menu state when no file is loaded.
-- [ ] Add status bar state messages for loading, playing, paused, stopped, and
+- [x] Add status bar state messages for loading, playing, paused, stopped, and
   errors.
 - [ ] Keep the window title synchronized with the current song and playlist.
 - [ ] Prevent duplicate playlist rows for the same file unless explicitly

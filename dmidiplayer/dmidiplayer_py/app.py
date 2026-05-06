@@ -45,11 +45,14 @@ class MainWindow(QMainWindow):
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
+        self.player.started.connect(self._playback_started)
+        self.player.stopped.connect(self._playback_stopped)
         self.player.positionChanged.connect(self._update_position)
         self.player.eventPlayed.connect(self._event_played)
         self.player.outputError.connect(self._output_error)
         self.player.finished.connect(self._finished)
         self.auto_advance_playlist = True
+        self._pause_requested = False
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
@@ -112,15 +115,15 @@ class MainWindow(QMainWindow):
         self.play_action = QAction(self.tr("Play"), self)
         self.play_action.setObjectName("play_action")
         self.play_action.setShortcut(QKeySequence("Space"))
-        self.play_action.triggered.connect(self.player.play)
+        self.play_action.triggered.connect(self.play)
         self.pause_action = QAction(self.tr("Pause"), self)
         self.pause_action.setObjectName("pause_action")
         self.pause_action.setShortcut(QKeySequence("P"))
-        self.pause_action.triggered.connect(self.player.pause)
+        self.pause_action.triggered.connect(self.pause)
         self.stop_action = QAction(self.tr("Stop"), self)
         self.stop_action.setObjectName("stop_action")
         self.stop_action.setShortcut(QKeySequence("Esc"))
-        self.stop_action.triggered.connect(self.player.stop)
+        self.stop_action.triggered.connect(self.stop)
         self.next_action = QAction(self.tr("Next"), self)
         self.next_action.setObjectName("next_action")
         self.next_action.setShortcut(QKeySequence("Ctrl+Right"))
@@ -225,6 +228,26 @@ class MainWindow(QMainWindow):
     def _clear_recent_files(self) -> None:
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
+
+    def play(self) -> None:
+        self._pause_requested = False
+        self.player.play()
+
+    def pause(self) -> None:
+        self._pause_requested = True
+        self.player.pause()
+
+    def stop(self) -> None:
+        self._pause_requested = False
+        self.player.stop()
+
+    def _playback_started(self) -> None:
+        self.statusBar().showMessage(self.tr("Playing"))
+
+    def _playback_stopped(self) -> None:
+        message = self.tr("Paused") if self._pause_requested else self.tr("Stopped")
+        self.statusBar().showMessage(message)
+        self._pause_requested = False
 
     def _restore_window_geometry(self) -> None:
         geometry = self.settings.window_geometry()
@@ -475,9 +498,11 @@ class MainWindow(QMainWindow):
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
 
     def load_file(self, file_name: str) -> None:
+        self.statusBar().showMessage(self.tr("Loading {name}").format(name=Path(file_name).name))
         try:
             self.player.load_file(file_name)
         except (OSError, MidiFileError) as exc:
+            self.statusBar().showMessage(self.tr("Error loading file: {error}").format(error=exc), 10000)
             QMessageBox.critical(self, self.tr("Error"), str(exc))
             return
         midi = self.player.sequence.midi
@@ -502,6 +527,7 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._update_action_state()
+        self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))
 
     def previous_file(self) -> None:
         row = self.playlist.currentRow()
@@ -669,6 +695,7 @@ class MainWindow(QMainWindow):
         if self.auto_advance_playlist and self._load_playlist_row(self.playlist.currentRow() + 1, autoplay=True):
             return
         self.event_label.setText(self.tr("End of sequence"))
+        self.statusBar().showMessage(self.tr("End of sequence"))
         self.keyboard.clear()
         self._update_action_state()
 
@@ -679,7 +706,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_window_geometry()
-        self.player.stop()
+        self.stop()
         if hasattr(self.output, "close"):
             self.output.close()
         super().closeEvent(event)

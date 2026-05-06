@@ -399,6 +399,32 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.output.all_notes_off_count, 1)
 
+    def test_status_bar_reports_load_and_playback_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_file(str(path))
+
+                self.assertEqual(window.statusBar().currentMessage(), "Ready: simple.mid")
+
+                window.player.started.emit()
+                self.assertEqual(window.statusBar().currentMessage(), "Playing")
+
+                window.pause_action.trigger()
+                self.assertEqual(window.statusBar().currentMessage(), "Paused")
+
+                window.stop_action.trigger()
+                self.assertEqual(window.statusBar().currentMessage(), "Stopped")
+
+                window.player.finished.emit()
+                self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
+
     def test_playback_actions_are_disabled_until_file_load(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
