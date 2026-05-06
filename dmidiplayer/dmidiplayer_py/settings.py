@@ -30,6 +30,16 @@ class AppSettings:
             self._settings.setValue("files/last_folder", str(path))
             self._settings.sync()
 
+    def midi_destination(self) -> str:
+        return self._settings.value("midi/destination", "", str)
+
+    def set_midi_destination(self, destination: str) -> None:
+        if destination:
+            self._settings.setValue("midi/destination", destination)
+        else:
+            self._settings.remove("midi/destination")
+        self._settings.sync()
+
 
 def app_config_dir() -> Path:
     location = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)

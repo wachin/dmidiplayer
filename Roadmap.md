@@ -490,7 +490,7 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
 - [ ] Per-channel volume and restoring original song/channel volume through song
   settings are still missing.
 - [ ] ALSA output lists/connects destinations from the UI, but backend-querying
-  active connection display and reconnect support are still missing.
+  active connection display is still missing.
 - [ ] The current PyQt6 UI is a minimal hand-written window, not a full conversion
   of `guiplayer.ui`.
 - [ ] Full channels, playlist dialog, lyrics, full pianola, preferences, and help are
@@ -519,7 +519,7 @@ Recommended priority:
      connections made during this process;
    - [ ] connect by a more flexible name search from preferences;
    - [ ] expose ALSA errors without excessive stderr noise;
-   - [ ] add reconnect-to-last-destination preferences once settings are expanded.
+   - [x] add reconnect-to-last-destination preferences once settings are expanded.
 3. [ ] Start real UI conversion:
    - [ ] decide between `pyuic6` and `PyQt6.uic.loadUi`;
    - [ ] load `guiplayer.ui`;

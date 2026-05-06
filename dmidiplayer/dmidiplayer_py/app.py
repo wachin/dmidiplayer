@@ -226,6 +226,17 @@ class MainWindow(QMainWindow):
             self._autoconnect_preferred_midi_output(connections)
 
     def _autoconnect_preferred_midi_output(self, connections: list[object]) -> None:
+        saved_destination = self.settings.midi_destination()
+        if saved_destination:
+            preferred = next(
+                (connection for connection in connections if connection.matches(saved_destination)),
+                None,
+            )
+            if preferred is not None:
+                index = connections.index(preferred)
+                self.connection_combo.setCurrentIndex(index)
+                self._connect_midi_output(preferred, remember=False)
+                return
         preferred = next(
             (
                 connection
@@ -247,7 +258,7 @@ class MainWindow(QMainWindow):
             return
         self._connect_midi_output(connection)
 
-    def _connect_midi_output(self, connection: object) -> None:
+    def _connect_midi_output(self, connection: object, remember: bool = True) -> None:
         if not hasattr(self.output, "connect_to"):
             self.statusBar().showMessage(self.tr("The dummy output does not support ALSA connections"), 5000)
             return
@@ -256,6 +267,8 @@ class MainWindow(QMainWindow):
         except MidiOutputError as exc:
             QMessageBox.warning(self, self.tr("MIDI connection"), str(exc))
             return
+        if remember:
+            self.settings.set_midi_destination(connection.name)
         self.statusBar().showMessage(self.tr("Connected to {name}").format(name=connection.name), 10000)
         self._update_midi_output_label()
 

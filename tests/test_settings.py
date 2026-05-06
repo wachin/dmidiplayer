@@ -31,6 +31,27 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertEqual(settings.last_folder(fallback), fallback)
 
+    def test_midi_destination_is_saved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_midi_destination("128:0 QSynth: MIDI")
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.midi_destination(), "128:0 QSynth: MIDI")
+
+    def test_empty_midi_destination_clears_saved_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_midi_destination("128:0 QSynth: MIDI")
+            settings.set_midi_destination("")
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.midi_destination(), "")
+
     def test_unwritable_app_data_falls_back_to_temp(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             blocking_file = Path(tmpdir, "not-a-directory")

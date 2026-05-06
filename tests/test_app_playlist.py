@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 
+from drumstick_py import MidiConnection
 from dmidiplayer_py.app import MainWindow
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
@@ -24,14 +25,58 @@ class FakeBackendManager:
 
 
 class FakeSettings:
+    midi_destination_value = ""
+
     def __init__(self) -> None:
         self.folder: Path | None = None
+        self.saved_midi_destination = ""
 
     def last_folder(self, fallback: Path) -> Path:
         return self.folder or fallback
 
     def set_last_folder(self, folder: str | Path) -> None:
         self.folder = Path(folder)
+
+    def midi_destination(self) -> str:
+        return self.midi_destination_value
+
+    def set_midi_destination(self, destination: str) -> None:
+        self.saved_midi_destination = destination
+        type(self).midi_destination_value = destination
+
+
+class FakeAlsaOutput(OutputStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "Fake ALSA"
+        self.connected: list[MidiConnection] = []
+        self.available_connections = [
+            MidiConnection(driver="alsa", name="128:0 QSynth: MIDI", client=128, port=0),
+            MidiConnection(driver="alsa", name="129:0 Hardware Synth: MIDI", client=129, port=0),
+        ]
+
+    def connections(self) -> list[MidiConnection]:
+        return self.available_connections
+
+    def connect_to(self, connection: MidiConnection) -> None:
+        if connection not in self.connected:
+            self.connected.append(connection)
+
+    def connected_connections(self) -> list[MidiConnection]:
+        return list(self.connected)
+
+    def disconnect_all(self) -> None:
+        self.connected.clear()
+
+
+class FakeAlsaBackendManager:
+    output = FakeAlsaOutput()
+
+    def __init__(self, parent: object | None = None) -> None:
+        type(self).output = FakeAlsaOutput()
+
+    def create_output(self, driver: str = "dummy", connection: str | None = None) -> FakeAlsaOutput:
+        return self.output
 
 
 def write_two_bar_midi(path: Path) -> None:
@@ -147,6 +192,31 @@ class AppPlaylistTest(unittest.TestCase):
                 window.jump_to_bar()
 
                 self.assertEqual(window.player._position, 1920)
+
+    def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
+        FakeSettings.midi_destination_value = "129:0"
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.output.connected_connections()[0].name, "129:0 Hardware Synth: MIDI")
+            self.assertEqual(window.connection_combo.currentText(), "129:0 Hardware Synth: MIDI")
+            self.assertEqual(FakeSettings.midi_destination_value, "129:0")
+
+    def test_manual_midi_connection_is_saved(self) -> None:
+        FakeSettings.midi_destination_value = ""
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            window.connection_combo.setCurrentIndex(1)
+            window._connect_selected_midi_output()
+
+            self.assertEqual(window.output.connected_connections()[-1].name, "129:0 Hardware Synth: MIDI")
+            self.assertEqual(FakeSettings.midi_destination_value, "129:0 Hardware Synth: MIDI")
 
 
 if __name__ == "__main__":
