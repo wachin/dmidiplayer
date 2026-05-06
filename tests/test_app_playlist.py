@@ -234,6 +234,42 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.count(), 0)
                 self.assertIsNone(window.settings.folder)
 
+    def test_menu_bar_contains_primary_menus_and_actions(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            menus = [action.text() for action in window.menuBar().actions()]
+
+            self.assertEqual(menus, ["File", "Playback", "View", "Tools", "Help"])
+            self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
+            self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
+            self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
+
+    def test_view_menu_toggles_status_bar(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.statusbar_action.setChecked(False)
+            self.assertTrue(window.statusBar().isHidden())
+            window.statusbar_action.setChecked(True)
+            self.assertFalse(window.statusBar().isHidden())
+
+    def test_stop_menu_action_turns_off_notes(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.stop_action.trigger()
+
+            self.assertEqual(window.output.all_notes_off_count, 1)
+
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
         with (

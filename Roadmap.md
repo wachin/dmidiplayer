@@ -568,10 +568,22 @@ clearer bites instead of rediscovering the next small step.
 
 ### Main Window UX
 
-- [ ] Build a real menu bar: File, Playback, View, Tools, Help.
+- [x] Build a real menu bar: File, Playback, View, Tools, Help.
 - [ ] Add File -> Open, Open Recent, Clear Recent, Exit.
-- [ ] Add Playback -> Play, Pause, Stop, Previous, Next.
+  - [x] Add File -> Open.
+  - [x] Add File -> Exit.
+  - [ ] Add File -> Open Recent submenu.
+  - [ ] Add File -> Clear Recent.
+- [x] Add Playback -> Play, Pause, Stop, Previous, Next.
 - [ ] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
+  - [x] Add toolbar visibility toggle.
+  - [x] Add status bar visibility toggle.
+  - [ ] Add keyboard visibility toggle.
+  - [ ] Add rhythm view visibility toggle.
+- [ ] Add Tools menu actions for MIDI connections and future preferences.
+- [ ] Add Help menu actions for About and local help.
+- [ ] Promote toolbar buttons to shared `QAction` instances everywhere.
+- [ ] Add enabled/disabled menu state when no file is loaded.
 - [ ] Add status bar state messages for loading, playing, paused, stopped, and
   errors.
 - [ ] Keep the window title synchronized with the current song and playlist.

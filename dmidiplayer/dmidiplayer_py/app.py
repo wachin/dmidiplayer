@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QSignalBlocker, Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QIcon
+from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QIcon, QKeySequence
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -72,7 +72,9 @@ class MainWindow(QMainWindow):
         self.jump_bar = self._spinbox(1, 1, 1, self._jump_bar_value_changed)
         self._updating_position = False
 
+        self._build_actions()
         self._build_toolbar()
+        self._build_menu_bar()
         self._build_layout()
         self._refresh_midi_connections(autoconnect=True)
         for file_name in start_files:
@@ -80,23 +82,84 @@ class MainWindow(QMainWindow):
         if start_files:
             self.load_file(start_files[0])
 
+    def _build_actions(self) -> None:
+        self.open_action = QAction(QIcon.fromTheme("document-open"), self.tr("Open"), self)
+        self.open_action.setObjectName("open_action")
+        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.open_action.triggered.connect(self.open_files)
+
+        self.exit_action = QAction(self.tr("Exit"), self)
+        self.exit_action.setObjectName("exit_action")
+        self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        self.exit_action.triggered.connect(self.close)
+
+        self.previous_action = QAction(self.tr("Previous"), self)
+        self.previous_action.setObjectName("previous_action")
+        self.previous_action.triggered.connect(self.previous_file)
+        self.play_action = QAction(self.tr("Play"), self)
+        self.play_action.setObjectName("play_action")
+        self.play_action.triggered.connect(self.player.play)
+        self.pause_action = QAction(self.tr("Pause"), self)
+        self.pause_action.setObjectName("pause_action")
+        self.pause_action.triggered.connect(self.player.pause)
+        self.stop_action = QAction(self.tr("Stop"), self)
+        self.stop_action.setObjectName("stop_action")
+        self.stop_action.triggered.connect(self.player.stop)
+        self.next_action = QAction(self.tr("Next"), self)
+        self.next_action.setObjectName("next_action")
+        self.next_action.triggered.connect(self.next_file)
+
     def _build_toolbar(self) -> None:
-        toolbar = QToolBar(self.tr("Playback"), self)
-        self.addToolBar(toolbar)
-        open_action = QAction(QIcon.fromTheme("document-open"), self.tr("Open"), self)
-        open_action.triggered.connect(self.open_files)
-        toolbar.addAction(open_action)
-        toolbar.addSeparator()
-        for text, slot in (
-            (self.tr("Previous"), self.previous_file),
-            (self.tr("Play"), self.player.play),
-            (self.tr("Pause"), self.player.pause),
-            (self.tr("Stop"), self.player.stop),
-            (self.tr("Next"), self.next_file),
+        self.playback_toolbar = QToolBar(self.tr("Playback"), self)
+        self.playback_toolbar.setObjectName("playback_toolbar")
+        self.addToolBar(self.playback_toolbar)
+        self.playback_toolbar.addAction(self.open_action)
+        self.playback_toolbar.addSeparator()
+        for action in (
+            self.previous_action,
+            self.play_action,
+            self.pause_action,
+            self.stop_action,
+            self.next_action,
         ):
-            button = QPushButton(text)
-            button.clicked.connect(slot)
-            toolbar.addWidget(button)
+            self.playback_toolbar.addAction(action)
+
+    def _build_menu_bar(self) -> None:
+        file_menu = self.menuBar().addMenu(self.tr("File"))
+        file_menu.setObjectName("file_menu")
+        file_menu.addAction(self.open_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.exit_action)
+
+        playback_menu = self.menuBar().addMenu(self.tr("Playback"))
+        playback_menu.setObjectName("playback_menu")
+        for action in (
+            self.previous_action,
+            self.play_action,
+            self.pause_action,
+            self.stop_action,
+            self.next_action,
+        ):
+            playback_menu.addAction(action)
+
+        view_menu = self.menuBar().addMenu(self.tr("View"))
+        view_menu.setObjectName("view_menu")
+        toolbar_action = self.playback_toolbar.toggleViewAction()
+        toolbar_action.setText(self.tr("Toolbar"))
+        toolbar_action.setObjectName("toggle_toolbar_action")
+        view_menu.addAction(toolbar_action)
+        self.statusbar_action = QAction(self.tr("Status bar"), self)
+        self.statusbar_action.setObjectName("toggle_statusbar_action")
+        self.statusbar_action.setCheckable(True)
+        self.statusbar_action.setChecked(True)
+        self.statusbar_action.toggled.connect(self.statusBar().setVisible)
+        view_menu.addAction(self.statusbar_action)
+
+        tools_menu = self.menuBar().addMenu(self.tr("Tools"))
+        tools_menu.setObjectName("tools_menu")
+
+        help_menu = self.menuBar().addMenu(self.tr("Help"))
+        help_menu.setObjectName("help_menu")
 
     def _build_layout(self) -> None:
         central = QWidget()
