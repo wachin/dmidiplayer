@@ -1,5 +1,11 @@
 % Índice de ayuda
 
+## Guía de usuario de PyQt6
+
+Para la interfaz actual en Python, comienza aquí:
+
+- [Guía de usuario de dmidiplayer PyQt6](pyqt6-user-guide.md)
+
 ## Introducción
 
 Esta aplicación es un reproductor de archivos MIDI multiplataforma para Linux, Windows y 

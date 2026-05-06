@@ -307,7 +307,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Document installation and usage in README.
 - [x] Keep testing notes for MX Linux 23, RT kernel, QjackCtl, QSynth, and
   `FluidR3.sf2`.
-- [ ] Port local help from existing markdown/html files.
+- [x] Port local help from existing markdown/html files.
+  - [x] Add a dedicated PyQt6 user guide for the current interface.
 - [ ] Prepare local packaging once the port is stable:
   - [x] launcher scripts;
   - [ ] `.desktop` file;
@@ -921,7 +922,7 @@ Tasks:
 Exit criteria:
 
 - [ ] English and Spanish work in the Python UI.
-- [ ] Help opens from the application.
+- [x] Help opens from the application.
 
 ## [ ] Phase 8: Drumstick Utilities
 

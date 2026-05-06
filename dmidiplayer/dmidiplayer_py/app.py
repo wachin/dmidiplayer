@@ -306,6 +306,9 @@ class MainWindow(QMainWindow):
         self.help_contents_action = QAction(self.tr("Help Contents"), self)
         self.help_contents_action.setObjectName("help_contents_action")
         self.help_contents_action.triggered.connect(self._show_help_contents)
+        self.user_guide_action = QAction(self.tr("User Guide"), self)
+        self.user_guide_action.setObjectName("user_guide_action")
+        self.user_guide_action.triggered.connect(self._show_user_guide)
         self.about_action = QAction(self.tr("About"), self)
         self.about_action.setObjectName("about_action")
         self.about_action.triggered.connect(self._show_about_dialog)
@@ -509,6 +512,7 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu(self.tr("Help"))
         help_menu.setObjectName("help_menu")
         help_menu.addAction(self.help_contents_action)
+        help_menu.addAction(self.user_guide_action)
         help_menu.addAction(self.about_action)
 
     def _refresh_recent_files_menu(self) -> None:
@@ -717,15 +721,21 @@ class MainWindow(QMainWindow):
     def _playlist_paths(self) -> list[Path]:
         return [Path(self.playlist.item(row).text()) for row in range(self.playlist.count())]
 
-    def _help_doc_path(self) -> Path:
+    def _localized_doc_path(self, file_name: str) -> Path:
         locale_name = QLocale.system().name()
         language = locale_name.split("_", 1)[0].casefold()
         candidates = [locale_name.casefold(), language, "en"]
         for candidate in candidates:
-            path = HELP_DOCS_DIR / candidate / "index.md"
+            path = HELP_DOCS_DIR / candidate / file_name
             if path.exists():
                 return path
-        return HELP_DOCS_DIR / "en" / "index.md"
+        return HELP_DOCS_DIR / "en" / file_name
+
+    def _help_doc_path(self) -> Path:
+        return self._localized_doc_path("index.md")
+
+    def _user_guide_path(self) -> Path:
+        return self._localized_doc_path("pyqt6-user-guide.md")
 
     def _about_html(self) -> str:
         return self.tr(
@@ -753,7 +763,12 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _show_help_contents(self) -> None:
-        path = self._help_doc_path()
+        self._show_markdown_help(self._help_doc_path(), self.tr("Help Contents"))
+
+    def _show_user_guide(self) -> None:
+        self._show_markdown_help(self._user_guide_path(), self.tr("User Guide"))
+
+    def _show_markdown_help(self, path: Path, window_title: str) -> None:
         try:
             markdown = path.read_text(encoding="utf-8")
         except OSError as exc:
@@ -761,7 +776,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, self.tr("Help"), str(exc))
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle(self.tr("Help Contents"))
+        dialog.setWindowTitle(window_title)
         layout = QVBoxLayout(dialog)
         browser = QTextBrowser(dialog)
         browser.setOpenExternalLinks(True)

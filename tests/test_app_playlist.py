@@ -475,6 +475,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.remove_selected_action), "remove_selected_action"))
             self.assertIsNotNone(window.findChild(type(window.clear_playlist_action), "clear_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.help_contents_action), "help_contents_action"))
+            self.assertIsNotNone(window.findChild(type(window.user_guide_action), "user_guide_action"))
             self.assertIsNotNone(window.findChild(type(window.about_action), "about_action"))
 
     def test_successful_load_adds_recent_file_menu_entry(self) -> None:
@@ -1183,6 +1184,18 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertEqual(path.name, "index.md")
 
+    def test_user_guide_path_falls_back_to_existing_local_file(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            path = window._user_guide_path()
+
+            self.assertTrue(path.exists())
+            self.assertEqual(path.name, "pyqt6-user-guide.md")
+
     def test_about_and_help_actions_open_dialogs(self) -> None:
         dialogs: list[str] = []
 
@@ -1198,8 +1211,9 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             window.about_action.trigger()
             window.help_contents_action.trigger()
+            window.user_guide_action.trigger()
 
-            self.assertEqual(dialogs, ["About", "Help Contents"])
+            self.assertEqual(dialogs, ["About", "Help Contents", "User Guide"])
             self.assertIn("Python/PyQt6 port", window._about_html())
 
     def test_preferences_action_opens_dialog(self) -> None:
