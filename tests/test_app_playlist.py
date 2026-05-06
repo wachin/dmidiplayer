@@ -29,10 +29,14 @@ class FakeSettings:
     DEFAULT_PERCUSSION_CHANNEL = 10
     DEFAULT_AUTO_PLAY_ON_LOAD = False
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
+    DEFAULT_SOLO_VOLUME_REDUCTION = 50
+    DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     midi_destination_value = ""
     percussion_channel_value = 10
     auto_play_on_load_value = False
     playlist_auto_advance_value = True
+    solo_volume_reduction_value = 50
+    midi_reset_before_playback_value = False
     playlist_path_value: Path | None = None
     window_geometry_value: tuple[int, int, int, int] | None = None
 
@@ -90,6 +94,18 @@ class FakeSettings:
 
     def set_playlist_auto_advance(self, enabled: bool) -> None:
         type(self).playlist_auto_advance_value = enabled
+
+    def solo_volume_reduction(self) -> int:
+        return type(self).solo_volume_reduction_value
+
+    def set_solo_volume_reduction(self, value: int) -> None:
+        type(self).solo_volume_reduction_value = value
+
+    def midi_reset_before_playback(self) -> bool:
+        return type(self).midi_reset_before_playback_value
+
+    def set_midi_reset_before_playback(self, enabled: bool) -> None:
+        type(self).midi_reset_before_playback_value = enabled
 
     def playlist_path(self) -> Path | None:
         return type(self).playlist_path_value
@@ -163,6 +179,8 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.percussion_channel_value = 10
         FakeSettings.auto_play_on_load_value = False
         FakeSettings.playlist_auto_advance_value = True
+        FakeSettings.solo_volume_reduction_value = 50
+        FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
 
@@ -955,8 +973,10 @@ class AppPlaylistTest(unittest.TestCase):
 
     def test_preferences_dialog_loads_current_settings_and_restores_defaults(self) -> None:
         FakeSettings.percussion_channel_value = 3
+        FakeSettings.solo_volume_reduction_value = 35
         FakeSettings.auto_play_on_load_value = True
         FakeSettings.playlist_auto_advance_value = False
+        FakeSettings.midi_reset_before_playback_value = True
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
@@ -967,14 +987,18 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsInstance(dialog, PreferencesDialog)
             self.assertEqual(dialog.tabs.tabText(0), "General")
             self.assertEqual(dialog.general_percussion_channel.value(), 3)
+            self.assertEqual(dialog.general_solo_volume_reduction.value(), 35)
             self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
+            self.assertTrue(dialog.general_midi_reset_before_playback.isChecked())
 
             dialog.restore_defaults()
 
             self.assertEqual(dialog.general_percussion_channel.value(), 10)
+            self.assertEqual(dialog.general_solo_volume_reduction.value(), 50)
             self.assertFalse(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
+            self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
 
     def test_preferences_dialog_applies_values_to_window_and_settings(self) -> None:
         with (
@@ -983,15 +1007,19 @@ class AppPlaylistTest(unittest.TestCase):
         ):
             window = MainWindow([])
 
-            window._apply_preferences(12, True, False)
+            window._apply_preferences(12, 40, True, False, True)
 
             self.assertEqual(window.player.percussion_channel, 12)
             self.assertEqual(window.percussion_channel_control.value(), 12)
+            self.assertEqual(window.solo_volume_reduction, 40)
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
+            self.assertTrue(window.player.send_reset_before_playback)
             self.assertEqual(FakeSettings.percussion_channel_value, 12)
+            self.assertEqual(FakeSettings.solo_volume_reduction_value, 40)
             self.assertTrue(FakeSettings.auto_play_on_load_value)
             self.assertFalse(FakeSettings.playlist_auto_advance_value)
+            self.assertTrue(FakeSettings.midi_reset_before_playback_value)
             self.assertEqual(window.statusBar().currentMessage(), "Preferences updated")
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
@@ -1243,6 +1271,16 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(window.player.percussion_channel, 11)
             self.assertEqual(FakeSettings.percussion_channel_value, 11)
+
+    def test_midi_reset_preference_initializes_player(self) -> None:
+        FakeSettings.midi_reset_before_playback_value = True
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertTrue(window.player.send_reset_before_playback)
 
 
 if __name__ == "__main__":

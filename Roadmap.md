@@ -249,7 +249,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Preferences dialog with Restore Defaults button.
 - [ ] General tab:
   - [x] percussion channel, default 10, persisted in settings;
-  - [ ] solo volume reduction percentage, default 50%;
+  - [x] solo volume reduction percentage, default 50%;
   - [x] auto-play on load;
   - [x] playlist auto-advance;
   - [ ] auto-load/save song settings;
@@ -257,7 +257,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] force dark mode where applicable;
   - [ ] use internal icon theme;
   - [ ] Qt Widgets style;
-  - [ ] MIDI reset SysEx before playback.
+  - [x] MIDI reset SysEx before playback.
 - [ ] Lyrics tab:
   - [ ] font;
   - [ ] future text color;

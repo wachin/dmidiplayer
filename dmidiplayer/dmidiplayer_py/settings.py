@@ -15,6 +15,8 @@ class AppSettings:
     DEFAULT_PERCUSSION_CHANNEL = 10
     DEFAULT_AUTO_PLAY_ON_LOAD = False
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
+    DEFAULT_SOLO_VOLUME_REDUCTION = 50
+    DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -100,6 +102,25 @@ class AppSettings:
 
     def set_playlist_auto_advance(self, enabled: bool) -> None:
         self._settings.setValue("playback/playlist_auto_advance", bool(enabled))
+        self._settings.sync()
+
+    def solo_volume_reduction(self) -> int:
+        value = self._settings.value("general/solo_volume_reduction", self.DEFAULT_SOLO_VOLUME_REDUCTION, int)
+        return max(0, min(100, value))
+
+    def set_solo_volume_reduction(self, value: int) -> None:
+        self._settings.setValue("general/solo_volume_reduction", max(0, min(100, value)))
+        self._settings.sync()
+
+    def midi_reset_before_playback(self) -> bool:
+        return self._settings.value(
+            "general/midi_reset_before_playback",
+            self.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK,
+            bool,
+        )
+
+    def set_midi_reset_before_playback(self, enabled: bool) -> None:
+        self._settings.setValue("general/midi_reset_before_playback", bool(enabled))
         self._settings.sync()
 
     def playlist_path(self) -> Path | None:

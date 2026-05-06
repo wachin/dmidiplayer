@@ -213,6 +213,35 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(len(output.events), 16)
         self.assertEqual(output.events[0].data, bytes([7, 80]))
 
+    def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player.set_send_reset_before_playback(True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player.play()
+
+        self.assertGreaterEqual(len(output.events), 2)
+        self.assertEqual(output.events[0].kind, "sysex")
+        self.assertEqual(output.events[0].data, bytes.fromhex("7e 7f 09 01 f7"))
+
+    def test_play_does_not_send_gm_reset_sysex_when_disabled(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player.play()
+
+        self.assertNotEqual(output.events[0].kind, "sysex")
+
     def test_loop_rewinds_to_start_tick_when_end_is_reached(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)

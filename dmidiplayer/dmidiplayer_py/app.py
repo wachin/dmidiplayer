@@ -64,6 +64,12 @@ class PreferencesDialog(QDialog):
         self.general_percussion_channel.setRange(1, 16)
         general_form.addRow(self.tr("Percussion channel:"), self.general_percussion_channel)
 
+        self.general_solo_volume_reduction = QSpinBox(general_tab)
+        self.general_solo_volume_reduction.setObjectName("general_solo_volume_reduction")
+        self.general_solo_volume_reduction.setRange(0, 100)
+        self.general_solo_volume_reduction.setSuffix("%")
+        general_form.addRow(self.tr("Solo volume reduction:"), self.general_solo_volume_reduction)
+
         self.general_auto_play_on_load = QCheckBox(self.tr("Auto-play after loading a file"), general_tab)
         self.general_auto_play_on_load.setObjectName("general_auto_play_on_load")
         general_form.addRow("", self.general_auto_play_on_load)
@@ -71,6 +77,10 @@ class PreferencesDialog(QDialog):
         self.general_playlist_auto_advance = QCheckBox(self.tr("Auto-advance to the next playlist item"), general_tab)
         self.general_playlist_auto_advance.setObjectName("general_playlist_auto_advance")
         general_form.addRow("", self.general_playlist_auto_advance)
+
+        self.general_midi_reset_before_playback = QCheckBox(self.tr("Send GM reset before playback"), general_tab)
+        self.general_midi_reset_before_playback.setObjectName("general_midi_reset_before_playback")
+        general_form.addRow("", self.general_midi_reset_before_playback)
         self.tabs.addTab(general_tab, self.tr("General"))
 
         self.buttons = QDialogButtonBox(
@@ -91,19 +101,25 @@ class PreferencesDialog(QDialog):
 
     def load_from_settings(self) -> None:
         self.general_percussion_channel.setValue(self._settings.percussion_channel())
+        self.general_solo_volume_reduction.setValue(self._settings.solo_volume_reduction())
         self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
+        self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
 
     def restore_defaults(self) -> None:
         self.general_percussion_channel.setValue(AppSettings.DEFAULT_PERCUSSION_CHANNEL)
+        self.general_solo_volume_reduction.setValue(AppSettings.DEFAULT_SOLO_VOLUME_REDUCTION)
         self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
+        self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
 
-    def preferences(self) -> tuple[int, bool, bool]:
+    def preferences(self) -> tuple[int, int, bool, bool, bool]:
         return (
             self.general_percussion_channel.value(),
+            self.general_solo_volume_reduction.value(),
             self.general_auto_play_on_load.isChecked(),
             self.general_playlist_auto_advance.isChecked(),
+            self.general_midi_reset_before_playback.isChecked(),
         )
 
 
@@ -177,6 +193,7 @@ class MainWindow(QMainWindow):
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
+        self.player.set_send_reset_before_playback(self.settings.midi_reset_before_playback())
         self.player.started.connect(self._playback_started)
         self.player.stopped.connect(self._playback_stopped)
         self.player.positionChanged.connect(self._update_position)
@@ -185,6 +202,7 @@ class MainWindow(QMainWindow):
         self.player.finished.connect(self._finished)
         self.auto_play_on_load = self.settings.auto_play_on_load()
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
+        self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self._pause_requested = False
         self._current_file: str | None = None
         self._current_playlist_path: Path | None = None
@@ -760,10 +778,21 @@ class MainWindow(QMainWindow):
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
 
-    def _apply_preferences(self, percussion_channel: int, auto_play_on_load: bool, playlist_auto_advance: bool) -> None:
+    def _apply_preferences(
+        self,
+        percussion_channel: int,
+        solo_volume_reduction: int,
+        auto_play_on_load: bool,
+        playlist_auto_advance: bool,
+        midi_reset_before_playback: bool,
+    ) -> None:
         self.percussion_channel_control.setValue(percussion_channel)
+        self.solo_volume_reduction = solo_volume_reduction
+        self.settings.set_solo_volume_reduction(solo_volume_reduction)
         self.auto_play_on_load_action.setChecked(auto_play_on_load)
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
+        self.player.set_send_reset_before_playback(midi_reset_before_playback)
+        self.settings.set_midi_reset_before_playback(midi_reset_before_playback)
         self.statusBar().showMessage(self.tr("Preferences updated"), 5000)
 
     def show_preferences(self) -> None:

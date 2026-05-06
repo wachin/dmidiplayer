@@ -175,6 +175,27 @@ class AppSettingsTest(unittest.TestCase):
             self.assertTrue(restored.auto_play_on_load())
             self.assertFalse(restored.playlist_auto_advance())
 
+    def test_general_preferences_are_saved_and_clamped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            self.assertEqual(settings.solo_volume_reduction(), 50)
+            self.assertFalse(settings.midi_reset_before_playback())
+
+            settings.set_solo_volume_reduction(80)
+            settings.set_midi_reset_before_playback(True)
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.solo_volume_reduction(), 80)
+            self.assertTrue(restored.midi_reset_before_playback())
+
+            settings.set_solo_volume_reduction(120)
+            self.assertEqual(AppSettings(base_dir).solo_volume_reduction(), 100)
+
+            settings.set_solo_volume_reduction(-10)
+            self.assertEqual(AppSettings(base_dir).solo_volume_reduction(), 0)
+
     def test_unwritable_app_data_falls_back_to_temp(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             blocking_file = Path(tmpdir, "not-a-directory")

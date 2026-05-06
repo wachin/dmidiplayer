@@ -36,6 +36,7 @@ class SequencePlayer(QObject):
         self._pitch_shift = 0
         self._volume_percent = 100
         self._percussion_channel = 9
+        self._send_reset_before_playback = False
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
@@ -75,6 +76,12 @@ class SequencePlayer(QObject):
             self._index = 0
             self._position = 0
             self._position_us = 0
+        if self._send_reset_before_playback:
+            try:
+                self.output.send_event(MidiEvent(tick=0, kind="sysex", data=bytes.fromhex("7e 7f 09 01 f7")))
+            except MidiOutputError as exc:
+                self.outputError.emit(str(exc))
+                return
         self._base_position_us = self._position_us
         self._clock.start()
         self._timer.start(2)
@@ -163,6 +170,13 @@ class SequencePlayer(QObject):
     def set_volume_percent(self, value: int) -> None:
         self._volume_percent = max(0, min(200, value))
         self._send_global_volume()
+
+    @property
+    def send_reset_before_playback(self) -> bool:
+        return self._send_reset_before_playback
+
+    def set_send_reset_before_playback(self, enabled: bool) -> None:
+        self._send_reset_before_playback = bool(enabled)
 
     @property
     def loop_enabled(self) -> bool:
