@@ -27,6 +27,7 @@ class FakeBackendManager:
 class FakeSettings:
     midi_destination_value = ""
     percussion_channel_value = 10
+    playlist_path_value: Path | None = None
     window_geometry_value: tuple[int, int, int, int] | None = None
 
     def __init__(self) -> None:
@@ -71,6 +72,12 @@ class FakeSettings:
 
     def set_percussion_channel(self, channel: int) -> None:
         type(self).percussion_channel_value = channel
+
+    def playlist_path(self) -> Path | None:
+        return type(self).playlist_path_value
+
+    def set_playlist_path(self, playlist_path: str | Path) -> None:
+        type(self).playlist_path_value = Path(playlist_path) if playlist_path else None
 
 
 class FakeAlsaOutput(OutputStub):
@@ -136,6 +143,7 @@ class AppPlaylistTest(unittest.TestCase):
     def setUp(self) -> None:
         FakeSettings.midi_destination_value = ""
         FakeSettings.percussion_channel_value = 10
+        FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
 
     def test_next_and_previous_select_playlist_items(self) -> None:
@@ -316,10 +324,17 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(menus, ["File", "Playback", "View", "Tools", "Help"])
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
+            self.assertIsNotNone(window.findChild(type(window.open_playlist_action), "open_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.save_playlist_action), "save_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.save_playlist_as_action), "save_playlist_as_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
+            self.assertIsNotNone(window.findChild(type(window.jump_bar_action), "jump_bar_action"))
+            self.assertIsNotNone(window.findChild(type(window.reset_pitch_action), "reset_pitch_action"))
+            self.assertIsNotNone(window.findChild(type(window.reset_tempo_action), "reset_tempo_action"))
+            self.assertIsNotNone(window.findChild(type(window.reset_volume_action), "reset_volume_action"))
             self.assertIsNotNone(window.findChild(type(window.repeat_playlist_action), "repeat_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.shuffle_playlist_action), "shuffle_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.refresh_midi_action), "refresh_midi_action"))
@@ -418,6 +433,32 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.next_action.shortcut().toString(), "Ctrl+Right")
             self.assertEqual(window.previous_bar_action.shortcut().toString(), "Alt+Left")
             self.assertEqual(window.next_bar_action.shortcut().toString(), "Alt+Right")
+            self.assertEqual(window.jump_bar_action.shortcut().toString(), "Ctrl+J")
+
+    def test_shared_actions_drive_reset_controls_and_jump(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "two-bars.mid")
+            write_two_bar_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                window.pitch_control.setValue(5)
+                window.tempo_control.setValue(150)
+                window.volume_control.setValue(80)
+                window.jump_bar.setValue(2)
+
+                window.reset_pitch_action.trigger()
+                window.reset_tempo_action.trigger()
+                window.reset_volume_action.trigger()
+                window.jump_bar_action.trigger()
+
+                self.assertEqual(window.pitch_control.value(), 0)
+                self.assertEqual(window.tempo_control.value(), 100)
+                self.assertEqual(window.volume_control.value(), 100)
+                self.assertEqual(window.player._position, 1920)
 
     def test_bar_navigation_actions_seek_to_neighboring_bar(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -586,6 +627,70 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
 
                 self.assertEqual(window.windowTitle(), "solo.mid - dmidiplayer PyQt6")
+
+    def test_save_playlist_file_uses_relative_entries_when_possible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            songs = Path(tmpdir, "songs")
+            songs.mkdir()
+            first = songs / "first.mid"
+            second = songs / "second.mid"
+            playlist_path = Path(tmpdir, "setlist.lst")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.save_playlist_file(playlist_path)
+
+                self.assertEqual(playlist_path.read_text(encoding="utf-8"), "songs/first.mid\nsongs/second.mid\n")
+                self.assertEqual(FakeSettings.playlist_path_value, playlist_path)
+
+    def test_load_playlist_file_resolves_relative_entries_and_remembers_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            songs = Path(tmpdir, "songs")
+            songs.mkdir()
+            first = songs / "first.mid"
+            second = songs / "second.mid"
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path = Path(tmpdir, "setlist.lst")
+            playlist_path.write_text("songs/first.mid\nsongs/second.mid\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                loaded = window.load_playlist_file(playlist_path)
+
+                self.assertEqual(loaded, [first, second])
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - setlist.lst - dmidiplayer PyQt6")
+                self.assertEqual(FakeSettings.playlist_path_value, playlist_path)
+
+    def test_saved_playlist_title_shows_unsaved_marker_after_modification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+            playlist_path = Path(tmpdir, "setlist.lst")
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_playlist_file(playlist_path)
+                window.add_file(str(third))
+
+                self.assertEqual(window.windowTitle(), "first.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

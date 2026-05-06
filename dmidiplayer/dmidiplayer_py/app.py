@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ from PyQt6.QtWidgets import (
     QSlider,
     QSpinBox,
     QTextBrowser,
+    QToolButton,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -60,6 +62,8 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist = True
         self._pause_requested = False
         self._current_file: str | None = None
+        self._current_playlist_path: Path | None = None
+        self._playlist_modified = False
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
@@ -107,6 +111,17 @@ class MainWindow(QMainWindow):
         self.open_action.setObjectName("open_action")
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.triggered.connect(self.open_files)
+        self.open_playlist_action = QAction(self.tr("Open Playlist"), self)
+        self.open_playlist_action.setObjectName("open_playlist_action")
+        self.open_playlist_action.triggered.connect(self.open_playlist)
+        self.save_playlist_action = QAction(self.tr("Save Playlist"), self)
+        self.save_playlist_action.setObjectName("save_playlist_action")
+        self.save_playlist_action.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_playlist_action.triggered.connect(self.save_playlist)
+        self.save_playlist_as_action = QAction(self.tr("Save Playlist As"), self)
+        self.save_playlist_as_action.setObjectName("save_playlist_as_action")
+        self.save_playlist_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
+        self.save_playlist_as_action.triggered.connect(self.save_playlist_as)
 
         self.exit_action = QAction(self.tr("Exit"), self)
         self.exit_action.setObjectName("exit_action")
@@ -166,6 +181,19 @@ class MainWindow(QMainWindow):
         self.next_bar_action.setObjectName("next_bar_action")
         self.next_bar_action.setShortcut(QKeySequence("Alt+Right"))
         self.next_bar_action.triggered.connect(self.next_bar)
+        self.reset_pitch_action = QAction("0", self)
+        self.reset_pitch_action.setObjectName("reset_pitch_action")
+        self.reset_pitch_action.triggered.connect(lambda: self.pitch_control.setValue(0))
+        self.reset_tempo_action = QAction("100%", self)
+        self.reset_tempo_action.setObjectName("reset_tempo_action")
+        self.reset_tempo_action.triggered.connect(lambda: self.tempo_control.setValue(100))
+        self.reset_volume_action = QAction("100%", self)
+        self.reset_volume_action.setObjectName("reset_volume_action")
+        self.reset_volume_action.triggered.connect(lambda: self.volume_control.setValue(100))
+        self.jump_bar_action = QAction(self.tr("Go"), self)
+        self.jump_bar_action.setObjectName("jump_bar_action")
+        self.jump_bar_action.setShortcut(QKeySequence("Ctrl+J"))
+        self.jump_bar_action.triggered.connect(self.jump_to_bar)
         self.repeat_playlist_action = QAction(self.tr("Repeat Playlist"), self)
         self.repeat_playlist_action.setObjectName("repeat_playlist_action")
         self.repeat_playlist_action.setCheckable(True)
@@ -184,25 +212,39 @@ class MainWindow(QMainWindow):
         self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
         self.remove_selected_action.setEnabled(current_row >= 0)
         self.clear_playlist_action.setEnabled(self.playlist.count() > 0)
+        self.save_playlist_action.setEnabled(self.playlist.count() > 0)
+        self.save_playlist_as_action.setEnabled(self.playlist.count() > 0)
 
     def _update_window_title(self) -> None:
         midi = self.player.sequence.midi
+        playlist_name = None if self._current_playlist_path is None else self._current_playlist_path.name
+        if playlist_name is not None and self._playlist_modified:
+            playlist_name = f"*{playlist_name}"
         if midi is None:
-            self.setWindowTitle(self.tr(APP_TITLE))
+            if playlist_name is None:
+                self.setWindowTitle(self.tr(APP_TITLE))
+            else:
+                self.setWindowTitle(self.tr("{playlist} - {app}").format(playlist=playlist_name, app=self.tr(APP_TITLE)))
             return
         title = midi.title or self.tr("Untitled")
         current_row = self.playlist.currentRow()
+        song_title = title
         if self.playlist.count() > 1 and current_row >= 0:
-            self.setWindowTitle(
-                self.tr("{song} [{index}/{count}] - {app}").format(
-                    song=title,
-                    index=current_row + 1,
-                    count=self.playlist.count(),
-                    app=self.tr(APP_TITLE),
-                )
+            song_title = self.tr("{song} [{index}/{count}]").format(
+                song=title,
+                index=current_row + 1,
+                count=self.playlist.count(),
             )
+        if playlist_name is None:
+            self.setWindowTitle(self.tr("{song} - {app}").format(song=song_title, app=self.tr(APP_TITLE)))
             return
-        self.setWindowTitle(self.tr("{song} - {app}").format(song=title, app=self.tr(APP_TITLE)))
+        self.setWindowTitle(
+            self.tr("{song} - {playlist} - {app}").format(
+                song=song_title,
+                playlist=playlist_name,
+                app=self.tr(APP_TITLE),
+            )
+        )
 
     def _build_toolbar(self) -> None:
         self.playback_toolbar = QToolBar(self.tr("Playback"), self)
@@ -223,9 +265,13 @@ class MainWindow(QMainWindow):
         file_menu = self.menuBar().addMenu(self.tr("File"))
         file_menu.setObjectName("file_menu")
         file_menu.addAction(self.open_action)
+        file_menu.addAction(self.open_playlist_action)
         self.recent_files_menu = file_menu.addMenu(self.tr("Open Recent"))
         self.recent_files_menu.setObjectName("recent_files_menu")
         self._refresh_recent_files_menu()
+        file_menu.addSeparator()
+        file_menu.addAction(self.save_playlist_action)
+        file_menu.addAction(self.save_playlist_as_action)
         file_menu.addSeparator()
         file_menu.addAction(self.remove_selected_action)
         file_menu.addAction(self.clear_playlist_action)
@@ -245,6 +291,7 @@ class MainWindow(QMainWindow):
         playback_menu.addSeparator()
         playback_menu.addAction(self.previous_bar_action)
         playback_menu.addAction(self.next_bar_action)
+        playback_menu.addAction(self.jump_bar_action)
         playback_menu.addSeparator()
         playback_menu.addAction(self.repeat_playlist_action)
         playback_menu.addAction(self.shuffle_playlist_action)
@@ -297,6 +344,12 @@ class MainWindow(QMainWindow):
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
 
+    def _mark_playlist_modified(self) -> None:
+        if self._current_playlist_path is None:
+            return
+        self._playlist_modified = True
+        self._update_window_title()
+
     def _playlist_selection_changed(self, row: int) -> None:
         self._update_action_state()
         if row < 0 or self.player.sequence.midi is None or self.playlist.count() <= 1:
@@ -315,6 +368,12 @@ class MainWindow(QMainWindow):
         self._update_window_title()
         self.statusBar().showMessage(status_message, 5000)
 
+    def _playlist_dialog_folder(self) -> Path:
+        saved_playlist = self.settings.playlist_path()
+        if saved_playlist is not None:
+            return saved_playlist.parent
+        return self.settings.last_folder(Path.home())
+
     def _remove_selected_playlist_item(self) -> None:
         row = self.playlist.currentRow()
         if row < 0:
@@ -326,14 +385,17 @@ class MainWindow(QMainWindow):
         del item
         if self.playlist.count() == 0:
             self.player.clear()
+            self._mark_playlist_modified()
             self._reset_loaded_file_state(self.tr("Playlist cleared"))
             return
         self.playlist.setCurrentRow(min(row, self.playlist.count() - 1))
         if removed_file == self._current_file:
+            self._mark_playlist_modified()
             current_item = self.playlist.currentItem()
             if current_item is not None:
                 self.load_file(current_item.text())
             return
+        self._mark_playlist_modified()
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(self.tr("Removed {name} from playlist").format(name=Path(removed_file).name), 5000)
@@ -343,7 +405,87 @@ class MainWindow(QMainWindow):
             return
         self.playlist.clear()
         self.player.clear()
+        self._mark_playlist_modified()
         self._reset_loaded_file_state(self.tr("Playlist cleared"))
+
+    def open_playlist(self) -> None:
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("Open Playlist"),
+            str(self._playlist_dialog_folder()),
+            self.tr("Playlists (*.lst);;All files (*)"),
+        )
+        if file_name:
+            self.load_playlist_file(file_name)
+
+    def save_playlist(self) -> None:
+        if self._current_playlist_path is not None:
+            self.save_playlist_file(self._current_playlist_path)
+            return
+        self.save_playlist_as()
+
+    def save_playlist_as(self) -> None:
+        default_name = self._current_playlist_path.name if self._current_playlist_path is not None else "playlist.lst"
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Save Playlist"),
+            str(self._playlist_dialog_folder() / default_name),
+            self.tr("Playlists (*.lst);;All files (*)"),
+        )
+        if file_name:
+            self.save_playlist_file(file_name)
+
+    def load_playlist_file(self, file_name: str | Path) -> list[Path]:
+        playlist_path = Path(file_name)
+        lines = playlist_path.read_text(encoding="utf-8").splitlines()
+        files: list[Path] = []
+        for line in lines:
+            entry = line.strip()
+            if not entry:
+                continue
+            path = Path(entry)
+            if not path.is_absolute():
+                path = (playlist_path.parent / path).resolve()
+            if self._is_supported_file(path):
+                files.append(path)
+        self.playlist.clear()
+        for path in files:
+            self.add_file(str(path), mark_modified=False)
+        self._current_playlist_path = playlist_path
+        self._playlist_modified = False
+        self.settings.set_playlist_path(playlist_path)
+        if files:
+            self.settings.set_last_folder(files[0].parent)
+            self.load_file(str(files[0]))
+        else:
+            self.player.clear()
+            self._reset_loaded_file_state(self.tr("Loaded empty playlist"))
+        self._update_window_title()
+        self.statusBar().showMessage(self.tr("Loaded playlist {name}").format(name=playlist_path.name), 5000)
+        return files
+
+    def save_playlist_file(self, file_name: str | Path) -> Path:
+        playlist_path = Path(file_name)
+        entries: list[str] = []
+        for item_path in self._playlist_paths():
+            try:
+                entry = os.path.relpath(item_path, playlist_path.parent)
+            except ValueError:
+                entry = str(item_path)
+            entries.append(entry)
+        text = "\n".join(entries)
+        if text:
+            text += "\n"
+        playlist_path.write_text(text, encoding="utf-8")
+        self._current_playlist_path = playlist_path
+        self._playlist_modified = False
+        self.settings.set_playlist_path(playlist_path)
+        self._update_window_title()
+        self.statusBar().showMessage(self.tr("Saved playlist {name}").format(name=playlist_path.name), 5000)
+        return playlist_path
+
+    def _playlist_paths(self) -> list[Path]:
+        return [Path(self.playlist.item(row).text()) for row in range(self.playlist.count())]
 
     def _help_doc_path(self) -> Path:
         locale_name = QLocale.system().name()
@@ -464,18 +606,18 @@ class MainWindow(QMainWindow):
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.addWidget(QLabel(self.tr("Pitch:")))
         controls_layout.addWidget(self.pitch_control)
-        controls_layout.addWidget(self._button("0", lambda: self.pitch_control.setValue(0)))
+        controls_layout.addWidget(self._action_button(self.reset_pitch_action))
         controls_layout.addWidget(QLabel(self.tr("Drums:")))
         controls_layout.addWidget(self.percussion_channel_control)
         controls_layout.addWidget(QLabel(self.tr("Tempo:")))
         controls_layout.addWidget(self.tempo_control)
-        controls_layout.addWidget(self._button("100%", lambda: self.tempo_control.setValue(100)))
+        controls_layout.addWidget(self._action_button(self.reset_tempo_action))
         controls_layout.addWidget(QLabel(self.tr("Volume:")))
         controls_layout.addWidget(self.volume_control)
-        controls_layout.addWidget(self._button("100%", lambda: self.volume_control.setValue(100)))
+        controls_layout.addWidget(self._action_button(self.reset_volume_action))
         controls_layout.addWidget(QLabel(self.tr("Bar:")))
-        controls_layout.addWidget(self._button(self.tr("Bar -"), self.previous_bar_action.trigger))
-        controls_layout.addWidget(self._button(self.tr("Bar +"), self.next_bar_action.trigger))
+        controls_layout.addWidget(self._action_button(self.previous_bar_action))
+        controls_layout.addWidget(self._action_button(self.next_bar_action))
         controls_layout.addStretch(1)
 
         loop_row = QWidget()
@@ -483,7 +625,7 @@ class MainWindow(QMainWindow):
         loop_layout.setContentsMargins(0, 0, 0, 0)
         loop_layout.addWidget(QLabel(self.tr("Jump bar:")))
         loop_layout.addWidget(self.jump_bar)
-        loop_layout.addWidget(self._button(self.tr("Go"), self.jump_to_bar))
+        loop_layout.addWidget(self._action_button(self.jump_bar_action))
         loop_layout.addWidget(self.loop_check)
         loop_layout.addWidget(QLabel(self.tr("Start bar:")))
         loop_layout.addWidget(self.loop_start)
@@ -501,9 +643,9 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(QLabel(self.tr("MIDI destination:")))
         layout.addWidget(self.connection_combo, 1)
-        layout.addWidget(self._button(self.tr("Refresh"), self.refresh_midi_action.trigger))
-        layout.addWidget(self._button(self.tr("Connect"), self.connect_midi_action.trigger))
-        layout.addWidget(self._button(self.tr("Disconnect"), self.disconnect_midi_action.trigger))
+        layout.addWidget(self._action_button(self.refresh_midi_action))
+        layout.addWidget(self._action_button(self.connect_midi_action))
+        layout.addWidget(self._action_button(self.disconnect_midi_action))
         return row
 
     def _spinbox(self, minimum: int, maximum: int, value: int, slot: object, suffix: str = "") -> QSpinBox:
@@ -518,6 +660,11 @@ class MainWindow(QMainWindow):
     def _button(self, text: str, slot: object) -> QPushButton:
         button = QPushButton(text)
         button.clicked.connect(slot)
+        return button
+
+    def _action_button(self, action: QAction) -> QToolButton:
+        button = QToolButton()
+        button.setDefaultAction(action)
         return button
 
     def _create_midi_output(self) -> object:
@@ -662,7 +809,7 @@ class MainWindow(QMainWindow):
         self.load_file(str(files[0]))
         return files
 
-    def add_file(self, file_name: str) -> bool:
+    def add_file(self, file_name: str, mark_modified: bool = True) -> bool:
         path = Path(file_name)
         if not self._is_supported_file(path):
             return False
@@ -672,6 +819,8 @@ class MainWindow(QMainWindow):
                 self._update_action_state()
                 return False
         self.playlist.addItem(str(path))
+        if mark_modified:
+            self._mark_playlist_modified()
         self._update_action_state()
         return True
 

@@ -82,6 +82,20 @@ class AppSettings:
         self._settings.setValue("general/percussion_channel", max(1, min(16, channel)))
         self._settings.sync()
 
+    def playlist_path(self) -> Path | None:
+        value = self._settings.value("playlist/path", "", str)
+        if not value:
+            return None
+        path = Path(value)
+        return path if path.exists() else None
+
+    def set_playlist_path(self, playlist_path: str | Path) -> None:
+        if playlist_path:
+            self._settings.setValue("playlist/path", str(Path(playlist_path)))
+        else:
+            self._settings.remove("playlist/path")
+        self._settings.sync()
+
     def midi_destination(self) -> str:
         return self._settings.value("midi/destination", "", str)
 

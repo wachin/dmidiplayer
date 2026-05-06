@@ -219,13 +219,13 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [ ] Manage playlists from `File -> Play List...`.
 - [ ] Create, modify, sort, open, and save playlists.
-- [ ] Show the playlist file name in the window title.
+- [x] Show the playlist file name in the window title.
 - [x] Navigate manually with Next and Previous.
 - [x] Create a temporary playlist when opening multiple command-line files.
 - [x] Create a temporary playlist when dragging/dropping files into the window.
-- [ ] Remember the last opened or saved playlist.
+- [x] Remember the last opened or saved playlist.
 - [x] Do not save playlists automatically unless explicitly requested.
-- [ ] Use plain text playlist files, one file per line.
+- [x] Use plain text playlist files, one file per line.
 - [ ] Support absolute paths and paths relative to the `.lst` file.
 - [ ] Include an initial playlist with examples or allow starting with an empty list.
 
@@ -582,7 +582,7 @@ clearer bites instead of rediscovering the next small step.
   - [ ] Add rhythm view visibility toggle.
 - [x] Add Tools menu actions for MIDI connections and future preferences.
 - [x] Add Help menu actions for About and local help.
-- [ ] Promote toolbar buttons to shared `QAction` instances everywhere.
+- [x] Promote toolbar buttons to shared `QAction` instances everywhere.
 - [x] Add enabled/disabled menu state when no file is loaded.
 - [x] Add status bar state messages for loading, playing, paused, stopped, and
   errors.
@@ -600,13 +600,13 @@ clearer bites instead of rediscovering the next small step.
 ### Playlist Files
 
 - [ ] Create a playlist model separate from `QListWidget`.
-- [ ] Open `.lst` playlist files with relative path resolution.
-- [ ] Save `.lst` playlist files using paths relative to the playlist location
+- [x] Open `.lst` playlist files with relative path resolution.
+- [x] Save `.lst` playlist files using paths relative to the playlist location
   when possible.
-- [ ] Add Save Playlist and Save Playlist As actions.
-- [ ] Remember the last playlist path in settings.
-- [ ] Show unsaved playlist state in the window title.
-- [ ] Add tests for absolute and relative playlist entries.
+- [x] Add Save Playlist and Save Playlist As actions.
+- [x] Remember the last playlist path in settings.
+- [x] Show unsaved playlist state in the window title.
+- [x] Add tests for absolute and relative playlist entries.
 
 ### Dialogs And Original UI
 

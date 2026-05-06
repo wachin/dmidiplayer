@@ -116,6 +116,29 @@ class AppSettingsTest(unittest.TestCase):
             settings.set_percussion_channel(0)
             self.assertEqual(AppSettings(base_dir).percussion_channel(), 1)
 
+    def test_playlist_path_is_saved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+            playlist = Path(tmpdir, "setlist.lst")
+            playlist.write_text("")
+
+            settings = AppSettings(base_dir)
+            settings.set_playlist_path(playlist)
+
+            self.assertEqual(AppSettings(base_dir).playlist_path(), playlist)
+
+    def test_empty_playlist_path_clears_saved_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+            playlist = Path(tmpdir, "setlist.lst")
+            playlist.write_text("")
+
+            settings = AppSettings(base_dir)
+            settings.set_playlist_path(playlist)
+            settings.set_playlist_path("")
+
+            self.assertIsNone(AppSettings(base_dir).playlist_path())
+
     def test_midi_destination_is_saved(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir, "appdata")
