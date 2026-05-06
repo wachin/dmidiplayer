@@ -31,12 +31,13 @@ from .settings import AppSettings
 
 
 MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
+APP_TITLE = "dmidiplayer PyQt6"
 
 
 class MainWindow(QMainWindow):
     def __init__(self, start_files: list[str]) -> None:
         super().__init__()
-        self.setWindowTitle(self.tr("dmidiplayer PyQt6"))
+        self.setWindowTitle(self.tr(APP_TITLE))
         self.resize(900, 520)
         self.setAcceptDrops(True)
         self.settings = AppSettings()
@@ -146,6 +147,25 @@ class MainWindow(QMainWindow):
         self.next_bar_action.setEnabled(has_file)
         self.previous_action.setEnabled(current_row > 0)
         self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
+
+    def _update_window_title(self) -> None:
+        midi = self.player.sequence.midi
+        if midi is None:
+            self.setWindowTitle(self.tr(APP_TITLE))
+            return
+        title = midi.title or self.tr("Untitled")
+        current_row = self.playlist.currentRow()
+        if self.playlist.count() > 1 and current_row >= 0:
+            self.setWindowTitle(
+                self.tr("{song} [{index}/{count}] - {app}").format(
+                    song=title,
+                    index=current_row + 1,
+                    count=self.playlist.count(),
+                    app=self.tr(APP_TITLE),
+                )
+            )
+            return
+        self.setWindowTitle(self.tr("{song} - {app}").format(song=title, app=self.tr(APP_TITLE)))
 
     def _build_toolbar(self) -> None:
         self.playback_toolbar = QToolBar(self.tr("Playback"), self)
@@ -527,6 +547,7 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._update_action_state()
+        self._update_window_title()
         self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))
 
     def previous_file(self) -> None:
@@ -556,6 +577,7 @@ class MainWindow(QMainWindow):
             if self.playlist.item(row).text() == file_name:
                 self.playlist.setCurrentRow(row)
                 self._update_action_state()
+                self._update_window_title()
                 return
 
     def _update_position(self, tick: int, maximum: int) -> None:

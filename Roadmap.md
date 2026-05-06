@@ -586,7 +586,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Add enabled/disabled menu state when no file is loaded.
 - [x] Add status bar state messages for loading, playing, paused, stopped, and
   errors.
-- [ ] Keep the window title synchronized with the current song and playlist.
+- [x] Keep the window title synchronized with the current song and playlist.
 - [ ] Prevent duplicate playlist rows for the same file unless explicitly
   requested.
 - [ ] Add remove-selected and clear-playlist actions.

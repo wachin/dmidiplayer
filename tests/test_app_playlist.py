@@ -465,6 +465,40 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertTrue(window.previous_action.isEnabled())
                 self.assertFalse(window.next_action.isEnabled())
 
+    def test_window_title_tracks_current_song_and_playlist_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+
+                self.assertEqual(window.windowTitle(), "dmidiplayer PyQt6")
+
+                window.open_paths([first, second], remember_folder=True)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - dmidiplayer PyQt6")
+
+                window.next_file()
+                self.assertEqual(window.windowTitle(), "second.mid [2/2] - dmidiplayer PyQt6")
+
+    def test_window_title_uses_song_name_without_playlist_context_for_single_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "solo.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                self.assertEqual(window.windowTitle(), "solo.mid - dmidiplayer PyQt6")
+
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
         with (
