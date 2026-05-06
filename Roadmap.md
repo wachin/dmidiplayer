@@ -587,7 +587,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Add status bar state messages for loading, playing, paused, stopped, and
   errors.
 - [x] Keep the window title synchronized with the current song and playlist.
-- [ ] Prevent duplicate playlist rows for the same file unless explicitly
+- [x] Prevent duplicate playlist rows for the same file unless explicitly
   requested.
 - [x] Add remove-selected and clear-playlist actions.
 - [ ] Add repeat playlist and shuffle toggles.

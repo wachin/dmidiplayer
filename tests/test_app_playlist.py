@@ -252,6 +252,26 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn("first", window.title_label.text())
                 self.assertEqual(window.settings.folder, first.parent)
 
+    def test_open_paths_does_not_duplicate_existing_playlist_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                opened = window.open_paths([first, second], remember_folder=True)
+
+                self.assertEqual(opened, [first, second])
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.item(0).text(), str(first))
+                self.assertEqual(window.playlist.item(1).text(), str(second))
+                self.assertEqual(window.playlist.currentRow(), 0)
+
     def test_open_paths_ignores_unsupported_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             ignored = Path(tmpdir, "notes.txt")
@@ -266,6 +286,25 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.open_paths([ignored], remember_folder=True), [])
                 self.assertEqual(window.playlist.count(), 0)
                 self.assertIsNone(window.settings.folder)
+
+    def test_add_file_reuses_existing_playlist_row_instead_of_duplicating(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+
+                added = window.add_file(str(first))
+
+                self.assertFalse(added)
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.currentRow(), 0)
 
     def test_menu_bar_contains_primary_menus_and_actions(self) -> None:
         with (

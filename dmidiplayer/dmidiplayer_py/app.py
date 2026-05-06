@@ -652,11 +652,18 @@ class MainWindow(QMainWindow):
         self.load_file(str(files[0]))
         return files
 
-    def add_file(self, file_name: str) -> None:
+    def add_file(self, file_name: str) -> bool:
         path = Path(file_name)
-        if self._is_supported_file(path):
-            self.playlist.addItem(str(path))
-            self._update_action_state()
+        if not self._is_supported_file(path):
+            return False
+        for row in range(self.playlist.count()):
+            if self.playlist.item(row).text() == str(path):
+                self.playlist.setCurrentRow(row)
+                self._update_action_state()
+                return False
+        self.playlist.addItem(str(path))
+        self._update_action_state()
+        return True
 
     def _is_supported_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
