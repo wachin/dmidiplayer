@@ -205,11 +205,15 @@ Cuando un archivo tiene texto en varias pistas, la ventana empieza
 automáticamente en la pista con mas eventos de texto. Si vuelves a `All tracks`,
 veras el numero de pista delante de cada linea para distinguir el origen.
 
+Usa `Save` para guardar en un archivo el texto filtrado actual. El selector
+`Encoding` controla si el archivo se escribe como `UTF-8`, `Latin-1` o
+`CP1252`.
+
 Usa `Copy` para llevar al portapapeles el texto filtrado actual. Usa `Font`
 para elegir una fuente mas comoda para el panel de letras.
 
-Todavia faltan las anulaciones de codificacion, guardar/exportar y el modo de
-pantalla completa.
+Todavia faltan la deteccion/anulacion manual de codificacion, la impresion y el
+modo de pantalla completa.
 
 ## Fila de destino MIDI
 

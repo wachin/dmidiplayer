@@ -202,10 +202,15 @@ When a file has text in multiple tracks, the window automatically starts on the
 track with the most text events. Switching back to `All tracks` shows the track
 number before each line so mixed sources stay readable.
 
+Use `Save` to write the currently filtered text to a file. The `Encoding`
+selector controls whether the file is written as `UTF-8`, `Latin-1`, or
+`CP1252`.
+
 Use `Copy` to place the currently filtered text into the clipboard. Use `Font`
 to choose a more comfortable display font for the lyrics pane.
 
-Encoding overrides, save/export, and fullscreen behavior are still pending.
+Encoding detection/manual override, printing, and fullscreen behavior are still
+pending.
 
 ## MIDI Destination Row
 

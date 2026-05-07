@@ -6,7 +6,7 @@ import random
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QLocale, QSignalBlocker, Qt
+from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
 from PyQt6.QtWidgets import (
     QApplication,
@@ -433,6 +433,7 @@ class ChannelsDialog(QDialog):
 
 
 class LyricsDialog(QDialog):
+    textSaved = pyqtSignal(str, str)
     FILTERS = (
         ("all", "All"),
         ("lyrics", "Lyrics"),
@@ -467,7 +468,18 @@ class LyricsDialog(QDialog):
         self.browser.setObjectName("lyrics_browser")
         layout.addWidget(self.browser)
         button_row = QHBoxLayout()
+        button_row.addWidget(QLabel(self.tr("Encoding:")))
+        self.encoding_combo = QComboBox(self)
+        self.encoding_combo.setObjectName("lyrics_encoding_combo")
+        self.encoding_combo.addItem("UTF-8", "utf-8")
+        self.encoding_combo.addItem("Latin-1", "latin-1")
+        self.encoding_combo.addItem("CP1252", "cp1252")
+        button_row.addWidget(self.encoding_combo)
         button_row.addStretch(1)
+        self.save_button = QPushButton(self.tr("Save"), self)
+        self.save_button.setObjectName("lyrics_save_button")
+        self.save_button.clicked.connect(self.save_to_file)
+        button_row.addWidget(self.save_button)
         self.copy_button = QPushButton(self.tr("Copy"), self)
         self.copy_button.setObjectName("lyrics_copy_button")
         self.copy_button.clicked.connect(self.copy_to_clipboard)
@@ -557,6 +569,23 @@ class LyricsDialog(QDialog):
         font, accepted = QFontDialog.getFont(self.browser.font(), self, self.tr("Lyrics Font"))
         if accepted:
             self.browser.setFont(font)
+
+    def save_to_file(self) -> None:
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Save Lyrics"),
+            "lyrics.txt",
+            self.tr("Text files (*.txt);;All files (*)"),
+        )
+        if not file_name:
+            return
+        encoding = str(self.encoding_combo.currentData() or "utf-8")
+        try:
+            Path(file_name).write_text(self.current_text(), encoding=encoding)
+        except OSError as exc:
+            QMessageBox.warning(self, self.tr("Save Lyrics"), str(exc))
+            return
+        self.textSaved.emit(file_name, encoding)
 
 
 class MainWindow(QMainWindow):
@@ -1269,6 +1298,7 @@ class MainWindow(QMainWindow):
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
             self.lyrics_dialog = self._create_lyrics_dialog()
+            self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
             self._refresh_lyrics_dialog()
         return self.lyrics_dialog
 
@@ -1282,6 +1312,15 @@ class MainWindow(QMainWindow):
         if self.lyrics_dialog is None:
             return
         self.lyrics_dialog.set_text_events(self.player.sequence.text_events())
+
+    def _lyrics_text_saved(self, file_name: str, encoding: str) -> None:
+        self.statusBar().showMessage(
+            self.tr("Saved lyrics to {name} ({encoding})").format(
+                name=Path(file_name).name,
+                encoding=encoding,
+            ),
+            5000,
+        )
 
     def _set_channel_muted(self, channel: int, muted: bool) -> None:
         self.player.set_channel_muted(channel, muted)

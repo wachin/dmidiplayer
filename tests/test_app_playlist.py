@@ -937,6 +937,47 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.browser.font().family(), chosen_font.family())
                 self.assertEqual(dialog.browser.font().pointSize(), chosen_font.pointSize())
 
+    def test_lyrics_dialog_save_button_writes_filtered_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            save_path = Path(tmpdir, "lyrics.txt")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.QFileDialog.getSaveFileName", return_value=(str(save_path), "")),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.filter_combo.setCurrentIndex(1)
+
+                dialog.save_button.click()
+
+                self.assertEqual(save_path.read_text(encoding="utf-8").strip(), "Lyric: Sing!")
+                self.assertEqual(window.statusBar().currentMessage(), "Saved lyrics to lyrics.txt (utf-8)")
+
+    def test_lyrics_dialog_save_button_uses_selected_encoding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            save_path = Path(tmpdir, "lyrics-latin1.txt")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.QFileDialog.getSaveFileName", return_value=(str(save_path), "")),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.browser.setPlainText("Lyric: Canción")
+                dialog.encoding_combo.setCurrentIndex(1)
+
+                dialog.save_button.click()
+
+                self.assertEqual(save_path.read_text(encoding="latin-1"), "Lyric: Canción")
+                self.assertEqual(window.statusBar().currentMessage(), "Saved lyrics to lyrics-latin1.txt (latin-1)")
+
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),

@@ -205,7 +205,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Detect encoding automatically and allow manual override.
 - [ ] Highlight past/future lyrics with configurable colors.
 - [x] Copy lyrics to clipboard.
-- [ ] Save lyrics to a file with selected encoding.
+- [x] Save lyrics to a file with selected encoding.
 - [ ] Print lyrics.
 - [x] Change lyrics font.
 - [ ] Fullscreen lyrics view.
