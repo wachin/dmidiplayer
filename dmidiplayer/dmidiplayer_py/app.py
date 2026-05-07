@@ -179,6 +179,25 @@ GENERAL_MIDI_PROGRAMS = (
     "Gunshot",
 )
 
+CHANNEL_COLOR_PALETTES = (
+    ("#fee2e2", "#dc2626", "#991b1b", "#fca5a5"),
+    ("#ffedd5", "#ea580c", "#9a3412", "#fdba74"),
+    ("#fef3c7", "#d97706", "#92400e", "#fcd34d"),
+    ("#ecfccb", "#65a30d", "#365314", "#bef264"),
+    ("#dcfce7", "#16a34a", "#166534", "#86efac"),
+    ("#cffafe", "#0891b2", "#155e75", "#67e8f9"),
+    ("#dbeafe", "#2563eb", "#1e3a8a", "#93c5fd"),
+    ("#e0e7ff", "#4f46e5", "#312e81", "#a5b4fc"),
+    ("#ede9fe", "#7c3aed", "#4c1d95", "#c4b5fd"),
+    ("#fae8ff", "#c026d3", "#86198f", "#e879f9"),
+    ("#fce7f3", "#db2777", "#9d174d", "#f9a8d4"),
+    ("#ffe4e6", "#e11d48", "#9f1239", "#fda4af"),
+    ("#f3f4f6", "#4b5563", "#111827", "#d1d5db"),
+    ("#ede9fe", "#6d28d9", "#581c87", "#ddd6fe"),
+    ("#ecfeff", "#0f766e", "#134e4a", "#99f6e4"),
+    ("#fef2f2", "#b91c1c", "#7f1d1d", "#fecaca"),
+)
+
 
 def gm_program_label(program: int) -> str:
     program = max(0, min(127, program))
@@ -438,6 +457,7 @@ class PianolaDialog(QDialog):
     allTracksVisibilityChanged = pyqtSignal(bool)
     rangeModeChanged = pyqtSignal(str)
     noteLabelModeChanged = pyqtSignal(str)
+    colorModeChanged = pyqtSignal(str)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -448,8 +468,10 @@ class PianolaDialog(QDialog):
         self._track_visibility: dict[int, QCheckBox] = {}
         self._track_keyboard_containers: dict[int, QWidget] = {}
         self._track_note_ranges: dict[int, tuple[int, int]] = {}
+        self._track_primary_channels: dict[int, int | None] = {}
         self._range_mode = "exact"
         self._note_label_mode = "never"
+        self._color_mode = "blue"
         layout = QVBoxLayout(self)
         button_row = QHBoxLayout()
         button_row.addWidget(QLabel(self.tr("Range:"), self))
@@ -468,6 +490,13 @@ class PianolaDialog(QDialog):
         self.note_labels_combo.addItem(self.tr("Always"), "always")
         self.note_labels_combo.currentIndexChanged.connect(self._note_label_mode_changed)
         button_row.addWidget(self.note_labels_combo)
+        button_row.addWidget(QLabel(self.tr("Colors:"), self))
+        self.color_mode_combo = QComboBox(self)
+        self.color_mode_combo.setObjectName("pianola_color_mode_combo")
+        self.color_mode_combo.addItem(self.tr("Blue"), "blue")
+        self.color_mode_combo.addItem(self.tr("By channel"), "channel")
+        self.color_mode_combo.currentIndexChanged.connect(self._color_mode_changed)
+        button_row.addWidget(self.color_mode_combo)
         button_row.addStretch(1)
         self.show_all_button = QPushButton(self.tr("Show All"), self)
         self.show_all_button.setObjectName("pianola_show_all_button")
@@ -507,6 +536,7 @@ class PianolaDialog(QDialog):
         self._track_visibility.clear()
         self._track_keyboard_containers.clear()
         self._track_note_ranges.clear()
+        self._track_primary_channels.clear()
         self._track_channels = {
             int(track["track"]): set(track["channels"]) for track in tracks
         }
@@ -563,6 +593,7 @@ class PianolaDialog(QDialog):
                 self._track_visibility[track_number] = visible_checkbox
                 self._track_keyboard_containers[track_number] = keyboard_container
                 self._track_note_ranges[track_number] = (min_note, max_note)
+                self._track_primary_channels[track_number] = min(channels) if channels else None
                 visible_checkbox.toggled.connect(
                     lambda checked, track=track_number: self._set_track_visible(track, checked, emit_signal=True)
                 )
@@ -570,6 +601,7 @@ class PianolaDialog(QDialog):
             start = tab_index + 1
             end = tab_index + len(chunk)
             self.tabs.addTab(page, self.tr("Tracks {start}-{end}").format(start=start, end=end))
+        self._apply_track_colors()
         self.tabs.setCurrentIndex(0)
 
     def _set_track_visible(self, track_number: int, visible: bool, emit_signal: bool) -> None:
@@ -609,6 +641,31 @@ class PianolaDialog(QDialog):
         for keyboard in self._track_keyboards.values():
             keyboard.set_note_label_mode(self._note_label_mode)
         self.noteLabelModeChanged.emit(self._note_label_mode)
+
+    def _color_mode_changed(self, index: int) -> None:
+        self._color_mode = str(self.color_mode_combo.itemData(index) or "blue")
+        self._apply_track_colors()
+        self.colorModeChanged.emit(self._color_mode)
+
+    def _apply_track_colors(self) -> None:
+        for track_number, keyboard in self._track_keyboards.items():
+            channel = self._track_primary_channels.get(track_number)
+            if self._color_mode == "channel" and channel is not None:
+                white_low, white_high, black_low, black_high = CHANNEL_COLOR_PALETTES[channel % len(CHANNEL_COLOR_PALETTES)]
+                keyboard.set_active_colors(
+                    white_low=white_low,
+                    white_high=white_high,
+                    black_low=black_low,
+                    black_high=black_high,
+                )
+            else:
+                keyboard.set_active_colors(
+                    white_low="#bfdbfe",
+                    white_high="#1d4ed8",
+                    black_low="#1d4ed8",
+                    black_high="#93c5fd",
+                    black_idle="#111827",
+                )
 
     def set_fullscreen_enabled(self, enabled: bool) -> None:
         if enabled:
@@ -1618,6 +1675,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.allTracksVisibilityChanged.connect(self._pianola_all_tracks_visibility_changed)
             self.pianola_dialog.rangeModeChanged.connect(self._pianola_range_mode_changed)
             self.pianola_dialog.noteLabelModeChanged.connect(self._pianola_note_label_mode_changed)
+            self.pianola_dialog.colorModeChanged.connect(self._pianola_color_mode_changed)
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1665,6 +1723,16 @@ class MainWindow(QMainWindow):
         }
         self.statusBar().showMessage(
             self.tr("Piano Player labels: {mode}").format(mode=labels.get(mode, mode)),
+            3000,
+        )
+
+    def _pianola_color_mode_changed(self, mode: str) -> None:
+        labels = {
+            "blue": self.tr("Blue"),
+            "channel": self.tr("By channel"),
+        }
+        self.statusBar().showMessage(
+            self.tr("Piano Player colors: {mode}").format(mode=labels.get(mode, mode)),
             3000,
         )
 

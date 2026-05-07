@@ -216,6 +216,9 @@ comfortable reading layout.
 Use the `Labels` selector to choose how note names appear on the keys:
 `Never`, `Minimal`, `When active`, or `Always`.
 
+Use the `Colors` selector to keep the current blue palette or switch to
+`By channel`, which gives each track keyboard a channel-based color family.
+
 The keyboard widget now includes black keys as part of that reduced range, so
 the track view reads more like a real piano layout.
 

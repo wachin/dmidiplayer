@@ -221,6 +221,10 @@ lectura mas comoda.
 Usa el selector `Labels` para elegir como aparecen los nombres de las notas en
 las teclas: `Never`, `Minimal`, `When active` o `Always`.
 
+Usa el selector `Colors` para mantener la paleta azul actual o cambiar a
+`By channel`, que da a cada teclado de pista una familia de color basada en su
+canal.
+
 El widget de teclado ahora incluye teclas negras dentro de ese rango reducido,
 de modo que la vista de pista se parece mas a un teclado de piano real.
 

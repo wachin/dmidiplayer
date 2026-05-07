@@ -18,6 +18,11 @@ class PianoKeyboard(QWidget):
         self._min_note = 21
         self._max_note = 108
         self._note_label_mode = "never"
+        self._white_low_color = QColor("#bfdbfe")
+        self._white_high_color = QColor("#1d4ed8")
+        self._black_low_color = QColor("#1d4ed8")
+        self._black_high_color = QColor("#93c5fd")
+        self._black_idle_color = QColor("#111827")
         self.setMinimumHeight(72)
 
     def note_on(self, note: int, velocity: int = 127) -> None:
@@ -46,6 +51,23 @@ class PianoKeyboard(QWidget):
         self._note_label_mode = mode
         self.update()
 
+    def set_active_colors(
+        self,
+        *,
+        white_low: QColor | str,
+        white_high: QColor | str,
+        black_low: QColor | str,
+        black_high: QColor | str,
+        black_idle: QColor | str | None = None,
+    ) -> None:
+        self._white_low_color = QColor(white_low)
+        self._white_high_color = QColor(white_high)
+        self._black_low_color = QColor(black_low)
+        self._black_high_color = QColor(black_high)
+        if black_idle is not None:
+            self._black_idle_color = QColor(black_idle)
+        self.update()
+
     def visible_white_notes(self) -> list[int]:
         return [note for note in range(self._min_note, self._max_note + 1) if note % 12 not in self.BLACK_KEY_CLASSES]
 
@@ -70,11 +92,11 @@ class PianoKeyboard(QWidget):
     def active_note_color(self, note: int, black_key: bool = False) -> QColor:
         velocity = self._active_velocities.get(note, 127)
         if black_key:
-            low = QColor("#1d4ed8")
-            high = QColor("#93c5fd")
+            low = self._black_low_color
+            high = self._black_high_color
         else:
-            low = QColor("#bfdbfe")
-            high = QColor("#1d4ed8")
+            low = self._white_low_color
+            high = self._white_high_color
         return self._interpolate_color(low, high, velocity / 127.0)
 
     def _interpolate_color(self, low: QColor, high: QColor, ratio: float) -> QColor:
@@ -93,7 +115,6 @@ class PianoKeyboard(QWidget):
         if not white_notes:
             white_notes = [n for n in range(21, 109) if n % 12 not in (1, 3, 6, 8, 10)]
         key_width = max(1, self.width() / len(white_notes))
-        black_idle = QColor("#111827")
         painter.setPen(Qt.GlobalColor.black)
         white_positions: dict[int, tuple[int, int]] = {}
         for index, note in enumerate(white_notes):
@@ -126,7 +147,7 @@ class PianoKeyboard(QWidget):
                 0,
                 black_width,
                 black_height,
-                self.active_note_color(note, black_key=True) if note in self._active else black_idle,
+                self.active_note_color(note, black_key=True) if note in self._active else self._black_idle_color,
             )
             painter.drawRect(rect_x, 0, black_width, black_height)
             if note in labels:

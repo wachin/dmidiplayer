@@ -209,7 +209,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
 - [x] Allow show/hide individual track keyboards in the current Pianola window slice.
 - [x] Allow show all / hide all track keyboards in the current Pianola window slice.
-- [ ] Allow customizable colors per channel/state.
+- [x] Allow customizable colors per channel/state.
 - [x] Allow velocity tinting.
 - [x] Show note names according to preference:
   - [x] never;

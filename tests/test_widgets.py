@@ -72,6 +72,20 @@ class PianoKeyboardTest(unittest.TestCase):
         self.assertEqual(keyboard.visible_note_labels()[48], "C3")
         self.assertEqual(keyboard.visible_note_labels()[58], "A#3")
 
+    def test_active_colors_can_be_overridden(self) -> None:
+        keyboard = PianoKeyboard()
+        keyboard.set_active_colors(
+            white_low="#fef3c7",
+            white_high="#d97706",
+            black_low="#92400e",
+            black_high="#fcd34d",
+        )
+        keyboard.note_on(60, 127)
+        keyboard.note_on(61, 127)
+
+        self.assertEqual(keyboard.active_note_color(60).name(), "#d97706")
+        self.assertEqual(keyboard.active_note_color(61, black_key=True).name(), "#fcd34d")
+
 
 if __name__ == "__main__":
     unittest.main()

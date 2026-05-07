@@ -938,6 +938,30 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn(58, keyboard_one.visible_note_labels())
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player labels: Always")
 
+    def test_pianola_dialog_can_use_channel_based_colors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                color_mode_combo = dialog.findChild(QComboBox, "pianola_color_mode_combo")
+
+                default_color = keyboard_one._white_high_color.name()
+
+                color_mode_combo.setCurrentIndex(color_mode_combo.findData("channel"))
+
+                self.assertNotEqual(keyboard_one._white_high_color.name(), default_color)
+                self.assertNotEqual(keyboard_two._white_high_color.name(), default_color)
+                self.assertNotEqual(keyboard_one._white_high_color.name(), keyboard_two._white_high_color.name())
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player colors: By channel")
+
     def test_pianola_dialog_can_hide_individual_track_keyboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")
