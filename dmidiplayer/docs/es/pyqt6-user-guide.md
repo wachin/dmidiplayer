@@ -221,6 +221,9 @@ lectura mas comoda.
 Usa el selector `Labels` para elegir como aparecen los nombres de las notas en
 las teclas: `Never`, `Minimal`, `When active` o `Always`.
 
+Usa el selector `Octaves` para elegir la convencion de numeracion de octavas
+para esas etiquetas. Las opciones actuales son `Scientific` y `Yamaha`.
+
 Usa el selector `Colors` para mantener la paleta azul actual o cambiar a
 `By channel`, que da a cada teclado de pista una familia de color basada en su
 canal.

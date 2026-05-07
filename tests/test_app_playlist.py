@@ -938,6 +938,29 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn(58, keyboard_one.visible_note_labels())
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player labels: Always")
 
+    def test_pianola_dialog_can_change_octave_designation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "ranges.mid")
+            write_track_range_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
+                octave_combo = dialog.findChild(QComboBox, "pianola_octave_designation_combo")
+
+                note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
+                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C3", 60: "C4"})
+
+                octave_combo.setCurrentIndex(octave_combo.findData("yamaha"))
+
+                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C2", 60: "C3"})
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player octaves: Yamaha")
+
     def test_pianola_dialog_can_use_channel_based_colors(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")

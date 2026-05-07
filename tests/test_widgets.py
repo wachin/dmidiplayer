@@ -86,6 +86,15 @@ class PianoKeyboardTest(unittest.TestCase):
         self.assertEqual(keyboard.active_note_color(60).name(), "#d97706")
         self.assertEqual(keyboard.active_note_color(61, black_key=True).name(), "#fcd34d")
 
+    def test_note_labels_follow_octave_designation(self) -> None:
+        keyboard = PianoKeyboard()
+
+        self.assertEqual(keyboard.note_label(60), "C4")
+
+        keyboard.set_octave_offset(-2)
+
+        self.assertEqual(keyboard.note_label(60), "C3")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -458,6 +458,7 @@ class PianolaDialog(QDialog):
     rangeModeChanged = pyqtSignal(str)
     noteLabelModeChanged = pyqtSignal(str)
     colorModeChanged = pyqtSignal(str)
+    octaveDesignationChanged = pyqtSignal(str)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -472,6 +473,7 @@ class PianolaDialog(QDialog):
         self._range_mode = "exact"
         self._note_label_mode = "never"
         self._color_mode = "blue"
+        self._octave_designation = "scientific"
         layout = QVBoxLayout(self)
         button_row = QHBoxLayout()
         button_row.addWidget(QLabel(self.tr("Range:"), self))
@@ -490,6 +492,13 @@ class PianolaDialog(QDialog):
         self.note_labels_combo.addItem(self.tr("Always"), "always")
         self.note_labels_combo.currentIndexChanged.connect(self._note_label_mode_changed)
         button_row.addWidget(self.note_labels_combo)
+        button_row.addWidget(QLabel(self.tr("Octaves:"), self))
+        self.octave_designation_combo = QComboBox(self)
+        self.octave_designation_combo.setObjectName("pianola_octave_designation_combo")
+        self.octave_designation_combo.addItem(self.tr("Scientific"), "scientific")
+        self.octave_designation_combo.addItem(self.tr("Yamaha"), "yamaha")
+        self.octave_designation_combo.currentIndexChanged.connect(self._octave_designation_changed)
+        button_row.addWidget(self.octave_designation_combo)
         button_row.addWidget(QLabel(self.tr("Colors:"), self))
         self.color_mode_combo = QComboBox(self)
         self.color_mode_combo.setObjectName("pianola_color_mode_combo")
@@ -586,6 +595,7 @@ class PianolaDialog(QDialog):
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
                 keyboard.set_note_range(display_min_note, display_max_note)
                 keyboard.set_note_label_mode(self._note_label_mode)
+                keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
                 keyboard_layout.addWidget(keyboard)
                 row_layout.addWidget(keyboard_container)
                 page_layout.addWidget(row)
@@ -641,6 +651,13 @@ class PianolaDialog(QDialog):
         for keyboard in self._track_keyboards.values():
             keyboard.set_note_label_mode(self._note_label_mode)
         self.noteLabelModeChanged.emit(self._note_label_mode)
+
+    def _octave_designation_changed(self, index: int) -> None:
+        self._octave_designation = str(self.octave_designation_combo.itemData(index) or "scientific")
+        offset = -1 if self._octave_designation == "scientific" else -2
+        for keyboard in self._track_keyboards.values():
+            keyboard.set_octave_offset(offset)
+        self.octaveDesignationChanged.emit(self._octave_designation)
 
     def _color_mode_changed(self, index: int) -> None:
         self._color_mode = str(self.color_mode_combo.itemData(index) or "blue")
@@ -1676,6 +1693,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.rangeModeChanged.connect(self._pianola_range_mode_changed)
             self.pianola_dialog.noteLabelModeChanged.connect(self._pianola_note_label_mode_changed)
             self.pianola_dialog.colorModeChanged.connect(self._pianola_color_mode_changed)
+            self.pianola_dialog.octaveDesignationChanged.connect(self._pianola_octave_designation_changed)
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1733,6 +1751,16 @@ class MainWindow(QMainWindow):
         }
         self.statusBar().showMessage(
             self.tr("Piano Player colors: {mode}").format(mode=labels.get(mode, mode)),
+            3000,
+        )
+
+    def _pianola_octave_designation_changed(self, mode: str) -> None:
+        labels = {
+            "scientific": self.tr("Scientific"),
+            "yamaha": self.tr("Yamaha"),
+        }
+        self.statusBar().showMessage(
+            self.tr("Piano Player octaves: {mode}").format(mode=labels.get(mode, mode)),
             3000,
         )
 

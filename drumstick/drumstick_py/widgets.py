@@ -18,6 +18,7 @@ class PianoKeyboard(QWidget):
         self._min_note = 21
         self._max_note = 108
         self._note_label_mode = "never"
+        self._octave_offset = -1
         self._white_low_color = QColor("#bfdbfe")
         self._white_high_color = QColor("#1d4ed8")
         self._black_low_color = QColor("#1d4ed8")
@@ -51,6 +52,10 @@ class PianoKeyboard(QWidget):
         self._note_label_mode = mode
         self.update()
 
+    def set_octave_offset(self, offset: int) -> None:
+        self._octave_offset = offset
+        self.update()
+
     def set_active_colors(
         self,
         *,
@@ -76,7 +81,7 @@ class PianoKeyboard(QWidget):
 
     def note_label(self, note: int) -> str:
         name = self.NOTE_NAMES[note % 12]
-        octave = (note // 12) - 1
+        octave = (note // 12) + self._octave_offset
         return f"{name}{octave}"
 
     def visible_note_labels(self) -> dict[int, str]:

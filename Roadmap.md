@@ -216,7 +216,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] minimal;
   - [x] when active;
   - [x] always.
-- [ ] Support configurable octave designation.
+- [x] Support configurable octave designation.
 - [ ] Allow manual note playing with computer keyboard and mouse where appropriate.
 - [ ] Window menu:
   - [x] fullscreen;
