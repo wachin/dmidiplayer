@@ -191,10 +191,10 @@ Drumstick documentation. It is the target list for the whole migration.
 ### Lyrics And Karaoke
 
 - [x] Show MIDI/KAR meta text.
-- [ ] Filter by track:
-  - [ ] all tracks;
-  - [ ] individual track.
-- [ ] Automatically select the track with the most text data.
+- [x] Filter by track:
+  - [x] all tracks;
+  - [x] individual track.
+- [x] Automatically select the track with the most text data.
 - [x] Filter by text type:
   - [x] lyrics;
   - [x] text;

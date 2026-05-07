@@ -217,6 +217,33 @@ def write_text_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track))
 
 
+def write_multitrack_text_midi(path: Path) -> None:
+    header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0").replace(b"\x00\x01", b"\x00\x02", 1)
+    track_one = b"".join(
+        [
+            varlen(0),
+            b"\xff\x01\x05Intro",
+            varlen(0),
+            b"\xff\x06\x05Start",
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    track_two = b"".join(
+        [
+            varlen(0),
+            b"\xff\x05\x05Line1",
+            varlen(120),
+            b"\xff\x05\x05Line2",
+            varlen(120),
+            b"\xff\x07\x04Solo",
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -819,6 +846,59 @@ class AppPlaylistTest(unittest.TestCase):
 
                 dialog.filter_combo.setCurrentIndex(3)
                 self.assertEqual(dialog.browser.toPlainText().strip(), "Marker: Verse")
+
+    def test_lyrics_dialog_track_filter_defaults_to_most_text_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multitrack-text.mid")
+            write_multitrack_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                self.assertEqual(dialog.track_combo.currentText(), "Track 2")
+                text = dialog.browser.toPlainText()
+                self.assertIn("Lyric: Line1", text)
+                self.assertIn("Lyric: Line2", text)
+                self.assertIn("Cue Point: Solo", text)
+                self.assertNotIn("Intro", text)
+
+    def test_lyrics_dialog_track_filter_can_show_all_tracks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multitrack-text.mid")
+            write_multitrack_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                dialog.track_combo.setCurrentIndex(0)
+                text = dialog.browser.toPlainText()
+
+                self.assertIn("Track 1 - Text: Intro", text)
+                self.assertIn("Track 1 - Marker: Start", text)
+                self.assertIn("Track 2 - Lyric: Line1", text)
+
+    def test_lyrics_dialog_track_filter_can_select_individual_track(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multitrack-text.mid")
+            write_multitrack_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                dialog.track_combo.setCurrentIndex(1)
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Intro\nMarker: Start")
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (

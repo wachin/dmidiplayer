@@ -190,6 +190,8 @@ relacionados con la canción cargada.
 
 El filtro superior permite cambiar entre:
 
+- `All tracks`
+- `Track 1`, `Track 2` y así sucesivamente para las pistas que contienen texto
 - `All`
 - `Lyrics`
 - `Text`
@@ -197,9 +199,12 @@ El filtro superior permite cambiar entre:
 - `Cue Point`
 - `Other`
 
-Este primer tramo ya sirve para leer texto y letras incrustadas, pero todavía
-faltan el filtrado por pista, las anulaciones de codificación, guardar/exportar
-y el modo de pantalla completa.
+Cuando un archivo tiene texto en varias pistas, la ventana empieza
+automáticamente en la pista con mas eventos de texto. Si vuelves a `All tracks`,
+veras el numero de pista delante de cada linea para distinguir el origen.
+
+Todavia faltan las anulaciones de codificacion, guardar/exportar y el modo de
+pantalla completa.
 
 ## Fila de destino MIDI
 

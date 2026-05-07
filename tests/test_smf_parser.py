@@ -283,7 +283,10 @@ class SmfParserTest(unittest.TestCase):
         self.assertEqual(len(midi.key_signatures), 1)
         self.assertEqual(midi.key_signatures[0].sharps_flats, -3)
         self.assertTrue(midi.key_signatures[0].minor)
-        self.assertEqual([(event.tick, event.meta_type, event.text) for event in midi.text_events], [(0, 0x05, "Hello"), (240, 0x06, "Verse1")])
+        self.assertEqual(
+            [(event.track, event.tick, event.meta_type, event.text) for event in midi.text_events],
+            [(0, 0, 0x05, "Hello"), (0, 240, 0x06, "Verse1")],
+        )
 
 
 if __name__ == "__main__":

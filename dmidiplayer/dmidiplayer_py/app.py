@@ -445,8 +445,14 @@ class LyricsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Lyrics"))
         self._text_events: list[object] = []
+        self._track_counts: dict[int, int] = {}
         layout = QVBoxLayout(self)
         filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel(self.tr("Track:")))
+        self.track_combo = QComboBox(self)
+        self.track_combo.setObjectName("lyrics_track_combo")
+        self.track_combo.currentIndexChanged.connect(self._apply_filter)
+        filter_row.addWidget(self.track_combo)
         filter_row.addWidget(QLabel(self.tr("Type:")))
         self.filter_combo = QComboBox(self)
         self.filter_combo.setObjectName("lyrics_filter_combo")
@@ -463,34 +469,71 @@ class LyricsDialog(QDialog):
 
     def set_text_events(self, text_events: list[object]) -> None:
         self._text_events = list(text_events)
+        self._track_counts = self._count_tracks()
+        self._rebuild_track_filter()
         self._apply_filter()
 
     def _apply_filter(self) -> None:
         category = self.filter_combo.currentData()
+        track = self.track_combo.currentData()
         lines = [
             self._format_text_event(event)
-            for event in self._filtered_text_events(category)
+            for event in self._filtered_text_events(track, category)
         ]
         self.browser.setPlainText("\n".join(lines))
 
-    def _filtered_text_events(self, category: str) -> list[object]:
+    def _count_tracks(self) -> dict[int, int]:
+        counts: dict[int, int] = {}
+        for event in self._text_events:
+            track = getattr(event, "track", 0)
+            counts[track] = counts.get(track, 0) + 1
+        return counts
+
+    def _rebuild_track_filter(self) -> None:
+        current_track = self.track_combo.currentData()
+        with QSignalBlocker(self.track_combo):
+            self.track_combo.clear()
+            self.track_combo.addItem(self.tr("All tracks"), None)
+            for track in sorted(self._track_counts):
+                self.track_combo.addItem(
+                    self.tr("Track {number}").format(number=track + 1),
+                    track,
+                )
+            if current_track in self._track_counts:
+                index = self.track_combo.findData(current_track)
+            else:
+                index = self.track_combo.findData(self._preferred_track())
+            self.track_combo.setCurrentIndex(max(0, index))
+
+    def _preferred_track(self) -> int | None:
+        if not self._track_counts:
+            return None
+        return max(self._track_counts, key=lambda track: (self._track_counts[track], -track))
+
+    def _filtered_text_events(self, track: int | None, category: str) -> list[object]:
+        events = list(self._text_events)
+        if track is not None:
+            events = [event for event in events if getattr(event, "track", None) == track]
         if category == "lyrics":
-            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x05]
+            return [event for event in events if getattr(event, "meta_type", None) == 0x05]
         if category == "text":
-            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x01]
+            return [event for event in events if getattr(event, "meta_type", None) == 0x01]
         if category == "marker":
-            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x06]
+            return [event for event in events if getattr(event, "meta_type", None) == 0x06]
         if category == "cue":
-            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x07]
+            return [event for event in events if getattr(event, "meta_type", None) == 0x07]
         if category == "other":
-            return [event for event in self._text_events if getattr(event, "meta_type", None) in (0x02, 0x03, 0x04)]
-        return list(self._text_events)
+            return [event for event in events if getattr(event, "meta_type", None) in (0x02, 0x03, 0x04)]
+        return events
 
     def _format_text_event(self, event: object) -> str:
         meta_type = getattr(event, "meta_type", 0x01)
         label = self.tr(TEXT_EVENT_LABELS.get(meta_type, "Text"))
         text = getattr(event, "text", "")
-        return f"{label}: {text}"
+        track = getattr(event, "track", None)
+        if track is None or len(self._track_counts) <= 1 or self.track_combo.currentData() is not None:
+            return f"{label}: {text}"
+        return self.tr("Track {number} - {label}: {text}").format(number=track + 1, label=label, text=text)
 
 
 class MainWindow(QMainWindow):

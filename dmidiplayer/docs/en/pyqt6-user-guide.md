@@ -188,6 +188,8 @@ meta events from the loaded song.
 
 The filter at the top lets you switch between:
 
+- `All tracks`
+- `Track 1`, `Track 2`, and so on for tracks that contain text
 - `All`
 - `Lyrics`
 - `Text`
@@ -195,9 +197,11 @@ The filter at the top lets you switch between:
 - `Cue Point`
 - `Other`
 
-This first slice is useful for reading embedded text and lyrics, but track-based
-filtering, encoding overrides, save/export, and fullscreen behavior are still
-pending.
+When a file has text in multiple tracks, the window automatically starts on the
+track with the most text events. Switching back to `All tracks` shows the track
+number before each line so mixed sources stay readable.
+
+Encoding overrides, save/export, and fullscreen behavior are still pending.
 
 ## MIDI Destination Row
 

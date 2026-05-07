@@ -65,6 +65,7 @@ class KeySignature:
 
 @dataclass(frozen=True, slots=True)
 class TextEvent:
+    track: int
     tick: int
     meta_type: int
     text: str
@@ -155,11 +156,12 @@ class MidiFile:
     @property
     def text_events(self) -> list[TextEvent]:
         if self._text_events_cache is None:
-            self._text_events_cache = [
-                TextEvent(event.tick, event.meta_type, event.text)
-                for event in self.events
-                if event.kind == "meta" and event.meta_type in (0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)
-            ]
+            text_events: list[TextEvent] = []
+            for track_number, track in enumerate(self.tracks):
+                for event in track.events:
+                    if event.kind == "meta" and event.meta_type in (0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07):
+                        text_events.append(TextEvent(track_number, event.tick, event.meta_type, event.text))
+            self._text_events_cache = sorted(text_events, key=lambda event: (event.tick, event.track, event.meta_type))
         return self._text_events_cache
 
     @property
