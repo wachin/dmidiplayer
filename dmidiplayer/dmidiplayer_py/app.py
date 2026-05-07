@@ -549,6 +549,14 @@ class LyricsDialog(QDialog):
     def _preferred_track(self) -> int | None:
         if not self._track_counts:
             return None
+        lyric_counts: dict[int, int] = {}
+        for event in self._text_events:
+            if getattr(event, "meta_type", None) != 0x05:
+                continue
+            track = getattr(event, "track", 0)
+            lyric_counts[track] = lyric_counts.get(track, 0) + 1
+        if lyric_counts:
+            return max(lyric_counts, key=lambda track: (lyric_counts[track], -track))
         return max(self._track_counts, key=lambda track: (self._track_counts[track], -track))
 
     def _filtered_text_events(self, track: int | None, category: str) -> list[object]:

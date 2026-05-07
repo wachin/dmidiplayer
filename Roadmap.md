@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-06.
+Last updated: 2026-05-07.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -9,6 +9,34 @@ session. Before changing code, read especially:
 - `Quick Verification`
 - `Next Session: Concrete Tasks`
 - `Known Limitations`
+- `Roadmap-GUI/dmidiplayer-GUI.md`
+
+## GUI Reference Check
+
+The `Roadmap-GUI/` folder is now part of the working reference for this port.
+It contains screenshots of the original `dmidiplayer` windows plus
+`Roadmap-GUI/dmidiplayer-GUI.md`, which maps the available images.
+
+Before marking any user-facing window or panel "done", compare the PyQt6 port
+against the corresponding screenshot and check both behavior and layout shape.
+This is an always-on review step, not a one-time migration task.
+
+Current GUI reference set:
+
+- `Roadmap-GUI/dmidiplayer.png`: main window
+- `Roadmap-GUI/Play List ....png`: `File -> Play List...`
+- `Roadmap-GUI/Lyrics and Texts.png`: `View -> Lyrics and texts`
+- `Roadmap-GUI/Channels.png`: `View -> Channels`
+- `Roadmap-GUI/Piano Player.png`: `View -> Piano Player`
+
+Keep this checklist active while porting:
+
+- [ ] Main window layout and control grouping visually checked against `Roadmap-GUI/dmidiplayer.png`.
+- [ ] Playlist window/dialog visually checked against `Roadmap-GUI/Play List ....png`.
+- [ ] Lyrics window visually checked against `Roadmap-GUI/Lyrics and Texts.png`.
+- [ ] Channels window visually checked against `Roadmap-GUI/Channels.png`.
+- [ ] Piano Player window visually checked against `Roadmap-GUI/Piano Player.png`.
+- [ ] When a referenced screenshot and the current PyQt6 port differ, record the gap in the relevant roadmap section before calling the feature complete.
 
 This repository contains two C++/Qt projects that must coexist during the port:
 
@@ -157,6 +185,7 @@ Drumstick documentation. It is the target list for the whole migration.
 ### Channel View
 
 - [x] Show up to 16 rows, one per used MIDI channel.
+- [x] Show only channels that are actually present in the loaded MIDI file.
 - [x] Show channel number and editable label.
 - [x] Mute per channel.
 - [x] Solo per channel, reducing other channels according to preference.
@@ -169,6 +198,12 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Player Piano / Pianola
 
+- [ ] Show only the tracks/channels that are actually present in the loaded MIDI data.
+- [ ] Use tabs inside the Pianola window when the MIDI file contains many tracks.
+  - [ ] First tab opens by default and shows up to 8 MIDI tracks.
+  - [ ] If the file has more than 8 MIDI tracks, show tracks 9-16 in a second tab.
+  - [ ] If the file has more than 16 MIDI tracks, show the remaining tracks in a third tab.
+  - [ ] Each tab must let the user click and view the instruments/tracks they need.
 - [ ] Show up to 16 rows, one per used channel.
 - [ ] Each row should have channel number/label and keyboard.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
@@ -191,10 +226,11 @@ Drumstick documentation. It is the target list for the whole migration.
 ### Lyrics And Karaoke
 
 - [x] Show MIDI/KAR meta text.
+- [x] Prefer the track containing lyric meta events when the file has lyrics.
 - [x] Filter by track:
   - [x] all tracks;
   - [x] individual track.
-- [x] Automatically select the track with the most text data.
+- [x] Automatically select the lyric track when present, otherwise the track with the most text data.
 - [x] Filter by text type:
   - [x] lyrics;
   - [x] text;

@@ -202,8 +202,10 @@ El filtro superior permite cambiar entre:
 - `Other`
 
 Cuando un archivo tiene texto en varias pistas, la ventana empieza
-automáticamente en la pista con mas eventos de texto. Si vuelves a `All tracks`,
-veras el numero de pista delante de cada linea para distinguir el origen.
+automaticamente en la pista que contiene eventos de letra cuando existe una. Si
+el archivo tiene texto pero no una pista de letras dedicada, entonces usa como
+respaldo la pista con mas eventos de texto. Si vuelves a `All tracks`, veras el
+numero de pista delante de cada linea para distinguir el origen.
 
 El selector `Encoding` controla como se decodifica en la ventana el texto MIDI
 incrustado. `Auto` usa la deteccion integrada, mientras que `UTF-8`,

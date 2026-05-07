@@ -199,8 +199,10 @@ The filter at the top lets you switch between:
 - `Other`
 
 When a file has text in multiple tracks, the window automatically starts on the
-track with the most text events. Switching back to `All tracks` shows the track
-number before each line so mixed sources stay readable.
+track that contains lyric meta events when one exists. If the file has text but
+no dedicated lyric track, it falls back to the track with the most text events.
+Switching back to `All tracks` shows the track number before each line so mixed
+sources stay readable.
 
 The `Encoding` selector controls how embedded MIDI text is decoded in the
 window. `Auto` uses the built-in guesser, while `UTF-8`, `Latin-1`, and

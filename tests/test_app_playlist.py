@@ -898,6 +898,22 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn("Cue Point: Solo", text)
                 self.assertNotIn("Intro", text)
 
+    def test_lyrics_dialog_prefers_track_with_lyrics_over_plain_text_track(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multitrack-text.mid")
+            write_multitrack_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                self.assertEqual(dialog.track_combo.currentText(), "Track 2")
+                self.assertIn("Lyric: Line1", dialog.browser.toPlainText())
+                self.assertNotIn("Text: Intro", dialog.browser.toPlainText())
+
     def test_lyrics_dialog_track_filter_can_show_all_tracks(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "multitrack-text.mid")
