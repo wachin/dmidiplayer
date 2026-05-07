@@ -51,6 +51,7 @@ to open a MIDI file or playlist.
 ## View Menu
 
 - `Channels`: open the channel activity window.
+- `Lyrics`: open the text and lyrics window for the current song.
 - `Toolbar`: show or hide the main toolbar.
 - `Status bar`: show or hide the status bar at the bottom.
 - `Keyboard`: show or hide the piano keyboard view.
@@ -179,6 +180,24 @@ Each row currently includes:
 
 This is still an early Python port slice of the channels view, so there are
 still richer channel behaviors pending.
+
+## Lyrics Window
+
+The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI
+meta events from the loaded song.
+
+The filter at the top lets you switch between:
+
+- `All`
+- `Lyrics`
+- `Text`
+- `Marker`
+- `Cue Point`
+- `Other`
+
+This first slice is useful for reading embedded text and lyrics, but track-based
+filtering, encoding overrides, save/export, and fullscreen behavior are still
+pending.
 
 ## MIDI Destination Row
 

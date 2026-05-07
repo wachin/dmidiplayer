@@ -51,6 +51,7 @@ abras un archivo MIDI o una lista `.lst`.
 ## Menú View
 
 - `Channels`: abre la ventana de actividad de canales.
+- `Lyrics`: abre la ventana de texto y letras de la canción actual.
 - `Toolbar`: muestra u oculta la barra de herramientas.
 - `Status bar`: muestra u oculta la barra de estado.
 - `Keyboard`: muestra u oculta la vista del teclado.
@@ -181,6 +182,24 @@ Cada fila incluye actualmente:
 
 Este sigue siendo un tramo temprano del port de la vista de canales, así que
 todavía faltan comportamientos de canal más avanzados.
+
+## Ventana de letras
+
+La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI
+relacionados con la canción cargada.
+
+El filtro superior permite cambiar entre:
+
+- `All`
+- `Lyrics`
+- `Text`
+- `Marker`
+- `Cue Point`
+- `Other`
+
+Este primer tramo ya sirve para leer texto y letras incrustadas, pero todavía
+faltan el filtrado por pista, las anulaciones de codificación, guardar/exportar
+y el modo de pantalla completa.
 
 ## Fila de destino MIDI
 

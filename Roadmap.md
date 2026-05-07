@@ -190,18 +190,18 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Lyrics And Karaoke
 
-- [ ] Show MIDI/KAR meta text.
+- [x] Show MIDI/KAR meta text.
 - [ ] Filter by track:
   - [ ] all tracks;
   - [ ] individual track.
 - [ ] Automatically select the track with the most text data.
-- [ ] Filter by text type:
-  - [ ] lyrics;
-  - [ ] text;
-  - [ ] marker;
-  - [ ] cue point;
-  - [ ] other relevant types;
-  - [ ] all.
+- [x] Filter by text type:
+  - [x] lyrics;
+  - [x] text;
+  - [x] marker;
+  - [x] cue point;
+  - [x] other relevant types;
+  - [x] all.
 - [ ] Detect encoding automatically and allow manual override.
 - [ ] Highlight past/future lyrics with configurable colors.
 - [ ] Copy lyrics to clipboard.
@@ -293,7 +293,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Port File menu, View menu, tools, status bar, and main dialogs.
 - [ ] Independent views:
   - [x] Channels;
-  - [ ] Lyrics;
+  - [x] Lyrics;
   - [ ] Piano Player.
 - [ ] Embedded views that can be shown/hidden:
   - [x] toolbar;

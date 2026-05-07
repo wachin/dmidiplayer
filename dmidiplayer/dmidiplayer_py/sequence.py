@@ -88,3 +88,8 @@ class Sequence(QObject):
                 continue
             programs.setdefault(event.channel, event.data[0])
         return programs
+
+    def text_events(self) -> list[object]:
+        if self.midi is None:
+            return []
+        return list(self.midi.text_events)

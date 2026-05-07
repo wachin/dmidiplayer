@@ -198,6 +198,25 @@ def write_multichannel_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track))
 
 
+def write_text_midi(path: Path) -> None:
+    header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0")
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x01\x05Hello",
+            varlen(0),
+            b"\xff\x05\x06Sing!\n",
+            varlen(0),
+            b"\xff\x06\x05Verse",
+            varlen(0),
+            b"\xff\x07\x03Cue",
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -482,6 +501,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.channels_action), "channels_action"))
+            self.assertIsNotNone(window.findChild(type(window.lyrics_action), "lyrics_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.rhythm_action), "toggle_rhythm_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
@@ -598,6 +618,24 @@ class AppPlaylistTest(unittest.TestCase):
             window.channels_action.trigger()
 
             self.assertEqual(shown, ["Channels"])
+
+    def test_lyrics_action_opens_dialog(self) -> None:
+        shown: list[str] = []
+
+        def fake_show(dialog: object) -> None:
+            shown.append(getattr(dialog, "windowTitle")())
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.LyricsDialog.show", fake_show),
+            patch("dmidiplayer_py.app.LyricsDialog.raise_", lambda dialog: None),
+            patch("dmidiplayer_py.app.LyricsDialog.activateWindow", lambda dialog: None),
+        ):
+            window = MainWindow([])
+            window.lyrics_action.trigger()
+
+            self.assertEqual(shown, ["Lyrics"])
 
     def test_view_menu_toggles_rhythm_panel(self) -> None:
         with (
@@ -745,6 +783,42 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.player.channel_volume_percent(0), 60)
                 self.assertEqual(window.statusBar().currentMessage(), "Channel 1 volume 60%")
+
+    def test_lyrics_dialog_shows_text_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                text = dialog.browser.toPlainText()
+
+                self.assertIn("Text: Hello", text)
+                self.assertIn("Lyric: Sing!", text)
+                self.assertIn("Marker: Verse", text)
+                self.assertIn("Cue Point: Cue", text)
+
+    def test_lyrics_dialog_filter_selects_event_types(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                dialog.filter_combo.setCurrentIndex(1)
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Lyric: Sing!")
+
+                dialog.filter_combo.setCurrentIndex(3)
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Marker: Verse")
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (

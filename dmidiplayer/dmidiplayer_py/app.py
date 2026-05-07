@@ -183,6 +183,17 @@ def gm_program_label(program: int) -> str:
     return f"{program}: {GENERAL_MIDI_PROGRAMS[program]}"
 
 
+TEXT_EVENT_LABELS = {
+    0x01: "Text",
+    0x02: "Copyright",
+    0x03: "Track Name",
+    0x04: "Instrument",
+    0x05: "Lyric",
+    0x06: "Marker",
+    0x07: "Cue Point",
+}
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
         super().__init__(parent)
@@ -420,6 +431,68 @@ class ChannelsDialog(QDialog):
             level.setValue(max(0, min(127, value)))
 
 
+class LyricsDialog(QDialog):
+    FILTERS = (
+        ("all", "All"),
+        ("lyrics", "Lyrics"),
+        ("text", "Text"),
+        ("marker", "Marker"),
+        ("cue", "Cue Point"),
+        ("other", "Other"),
+    )
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Lyrics"))
+        self._text_events: list[object] = []
+        layout = QVBoxLayout(self)
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel(self.tr("Type:")))
+        self.filter_combo = QComboBox(self)
+        self.filter_combo.setObjectName("lyrics_filter_combo")
+        for key, label in self.FILTERS:
+            self.filter_combo.addItem(self.tr(label), key)
+        self.filter_combo.currentIndexChanged.connect(self._apply_filter)
+        filter_row.addWidget(self.filter_combo)
+        filter_row.addStretch(1)
+        layout.addLayout(filter_row)
+        self.browser = QTextBrowser(self)
+        self.browser.setObjectName("lyrics_browser")
+        layout.addWidget(self.browser)
+        self.resize(560, 420)
+
+    def set_text_events(self, text_events: list[object]) -> None:
+        self._text_events = list(text_events)
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        category = self.filter_combo.currentData()
+        lines = [
+            self._format_text_event(event)
+            for event in self._filtered_text_events(category)
+        ]
+        self.browser.setPlainText("\n".join(lines))
+
+    def _filtered_text_events(self, category: str) -> list[object]:
+        if category == "lyrics":
+            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x05]
+        if category == "text":
+            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x01]
+        if category == "marker":
+            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x06]
+        if category == "cue":
+            return [event for event in self._text_events if getattr(event, "meta_type", None) == 0x07]
+        if category == "other":
+            return [event for event in self._text_events if getattr(event, "meta_type", None) in (0x02, 0x03, 0x04)]
+        return list(self._text_events)
+
+    def _format_text_event(self, event: object) -> str:
+        meta_type = getattr(event, "meta_type", 0x01)
+        label = self.tr(TEXT_EVENT_LABELS.get(meta_type, "Text"))
+        text = getattr(event, "text", "")
+        return f"{label}: {text}"
+
+
 class MainWindow(QMainWindow):
     def __init__(self, start_files: list[str]) -> None:
         super().__init__()
@@ -448,6 +521,7 @@ class MainWindow(QMainWindow):
         self._current_playlist_path: Path | None = None
         self._playlist_modified = False
         self.channels_dialog: ChannelsDialog | None = None
+        self.lyrics_dialog: LyricsDialog | None = None
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
@@ -738,6 +812,10 @@ class MainWindow(QMainWindow):
         self.channels_action.setObjectName("channels_action")
         self.channels_action.triggered.connect(self._show_channels_dialog)
         view_menu.addAction(self.channels_action)
+        self.lyrics_action = QAction(self.tr("Lyrics"), self)
+        self.lyrics_action.setObjectName("lyrics_action")
+        self.lyrics_action.triggered.connect(self._show_lyrics_dialog)
+        view_menu.addAction(self.lyrics_action)
         view_menu.addAction(self.keyboard_action)
         self.rhythm_action = QAction(self.tr("Rhythm"), self)
         self.rhythm_action.setObjectName("toggle_rhythm_action")
@@ -800,6 +878,8 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.set_channels([])
+        if self.lyrics_dialog is not None:
+            self.lyrics_dialog.set_text_events([])
         self._update_midi_output_label()
         self._update_action_state()
         self._update_window_title()
@@ -1077,6 +1157,26 @@ class MainWindow(QMainWindow):
             lock_changed=self._set_channel_locked,
             volume_changed=self._set_channel_volume,
         )
+
+    def _create_lyrics_dialog(self) -> LyricsDialog:
+        return LyricsDialog(self)
+
+    def _ensure_lyrics_dialog(self) -> LyricsDialog:
+        if self.lyrics_dialog is None:
+            self.lyrics_dialog = self._create_lyrics_dialog()
+            self._refresh_lyrics_dialog()
+        return self.lyrics_dialog
+
+    def _show_lyrics_dialog(self) -> None:
+        dialog = self._ensure_lyrics_dialog()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _refresh_lyrics_dialog(self) -> None:
+        if self.lyrics_dialog is None:
+            return
+        self.lyrics_dialog.set_text_events(self.player.sequence.text_events())
 
     def _set_channel_muted(self, channel: int, muted: bool) -> None:
         self.player.set_channel_muted(channel, muted)
@@ -1484,6 +1584,7 @@ class MainWindow(QMainWindow):
         self._update_time_label(0, midi.length_ticks)
         self.keyboard.clear()
         self._refresh_channels_dialog()
+        self._refresh_lyrics_dialog()
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._current_file = file_name
