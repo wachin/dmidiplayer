@@ -943,6 +943,48 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertFalse(keyboard_two.parentWidget().isHidden())
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player tracks shown")
 
+    def test_pianola_dialog_fullscreen_button_toggles_window_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                dialog.show()
+
+                dialog.fullscreen_button.click()
+
+                self.assertTrue(dialog.isFullScreen())
+                self.assertEqual(dialog.fullscreen_button.text(), "Window")
+
+                dialog.fullscreen_button.click()
+
+                self.assertFalse(dialog.isFullScreen())
+                self.assertEqual(dialog.fullscreen_button.text(), "Fullscreen")
+
+    def test_pianola_dialog_escape_exits_fullscreen(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                dialog.show()
+                dialog.fullscreen_button.setChecked(True)
+
+                dialog.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier))
+
+                self.assertFalse(dialog.isFullScreen())
+                self.assertFalse(dialog.fullscreen_button.isChecked())
+
     def test_stop_clears_pianola_track_activity(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")

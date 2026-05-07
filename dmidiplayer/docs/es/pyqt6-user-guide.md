@@ -207,6 +207,9 @@ de esa pista sin perder el encabezado. La ventana incluye botones `Show All`
 y `Hide All` para cambiar rapidamente la visibilidad de todas las pistas
 mostradas.
 
+La ventana tambien incluye un boton `Fullscreen`. Puedes usar `Esc` para salir
+rapidamente del modo de pantalla completa.
+
 En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
 pista realmente usa, de modo que las partes graves y agudas no comparten todas
 el mismo rango sobredimensionado.

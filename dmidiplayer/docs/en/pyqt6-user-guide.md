@@ -202,6 +202,9 @@ Each row also has a `Show` checkbox so you can collapse that track's keyboard
 without removing the track heading. The window includes `Show All` and `Hide
 All` buttons for quick visibility changes across every displayed track.
 
+The window also includes a `Fullscreen` button. Press `Esc` to leave
+fullscreen mode quickly.
+
 In the current slice, each track keyboard is narrowed to the note range that
 track actually uses, so low and high parts do not all share the same oversized
 span.

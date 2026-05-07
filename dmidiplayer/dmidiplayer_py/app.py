@@ -456,6 +456,11 @@ class PianolaDialog(QDialog):
         self.hide_all_button.setObjectName("pianola_hide_all_button")
         self.hide_all_button.clicked.connect(self.hide_all_tracks)
         button_row.addWidget(self.hide_all_button)
+        self.fullscreen_button = QPushButton(self.tr("Fullscreen"), self)
+        self.fullscreen_button.setObjectName("pianola_fullscreen_button")
+        self.fullscreen_button.setCheckable(True)
+        self.fullscreen_button.toggled.connect(self.set_fullscreen_enabled)
+        button_row.addWidget(self.fullscreen_button)
         layout.addLayout(button_row)
         self.tabs = QTabWidget(self)
         self.tabs.setObjectName("pianola_tabs")
@@ -558,6 +563,14 @@ class PianolaDialog(QDialog):
             self._set_track_visible(track_number, False, emit_signal=False)
         self.allTracksVisibilityChanged.emit(False)
 
+    def set_fullscreen_enabled(self, enabled: bool) -> None:
+        if enabled:
+            self.showFullScreen()
+            self.fullscreen_button.setText(self.tr("Window"))
+        else:
+            self.showNormal()
+            self.fullscreen_button.setText(self.tr("Fullscreen"))
+
     def note_on(self, channel: int, note: int) -> None:
         for track_number, channels in self._track_channels.items():
             if channel in channels and track_number in self._track_keyboards:
@@ -571,6 +584,12 @@ class PianolaDialog(QDialog):
     def clear(self) -> None:
         for keyboard in self._track_keyboards.values():
             keyboard.clear()
+
+    def keyPressEvent(self, event: object) -> None:
+        if getattr(event, "key", lambda: None)() == int(Qt.Key.Key_Escape) and self.isFullScreen():
+            self.fullscreen_button.setChecked(False)
+            return
+        super().keyPressEvent(event)
 
 
 class LyricsDialog(QDialog):
