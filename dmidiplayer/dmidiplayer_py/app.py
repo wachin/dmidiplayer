@@ -473,9 +473,11 @@ class LyricsDialog(QDialog):
         button_row.addWidget(QLabel(self.tr("Encoding:")))
         self.encoding_combo = QComboBox(self)
         self.encoding_combo.setObjectName("lyrics_encoding_combo")
+        self.encoding_combo.addItem(self.tr("Auto"), None)
         self.encoding_combo.addItem("UTF-8", "utf-8")
         self.encoding_combo.addItem("Latin-1", "latin-1")
         self.encoding_combo.addItem("CP1252", "cp1252")
+        self.encoding_combo.currentIndexChanged.connect(self._apply_filter)
         button_row.addWidget(self.encoding_combo)
         button_row.addStretch(1)
         self.save_button = QPushButton(self.tr("Save"), self)
@@ -564,14 +566,24 @@ class LyricsDialog(QDialog):
     def _format_text_event(self, event: object) -> str:
         meta_type = getattr(event, "meta_type", 0x01)
         label = self.tr(TEXT_EVENT_LABELS.get(meta_type, "Text"))
-        text = getattr(event, "text", "")
+        text = self._decoded_text(event)
         track = getattr(event, "track", None)
         if track is None or len(self._track_counts) <= 1 or self.track_combo.currentData() is not None:
             return f"{label}: {text}"
         return self.tr("Track {number} - {label}: {text}").format(number=track + 1, label=label, text=text)
 
+    def _decoded_text(self, event: object) -> str:
+        preferred_encoding = self.selected_encoding()
+        decoder = getattr(event, "decoded_text", None)
+        if callable(decoder):
+            return decoder(preferred_encoding)
+        return getattr(event, "text", "")
+
     def current_text(self) -> str:
         return self.browser.toPlainText()
+
+    def selected_encoding(self) -> str | None:
+        return self.encoding_combo.currentData()
 
     def copy_to_clipboard(self) -> None:
         QApplication.clipboard().setText(self.current_text())
@@ -598,7 +610,7 @@ class LyricsDialog(QDialog):
         )
         if not file_name:
             return
-        encoding = str(self.encoding_combo.currentData() or "utf-8")
+        encoding = str(self.selected_encoding() or "utf-8")
         try:
             Path(file_name).write_text(self.current_text(), encoding=encoding)
         except OSError as exc:

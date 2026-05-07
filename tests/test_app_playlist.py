@@ -246,6 +246,19 @@ def write_multitrack_text_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
 
 
+def write_cp1252_text_midi(path: Path) -> None:
+    header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0")
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x01\x0aPrecio \x8010",
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -971,8 +984,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
+                dialog.encoding_combo.setCurrentIndex(dialog.encoding_combo.findData("latin-1"))
                 dialog.browser.setPlainText("Lyric: Canción")
-                dialog.encoding_combo.setCurrentIndex(1)
 
                 dialog.save_button.click()
 
@@ -1020,6 +1033,37 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertFalse(dialog.isFullScreen())
                 self.assertFalse(dialog.fullscreen_button.isChecked())
+
+    def test_lyrics_dialog_auto_detects_cp1252_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "cp1252.mid")
+            write_cp1252_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                self.assertEqual(dialog.encoding_combo.currentData(), None)
+                self.assertIn("Text: Precio €10", dialog.browser.toPlainText())
+
+    def test_lyrics_dialog_manual_encoding_override_redecodes_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "cp1252.mid")
+            write_cp1252_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                dialog.encoding_combo.setCurrentIndex(dialog.encoding_combo.findData("latin-1"))
+
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Precio \x8010")
 
     def test_lyrics_dialog_print_button_prints_filtered_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

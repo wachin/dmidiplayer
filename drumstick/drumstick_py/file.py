@@ -17,6 +17,21 @@ class MidiFileError(ValueError):
     """Raised when a MIDI file cannot be parsed."""
 
 
+def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
+    if preferred_encoding is not None:
+        return data.decode(preferred_encoding, errors="replace")
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    if any(0x80 <= value <= 0x9F for value in data):
+        try:
+            return data.decode("cp1252")
+        except UnicodeDecodeError:
+            pass
+    return data.decode("latin-1", errors="replace")
+
+
 @dataclass(slots=True)
 class MidiEvent:
     tick: int
@@ -27,12 +42,7 @@ class MidiEvent:
 
     @property
     def text(self) -> str:
-        for encoding in ("utf-8", "latin-1"):
-            try:
-                return self.data.decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        return self.data.decode("utf-8", errors="replace")
+        return decode_midi_text(self.data)
 
     @property
     def tempo_us_per_quarter(self) -> int | None:
@@ -68,7 +78,14 @@ class TextEvent:
     track: int
     tick: int
     meta_type: int
-    text: str
+    data: bytes
+
+    @property
+    def text(self) -> str:
+        return decode_midi_text(self.data)
+
+    def decoded_text(self, preferred_encoding: str | None = None) -> str:
+        return decode_midi_text(self.data, preferred_encoding)
 
 
 @dataclass(slots=True)
@@ -160,7 +177,7 @@ class MidiFile:
             for track_number, track in enumerate(self.tracks):
                 for event in track.events:
                     if event.kind == "meta" and event.meta_type in (0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07):
-                        text_events.append(TextEvent(track_number, event.tick, event.meta_type, event.text))
+                        text_events.append(TextEvent(track_number, event.tick, event.meta_type, event.data))
             self._text_events_cache = sorted(text_events, key=lambda event: (event.tick, event.track, event.meta_type))
         return self._text_events_cache
 

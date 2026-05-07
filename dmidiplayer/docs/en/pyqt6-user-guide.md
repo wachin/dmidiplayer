@@ -202,9 +202,12 @@ When a file has text in multiple tracks, the window automatically starts on the
 track with the most text events. Switching back to `All tracks` shows the track
 number before each line so mixed sources stay readable.
 
-Use `Save` to write the currently filtered text to a file. The `Encoding`
-selector controls whether the file is written as `UTF-8`, `Latin-1`, or
-`CP1252`.
+The `Encoding` selector controls how embedded MIDI text is decoded in the
+window. `Auto` uses the built-in guesser, while `UTF-8`, `Latin-1`, and
+`CP1252` let you override the display manually.
+
+Use `Save` to write the currently filtered text to a file. When `Auto` is
+selected, files are saved as `UTF-8`; otherwise the selected encoding is used.
 
 Use `Print` to send the currently filtered text to a printer through the
 standard Qt print dialog.
@@ -214,7 +217,7 @@ to choose a more comfortable display font for the lyrics pane. Use
 `Fullscreen` to expand the lyrics window for rehearsal or singing along, and
 press `Esc` to return to the normal window.
 
-Encoding detection/manual override is still pending.
+Highlighting past/future lyrics is still pending.
 
 ## MIDI Destination Row
 

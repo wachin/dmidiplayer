@@ -288,6 +288,21 @@ class SmfParserTest(unittest.TestCase):
             [(0, 0, 0x05, "Hello"), (0, 240, 0x06, "Verse1")],
         )
 
+    def test_auto_detects_cp1252_text_events(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x01",
+                varlen(7),
+                b"Euro \x801",
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(0, 480, [track]), "cp1252.mid")
+
+        self.assertEqual(midi.text_events[0].text, "Euro €1")
+
 
 if __name__ == "__main__":
     unittest.main()

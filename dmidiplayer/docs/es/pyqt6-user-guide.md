@@ -205,9 +205,13 @@ Cuando un archivo tiene texto en varias pistas, la ventana empieza
 automáticamente en la pista con mas eventos de texto. Si vuelves a `All tracks`,
 veras el numero de pista delante de cada linea para distinguir el origen.
 
-Usa `Save` para guardar en un archivo el texto filtrado actual. El selector
-`Encoding` controla si el archivo se escribe como `UTF-8`, `Latin-1` o
-`CP1252`.
+El selector `Encoding` controla como se decodifica en la ventana el texto MIDI
+incrustado. `Auto` usa la deteccion integrada, mientras que `UTF-8`,
+`Latin-1` y `CP1252` te permiten forzar manualmente la visualizacion.
+
+Usa `Save` para guardar en un archivo el texto filtrado actual. Cuando esta
+seleccionado `Auto`, el archivo se guarda como `UTF-8`; en los demas casos se
+usa la codificacion elegida.
 
 Usa `Print` para enviar el texto filtrado actual a una impresora mediante el
 cuadro de impresion estandar de Qt.
@@ -217,7 +221,7 @@ para elegir una fuente mas comoda para el panel de letras. Usa `Fullscreen`
 para ampliar la ventana de letras durante el ensayo o el canto, y pulsa `Esc`
 para volver a la ventana normal.
 
-Todavia falta la deteccion/anulacion manual de codificacion.
+Todavia falta el resaltado de letras pasadas y futuras.
 
 ## Fila de destino MIDI
 
