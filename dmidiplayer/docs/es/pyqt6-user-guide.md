@@ -68,7 +68,9 @@ abras un archivo MIDI o una lista `.lst`.
 
 - `Help Contents`: abre el índice general de ayuda local.
 - `User Guide`: abre esta guía.
-- `About`: muestra información del proyecto y la licencia.
+- `About`: muestra créditos del proyecto, enlaces clicables para los autores,
+  información de licencia y las tecnologías principales usadas en el port a
+  Python/PyQt6.
 
 ## Barra de herramientas
 
@@ -202,6 +204,9 @@ El filtro superior permite cambiar entre:
 Cuando un archivo tiene texto en varias pistas, la ventana empieza
 automáticamente en la pista con mas eventos de texto. Si vuelves a `All tracks`,
 veras el numero de pista delante de cada linea para distinguir el origen.
+
+Usa `Copy` para llevar al portapapeles el texto filtrado actual. Usa `Font`
+para elegir una fuente mas comoda para el panel de letras.
 
 Todavia faltan las anulaciones de codificacion, guardar/exportar y el modo de
 pantalla completa.

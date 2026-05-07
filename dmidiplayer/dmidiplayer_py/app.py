@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QLocale, QSignalBlocker, Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QIcon, QKeySequence
+from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFontDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -465,6 +466,17 @@ class LyricsDialog(QDialog):
         self.browser = QTextBrowser(self)
         self.browser.setObjectName("lyrics_browser")
         layout.addWidget(self.browser)
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        self.copy_button = QPushButton(self.tr("Copy"), self)
+        self.copy_button.setObjectName("lyrics_copy_button")
+        self.copy_button.clicked.connect(self.copy_to_clipboard)
+        button_row.addWidget(self.copy_button)
+        self.font_button = QPushButton(self.tr("Font"), self)
+        self.font_button.setObjectName("lyrics_font_button")
+        self.font_button.clicked.connect(self.choose_font)
+        button_row.addWidget(self.font_button)
+        layout.addLayout(button_row)
         self.resize(560, 420)
 
     def set_text_events(self, text_events: list[object]) -> None:
@@ -534,6 +546,17 @@ class LyricsDialog(QDialog):
         if track is None or len(self._track_counts) <= 1 or self.track_combo.currentData() is not None:
             return f"{label}: {text}"
         return self.tr("Track {number} - {label}: {text}").format(number=track + 1, label=label, text=text)
+
+    def current_text(self) -> str:
+        return self.browser.toPlainText()
+
+    def copy_to_clipboard(self) -> None:
+        QApplication.clipboard().setText(self.current_text())
+
+    def choose_font(self) -> None:
+        font, accepted = QFontDialog.getFont(self.browser.font(), self, self.tr("Lyrics Font"))
+        if accepted:
+            self.browser.setFont(font)
 
 
 class MainWindow(QMainWindow):
@@ -1112,8 +1135,47 @@ class MainWindow(QMainWindow):
             """
             <h2>{app}</h2>
             <p>Python/PyQt6 port of the Drumstick multiplatform MIDI file player.</p>
-            <p>Copyright © 2006-2024 Pedro Lopez-Cabanillas.</p>
-            <p>Distributed under the GNU General Public License version 3 or later.</p>
+            <p><strong>Copyright dmidiplayer</strong></p>
+            <p>
+              Copyright © 2026
+              <a href="mailto:plcl@users.sf.net" title="plcl@users.sf.net">
+                Pedro Lopez-Cabanillas
+              </a>
+              (original C++ version)
+            </p>
+            <p>
+              Copyright © 2026
+              <a href="mailto:linuxfrontier@proton.me" title="linuxfrontier@proton.me">
+                Washington Indacochea Delgado
+              </a>
+              (Python/PyQt6 port)
+            </p>
+            <p>
+              This program is free software: you may redistribute it and/or modify it
+              under the terms of the GNU General Public License as published by the
+              Free Software Foundation, either version 3 of the License, or (at your
+              option) any later version.
+            </p>
+            <p>
+              This program is distributed in the hope that it will be useful but
+              WITHOUT ANY WARRANTY; without even the implied warranty of
+              MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+              Public License for more details.
+            </p>
+            <p>
+              You should have received a copy of the GNU General Public License along
+              with this program. If not, see
+              <a href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>.
+            </p>
+            <h3>Technologies used in this port</h3>
+            <ul>
+              <li>Python 3</li>
+              <li>PyQt6 Qt Widgets</li>
+              <li><code>drumstick_py</code> for MIDI file parsing and widgets</li>
+              <li><code>ctypes</code> bindings to ALSA Sequencer through <code>libasound</code></li>
+              <li>QSettings for persistent application preferences</li>
+              <li>Standard MIDI File support for <code>.mid</code> and <code>.kar</code></li>
+            </ul>
             """
         ).format(app=self.tr(APP_TITLE)).strip()
 

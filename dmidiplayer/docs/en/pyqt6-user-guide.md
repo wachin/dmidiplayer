@@ -69,7 +69,8 @@ to open a MIDI file or playlist.
 
 - `Help Contents`: open the general local help index.
 - `User Guide`: open this guide.
-- `About`: show project and license information.
+- `About`: show project credits, clickable author links, license information,
+  and the main technologies used in the Python/PyQt6 port.
 
 ## Toolbar
 
@@ -200,6 +201,9 @@ The filter at the top lets you switch between:
 When a file has text in multiple tracks, the window automatically starts on the
 track with the most text events. Switching back to `All tracks` shows the track
 number before each line so mixed sources stay readable.
+
+Use `Copy` to place the currently filtered text into the clipboard. Use `Font`
+to choose a more comfortable display font for the lyrics pane.
 
 Encoding overrides, save/export, and fullscreen behavior are still pending.
 

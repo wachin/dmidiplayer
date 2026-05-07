@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
@@ -900,6 +901,42 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog.track_combo.setCurrentIndex(1)
                 self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Intro\nMarker: Start")
 
+    def test_lyrics_dialog_copy_button_uses_filtered_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.filter_combo.setCurrentIndex(1)
+
+                dialog.copy_button.click()
+
+                self.assertEqual(QApplication.clipboard().text().strip(), "Lyric: Sing!")
+
+    def test_lyrics_dialog_font_button_updates_browser_font(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+            chosen_font = QFont("Sans Serif", 15)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.QFontDialog.getFont", return_value=(chosen_font, True)),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                dialog.font_button.click()
+
+                self.assertEqual(dialog.browser.font().family(), chosen_font.family())
+                self.assertEqual(dialog.browser.font().pointSize(), chosen_font.pointSize())
+
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
@@ -1551,7 +1588,16 @@ class AppPlaylistTest(unittest.TestCase):
             window.user_guide_action.trigger()
 
             self.assertEqual(dialogs, ["About", "Help Contents", "User Guide"])
-            self.assertIn("Python/PyQt6 port", window._about_html())
+            about_html = window._about_html()
+            self.assertIn("Python/PyQt6 port", about_html)
+            self.assertIn("Pedro Lopez-Cabanillas", about_html)
+            self.assertIn("Washington Indacochea Delgado", about_html)
+            self.assertIn("mailto:plcl@users.sf.net", about_html)
+            self.assertIn("mailto:linuxfrontier@proton.me", about_html)
+            self.assertIn('title="plcl@users.sf.net"', about_html)
+            self.assertIn('title="linuxfrontier@proton.me"', about_html)
+            self.assertIn("Technologies used in this port", about_html)
+            self.assertIn("PyQt6 Qt Widgets", about_html)
 
     def test_preferences_action_opens_dialog(self) -> None:
         dialogs: list[str] = []

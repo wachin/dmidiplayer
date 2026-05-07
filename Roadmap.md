@@ -204,10 +204,10 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] all.
 - [ ] Detect encoding automatically and allow manual override.
 - [ ] Highlight past/future lyrics with configurable colors.
-- [ ] Copy lyrics to clipboard.
+- [x] Copy lyrics to clipboard.
 - [ ] Save lyrics to a file with selected encoding.
 - [ ] Print lyrics.
-- [ ] Change lyrics font.
+- [x] Change lyrics font.
 - [ ] Fullscreen lyrics view.
 
 ### Rhythm View
