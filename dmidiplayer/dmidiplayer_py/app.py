@@ -433,6 +433,68 @@ class ChannelsDialog(QDialog):
             level.setValue(max(0, min(127, value)))
 
 
+class PianolaDialog(QDialog):
+    TRACKS_PER_TAB = 8
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Piano Player"))
+        self._track_keyboards: dict[int, PianoKeyboard] = {}
+        self._track_channels: dict[int, set[int]] = {}
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget(self)
+        self.tabs.setObjectName("pianola_tabs")
+        layout.addWidget(self.tabs)
+        self.resize(780, 520)
+
+    def set_tracks(self, tracks: list[tuple[int, set[int]]]) -> None:
+        self._track_keyboards.clear()
+        self._track_channels = {track_number: set(channels) for track_number, channels in tracks}
+        self.tabs.clear()
+        if not tracks:
+            empty = QLabel(self.tr("No MIDI tracks available"), self)
+            empty.setObjectName("pianola_empty_label")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabs.addTab(empty, self.tr("Tracks 1-8"))
+            return
+        for tab_index in range(0, len(tracks), self.TRACKS_PER_TAB):
+            chunk = tracks[tab_index : tab_index + self.TRACKS_PER_TAB]
+            page = QWidget(self.tabs)
+            page_layout = QVBoxLayout(page)
+            for track_number, _channels in chunk:
+                row = QWidget(page)
+                row_layout = QVBoxLayout(row)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(2)
+                label = QLabel(self.tr("Track {number}").format(number=track_number + 1), row)
+                label.setObjectName(f"pianola_track_label_{track_number + 1}")
+                keyboard = PianoKeyboard(row)
+                keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
+                row_layout.addWidget(label)
+                row_layout.addWidget(keyboard)
+                page_layout.addWidget(row)
+                self._track_keyboards[track_number] = keyboard
+            page_layout.addStretch(1)
+            start = tab_index + 1
+            end = tab_index + len(chunk)
+            self.tabs.addTab(page, self.tr("Tracks {start}-{end}").format(start=start, end=end))
+        self.tabs.setCurrentIndex(0)
+
+    def note_on(self, channel: int, note: int) -> None:
+        for track_number, channels in self._track_channels.items():
+            if channel in channels and track_number in self._track_keyboards:
+                self._track_keyboards[track_number].note_on(note)
+
+    def note_off(self, channel: int, note: int) -> None:
+        for track_number, channels in self._track_channels.items():
+            if channel in channels and track_number in self._track_keyboards:
+                self._track_keyboards[track_number].note_off(note)
+
+    def clear(self) -> None:
+        for keyboard in self._track_keyboards.values():
+            keyboard.clear()
+
+
 class LyricsDialog(QDialog):
     textPrinted = pyqtSignal()
     textSaved = pyqtSignal(str, str)
@@ -717,6 +779,7 @@ class MainWindow(QMainWindow):
         self._playlist_modified = False
         self.channels_dialog: ChannelsDialog | None = None
         self.lyrics_dialog: LyricsDialog | None = None
+        self.pianola_dialog: PianolaDialog | None = None
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
@@ -1007,6 +1070,10 @@ class MainWindow(QMainWindow):
         self.channels_action.setObjectName("channels_action")
         self.channels_action.triggered.connect(self._show_channels_dialog)
         view_menu.addAction(self.channels_action)
+        self.pianola_action = QAction(self.tr("Piano Player"), self)
+        self.pianola_action.setObjectName("pianola_action")
+        self.pianola_action.triggered.connect(self._show_pianola_dialog)
+        view_menu.addAction(self.pianola_action)
         self.lyrics_action = QAction(self.tr("Lyrics"), self)
         self.lyrics_action.setObjectName("lyrics_action")
         self.lyrics_action.triggered.connect(self._show_lyrics_dialog)
@@ -1073,6 +1140,8 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.set_channels([])
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.set_tracks([])
         if self.lyrics_dialog is not None:
             self.lyrics_dialog.set_text_events([])
         self._update_midi_output_label()
@@ -1394,6 +1463,26 @@ class MainWindow(QMainWindow):
 
     def _create_lyrics_dialog(self) -> LyricsDialog:
         return LyricsDialog(self)
+
+    def _create_pianola_dialog(self) -> PianolaDialog:
+        return PianolaDialog(self)
+
+    def _ensure_pianola_dialog(self) -> PianolaDialog:
+        if self.pianola_dialog is None:
+            self.pianola_dialog = self._create_pianola_dialog()
+            self._refresh_pianola_dialog()
+        return self.pianola_dialog
+
+    def _show_pianola_dialog(self) -> None:
+        dialog = self._ensure_pianola_dialog()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _refresh_pianola_dialog(self) -> None:
+        if self.pianola_dialog is None:
+            return
+        self.pianola_dialog.set_tracks(self.player.sequence.midi_tracks())
 
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
@@ -1833,6 +1922,7 @@ class MainWindow(QMainWindow):
         self._update_time_label(0, midi.length_ticks)
         self.keyboard.clear()
         self._refresh_channels_dialog()
+        self._refresh_pianola_dialog()
         self._refresh_lyrics_dialog()
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
@@ -1907,6 +1997,10 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.clear()
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.clear()
 
     def previous_bar(self) -> None:
         self._seek_to_bar_delta(-1)
@@ -1937,6 +2031,8 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.clear()
 
     def _jump_bar_value_changed(self, value: int) -> None:
         if self.player.sequence.midi is None:
@@ -2034,10 +2130,14 @@ class MainWindow(QMainWindow):
             self.keyboard.note_on(data[0])
             if channel is not None and self.channels_dialog is not None:
                 self.channels_dialog.set_channel_level(channel, data[1])
+            if channel is not None and self.pianola_dialog is not None:
+                self.pianola_dialog.note_on(channel, data[0])
         elif kind in ("note_off", "note_on") and data:
             self.keyboard.note_off(data[0])
             if channel is not None and self.channels_dialog is not None:
                 self.channels_dialog.set_channel_level(channel, 0)
+            if channel is not None and self.pianola_dialog is not None:
+                self.pianola_dialog.note_off(channel, data[0])
 
     def _finished(self) -> None:
         next_row = self._next_playlist_row() if self.auto_advance_playlist else None
@@ -2048,6 +2148,8 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.clear()
         self._update_action_state()
 
     def _output_error(self, message: str) -> None:

@@ -198,14 +198,14 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Player Piano / Pianola
 
-- [ ] Show only the tracks/channels that are actually present in the loaded MIDI data.
-- [ ] Use tabs inside the Pianola window when the MIDI file contains many tracks.
-  - [ ] First tab opens by default and shows up to 8 MIDI tracks.
-  - [ ] If the file has more than 8 MIDI tracks, show tracks 9-16 in a second tab.
-  - [ ] If the file has more than 16 MIDI tracks, show the remaining tracks in a third tab.
-  - [ ] Each tab must let the user click and view the instruments/tracks they need.
-- [ ] Show up to 16 rows, one per used channel.
-- [ ] Each row should have channel number/label and keyboard.
+- [x] Show only the tracks/channels that are actually present in the loaded MIDI data.
+- [x] Use tabs inside the Pianola window when the MIDI file contains many tracks.
+  - [x] First tab opens by default and shows up to 8 MIDI tracks.
+  - [x] If the file has more than 8 MIDI tracks, show tracks 9-16 in a second tab.
+  - [x] If the file has more than 16 MIDI tracks, show the remaining tracks in a third tab.
+  - [x] Each tab must let the user click and view the instruments/tracks they need.
+- [x] Show one row per MIDI-bearing track in the current Pianola window slice.
+- [x] Each row should have track label and keyboard in the current Pianola window slice.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
 - [ ] Allow customizable colors per channel/state.
 - [ ] Allow velocity tinting.
@@ -330,7 +330,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;
-  - [ ] Piano Player.
+  - [x] Piano Player.
 - [ ] Embedded views that can be shown/hidden:
   - [x] toolbar;
   - [x] status bar;

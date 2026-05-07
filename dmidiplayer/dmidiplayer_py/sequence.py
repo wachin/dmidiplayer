@@ -93,3 +93,13 @@ class Sequence(QObject):
         if self.midi is None:
             return []
         return list(self.midi.text_events)
+
+    def midi_tracks(self) -> list[tuple[int, set[int]]]:
+        if self.midi is None:
+            return []
+        tracks: list[tuple[int, set[int]]] = []
+        for track_number, track in enumerate(self.midi.tracks):
+            channels = {event.channel for event in track.events if event.channel is not None}
+            if channels:
+                tracks.append((track_number, channels))
+        return tracks

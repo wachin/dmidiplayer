@@ -182,6 +182,22 @@ Each row currently includes:
 This is still an early Python port slice of the channels view, so there are
 still richer channel behaviors pending.
 
+## Piano Player Window
+
+The `Piano Player` window is opened from the `View` menu.
+
+This first slice shows only MIDI-bearing tracks from the loaded file. Tracks
+are split across tabs with up to 8 tracks per tab:
+
+- the first tab opens by default
+- tracks 1-8 appear in the first tab
+- tracks 9-16 appear in the second tab when needed
+- later tracks continue in a third tab when needed
+
+Each visible row shows a track label and a keyboard. During playback, note
+activity is reflected in the keyboards for tracks whose MIDI channels are
+active.
+
 ## Lyrics Window
 
 The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI

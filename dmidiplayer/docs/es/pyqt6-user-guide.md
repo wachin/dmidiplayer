@@ -185,6 +185,23 @@ Cada fila incluye actualmente:
 Este sigue siendo un tramo temprano del port de la vista de canales, así que
 todavía faltan comportamientos de canal más avanzados.
 
+## Ventana Piano Player
+
+La ventana `Piano Player` se abre desde el menú `View`.
+
+Este primer tramo muestra solo las pistas que realmente contienen MIDI dentro
+del archivo cargado. Las pistas se reparten en pestañas con un maximo de 8
+pistas por pestaña:
+
+- la primera pestaña se abre por defecto
+- las pistas 1-8 aparecen en la primera pestaña
+- las pistas 9-16 aparecen en la segunda pestaña cuando hace falta
+- las pistas posteriores continúan en una tercera pestaña cuando hace falta
+
+Cada fila visible muestra una etiqueta de pista y un teclado. Durante la
+reproduccion, la actividad de notas se refleja en los teclados de las pistas
+cuyos canales MIDI estan activos.
+
 ## Ventana de letras
 
 La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI

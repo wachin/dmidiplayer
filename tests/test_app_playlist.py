@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,10 +15,11 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QDialog
+from PyQt6.QtWidgets import QLabel
 from PyQt6.QtWidgets import QSlider
 from PyQt6.QtCore import Qt
 
-from drumstick_py import MidiConnection
+from drumstick_py import MidiConnection, MidiEvent
 from dmidiplayer_py.app import MainWindow, PreferencesDialog
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
@@ -274,6 +276,28 @@ def write_timed_lyrics_midi(path: Path) -> None:
         ]
     )
     path.write_bytes(header + chunk(b"MTrk", track))
+
+
+def write_many_track_midi(path: Path, total_tracks: int, midi_track_indexes: list[int]) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 1, total_tracks, 480))
+    tracks: list[bytes] = []
+    for track_index in range(total_tracks):
+        if track_index in midi_track_indexes:
+            channel = track_index % 16
+            payload = b"".join(
+                [
+                    varlen(0),
+                    bytes([0x90 | channel, 60 + (track_index % 12), 100]),
+                    varlen(120),
+                    bytes([0x80 | channel, 60 + (track_index % 12), 0]),
+                    varlen(0),
+                    b"\xff\x2f\x00",
+                ]
+            )
+        else:
+            payload = b"".join([varlen(0), b"\xff\x03\x05Track", varlen(0), b"\xff\x2f\x00"])
+        tracks.append(chunk(b"MTrk", payload))
+    path.write_bytes(header + b"".join(tracks))
 
 
 class AppPlaylistTest(unittest.TestCase):
@@ -560,6 +584,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
             self.assertIsNotNone(window.findChild(type(window.channels_action), "channels_action"))
+            self.assertIsNotNone(window.findChild(type(window.pianola_action), "pianola_action"))
             self.assertIsNotNone(window.findChild(type(window.lyrics_action), "lyrics_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.rhythm_action), "toggle_rhythm_action"))
@@ -696,6 +721,24 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(shown, ["Lyrics"])
 
+    def test_pianola_action_opens_dialog(self) -> None:
+        shown: list[str] = []
+
+        def fake_show(dialog: object) -> None:
+            shown.append(getattr(dialog, "windowTitle")())
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.PianolaDialog.show", fake_show),
+            patch("dmidiplayer_py.app.PianolaDialog.raise_", lambda dialog: None),
+            patch("dmidiplayer_py.app.PianolaDialog.activateWindow", lambda dialog: None),
+        ):
+            window = MainWindow([])
+            window.pianola_action.trigger()
+
+            self.assertEqual(shown, ["Piano Player"])
+
     def test_view_menu_toggles_rhythm_panel(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
@@ -733,6 +776,60 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.table.cellWidget(0, 4).currentIndex(), 10)
                 self.assertEqual(dialog.table.cellWidget(1, 4).currentIndex(), 20)
                 self.assertIn("Music Box", dialog.table.cellWidget(0, 4).currentText())
+
+    def test_pianola_dialog_shows_only_tracks_with_midi(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=4, midi_track_indexes=[1, 3])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                tab = dialog.tabs.widget(0)
+                labels = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_track_label_")]
+
+                self.assertEqual(dialog.tabs.count(), 1)
+                self.assertEqual(labels, ["Track 2", "Track 4"])
+
+    def test_pianola_dialog_splits_tracks_into_tabs_of_eight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "many-tracks.mid")
+            write_many_track_midi(path, total_tracks=17, midi_track_indexes=list(range(17)))
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+
+                self.assertEqual(dialog.tabs.count(), 3)
+                self.assertEqual(dialog.tabs.tabText(0), "Tracks 1-8")
+                self.assertEqual(dialog.tabs.tabText(1), "Tracks 9-16")
+                self.assertEqual(dialog.tabs.tabText(2), "Tracks 17-17")
+                self.assertEqual(dialog.tabs.currentIndex(), 0)
+
+    def test_pianola_dialog_tracks_follow_played_channel_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+
+                window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
+                self.assertIn(60, keyboard._active)
+
+                window._event_played(MidiEvent(tick=120, kind="note_off", channel=0, data=bytes([60, 0])))
+                self.assertNotIn(60, keyboard._active)
 
     def test_channels_dialog_level_updates_from_played_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
