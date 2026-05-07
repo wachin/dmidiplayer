@@ -211,11 +211,11 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Allow show all / hide all track keyboards in the current Pianola window slice.
 - [ ] Allow customizable colors per channel/state.
 - [x] Allow velocity tinting.
-- [ ] Show note names according to preference:
-  - [ ] never;
-  - [ ] minimal;
-  - [ ] when active;
-  - [ ] always.
+- [x] Show note names according to preference:
+  - [x] never;
+  - [x] minimal;
+  - [x] when active;
+  - [x] always.
 - [ ] Support configurable octave designation.
 - [ ] Allow manual note playing with computer keyboard and mouse where appropriate.
 - [ ] Window menu:

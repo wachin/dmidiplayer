@@ -218,6 +218,9 @@ Usa el selector `Range` para cambiar entre el rango exacto de notas de cada
 pista y `Used octaves`, que amplia la vista a octavas completas para una
 lectura mas comoda.
 
+Usa el selector `Labels` para elegir como aparecen los nombres de las notas en
+las teclas: `Never`, `Minimal`, `When active` o `Always`.
+
 El widget de teclado ahora incluye teclas negras dentro de ese rango reducido,
 de modo que la vista de pista se parece mas a un teclado de piano real.
 

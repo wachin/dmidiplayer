@@ -914,6 +914,30 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 95))
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player range: Used octaves")
 
+    def test_pianola_dialog_can_change_note_label_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "ranges.mid")
+            write_track_range_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
+
+                note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
+                self.assertEqual(keyboard_one._note_label_mode, "minimal")
+                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C3", 60: "C4"})
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player labels: Minimal")
+
+                note_labels_combo.setCurrentIndex(note_labels_combo.findData("always"))
+                self.assertEqual(keyboard_one._note_label_mode, "always")
+                self.assertIn(58, keyboard_one.visible_note_labels())
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player labels: Always")
+
     def test_pianola_dialog_can_hide_individual_track_keyboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")

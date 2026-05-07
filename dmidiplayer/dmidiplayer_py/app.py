@@ -437,6 +437,7 @@ class PianolaDialog(QDialog):
     trackVisibilityChanged = pyqtSignal(int, bool)
     allTracksVisibilityChanged = pyqtSignal(bool)
     rangeModeChanged = pyqtSignal(str)
+    noteLabelModeChanged = pyqtSignal(str)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -448,6 +449,7 @@ class PianolaDialog(QDialog):
         self._track_keyboard_containers: dict[int, QWidget] = {}
         self._track_note_ranges: dict[int, tuple[int, int]] = {}
         self._range_mode = "exact"
+        self._note_label_mode = "never"
         layout = QVBoxLayout(self)
         button_row = QHBoxLayout()
         button_row.addWidget(QLabel(self.tr("Range:"), self))
@@ -457,6 +459,15 @@ class PianolaDialog(QDialog):
         self.range_mode_combo.addItem(self.tr("Used octaves"), "octaves")
         self.range_mode_combo.currentIndexChanged.connect(self._range_mode_changed)
         button_row.addWidget(self.range_mode_combo)
+        button_row.addWidget(QLabel(self.tr("Labels:"), self))
+        self.note_labels_combo = QComboBox(self)
+        self.note_labels_combo.setObjectName("pianola_note_labels_combo")
+        self.note_labels_combo.addItem(self.tr("Never"), "never")
+        self.note_labels_combo.addItem(self.tr("Minimal"), "minimal")
+        self.note_labels_combo.addItem(self.tr("When active"), "active")
+        self.note_labels_combo.addItem(self.tr("Always"), "always")
+        self.note_labels_combo.currentIndexChanged.connect(self._note_label_mode_changed)
+        button_row.addWidget(self.note_labels_combo)
         button_row.addStretch(1)
         self.show_all_button = QPushButton(self.tr("Show All"), self)
         self.show_all_button.setObjectName("pianola_show_all_button")
@@ -544,6 +555,7 @@ class PianolaDialog(QDialog):
                 keyboard = PianoKeyboard(row)
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
                 keyboard.set_note_range(display_min_note, display_max_note)
+                keyboard.set_note_label_mode(self._note_label_mode)
                 keyboard_layout.addWidget(keyboard)
                 row_layout.addWidget(keyboard_container)
                 page_layout.addWidget(row)
@@ -591,6 +603,12 @@ class PianolaDialog(QDialog):
             min_note, max_note = self._track_note_ranges.get(track_number, (21, 108))
             display_min_note, display_max_note = self._effective_note_range(min_note, max_note)
             keyboard.set_note_range(display_min_note, display_max_note)
+
+    def _note_label_mode_changed(self, index: int) -> None:
+        self._note_label_mode = str(self.note_labels_combo.itemData(index) or "never")
+        for keyboard in self._track_keyboards.values():
+            keyboard.set_note_label_mode(self._note_label_mode)
+        self.noteLabelModeChanged.emit(self._note_label_mode)
 
     def set_fullscreen_enabled(self, enabled: bool) -> None:
         if enabled:
@@ -1599,6 +1617,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.trackVisibilityChanged.connect(self._pianola_track_visibility_changed)
             self.pianola_dialog.allTracksVisibilityChanged.connect(self._pianola_all_tracks_visibility_changed)
             self.pianola_dialog.rangeModeChanged.connect(self._pianola_range_mode_changed)
+            self.pianola_dialog.noteLabelModeChanged.connect(self._pianola_note_label_mode_changed)
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1634,6 +1653,18 @@ class MainWindow(QMainWindow):
         mode_label = self.tr("Used octaves") if mode == "octaves" else self.tr("Exact")
         self.statusBar().showMessage(
             self.tr("Piano Player range: {mode}").format(mode=mode_label),
+            3000,
+        )
+
+    def _pianola_note_label_mode_changed(self, mode: str) -> None:
+        labels = {
+            "never": self.tr("Never"),
+            "minimal": self.tr("Minimal"),
+            "active": self.tr("When active"),
+            "always": self.tr("Always"),
+        }
+        self.statusBar().showMessage(
+            self.tr("Piano Player labels: {mode}").format(mode=labels.get(mode, mode)),
             3000,
         )
 

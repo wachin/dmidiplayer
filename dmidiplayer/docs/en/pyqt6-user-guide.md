@@ -213,6 +213,9 @@ Use the `Range` selector to switch between the exact note span of each track
 and `Used octaves`, which expands the display to complete octaves for a more
 comfortable reading layout.
 
+Use the `Labels` selector to choose how note names appear on the keys:
+`Never`, `Minimal`, `When active`, or `Always`.
+
 The keyboard widget now includes black keys as part of that reduced range, so
 the track view reads more like a real piano layout.
 

@@ -53,6 +53,25 @@ class PianoKeyboardTest(unittest.TestCase):
 
         self.assertNotEqual(soft.name(), loud.name())
 
+    def test_visible_note_labels_follow_selected_mode(self) -> None:
+        keyboard = PianoKeyboard()
+        keyboard.set_note_range(48, 60)
+
+        keyboard.set_note_label_mode("never")
+        self.assertEqual(keyboard.visible_note_labels(), {})
+
+        keyboard.set_note_label_mode("minimal")
+        self.assertEqual(keyboard.visible_note_labels(), {48: "C3", 60: "C4"})
+
+        keyboard.note_on(49, 70)
+        keyboard.note_on(60, 100)
+        keyboard.set_note_label_mode("active")
+        self.assertEqual(keyboard.visible_note_labels(), {49: "C#3", 60: "C4"})
+
+        keyboard.set_note_label_mode("always")
+        self.assertEqual(keyboard.visible_note_labels()[48], "C3")
+        self.assertEqual(keyboard.visible_note_labels()[58], "A#3")
+
 
 if __name__ == "__main__":
     unittest.main()
