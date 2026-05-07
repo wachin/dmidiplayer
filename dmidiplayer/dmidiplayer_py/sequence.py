@@ -103,3 +103,21 @@ class Sequence(QObject):
             if channels:
                 tracks.append((track_number, channels))
         return tracks
+
+    def midi_track_infos(self) -> list[dict[str, object]]:
+        if self.midi is None:
+            return []
+        tracks: list[dict[str, object]] = []
+        for track_number, track in enumerate(self.midi.tracks):
+            channels = {event.channel for event in track.events if event.channel is not None}
+            if not channels:
+                continue
+            title = ""
+            for event in track.events:
+                if event.kind == "meta" and event.meta_type in (0x03, 0x04):
+                    text = event.text.strip()
+                    if text:
+                        title = text
+                        break
+            tracks.append({"track": track_number, "channels": channels, "title": title})
+        return tracks

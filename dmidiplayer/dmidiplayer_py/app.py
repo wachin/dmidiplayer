@@ -447,9 +447,20 @@ class PianolaDialog(QDialog):
         layout.addWidget(self.tabs)
         self.resize(780, 520)
 
-    def set_tracks(self, tracks: list[tuple[int, set[int]]]) -> None:
+    def _format_track_heading(self, track_number: int, title: str) -> str:
+        if title:
+            return self.tr("Track {number} - {title}").format(number=track_number + 1, title=title)
+        return self.tr("Track {number}").format(number=track_number + 1)
+
+    def _format_channel_summary(self, channels: set[int]) -> str:
+        labels = ", ".join(str(channel + 1) for channel in sorted(channels))
+        return self.tr("Channels: {channels}").format(channels=labels)
+
+    def set_tracks(self, tracks: list[dict[str, object]]) -> None:
         self._track_keyboards.clear()
-        self._track_channels = {track_number: set(channels) for track_number, channels in tracks}
+        self._track_channels = {
+            int(track["track"]): set(track["channels"]) for track in tracks
+        }
         self.tabs.clear()
         if not tracks:
             empty = QLabel(self.tr("No MIDI tracks available"), self)
@@ -461,16 +472,22 @@ class PianolaDialog(QDialog):
             chunk = tracks[tab_index : tab_index + self.TRACKS_PER_TAB]
             page = QWidget(self.tabs)
             page_layout = QVBoxLayout(page)
-            for track_number, _channels in chunk:
+            for track in chunk:
+                track_number = int(track["track"])
+                channels = set(track["channels"])
+                title = str(track.get("title", ""))
                 row = QWidget(page)
                 row_layout = QVBoxLayout(row)
                 row_layout.setContentsMargins(0, 0, 0, 0)
                 row_layout.setSpacing(2)
-                label = QLabel(self.tr("Track {number}").format(number=track_number + 1), row)
+                label = QLabel(self._format_track_heading(track_number, title), row)
                 label.setObjectName(f"pianola_track_label_{track_number + 1}")
+                detail = QLabel(self._format_channel_summary(channels), row)
+                detail.setObjectName(f"pianola_track_detail_{track_number + 1}")
                 keyboard = PianoKeyboard(row)
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
                 row_layout.addWidget(label)
+                row_layout.addWidget(detail)
                 row_layout.addWidget(keyboard)
                 page_layout.addWidget(row)
                 self._track_keyboards[track_number] = keyboard
@@ -1482,7 +1499,7 @@ class MainWindow(QMainWindow):
     def _refresh_pianola_dialog(self) -> None:
         if self.pianola_dialog is None:
             return
-        self.pianola_dialog.set_tracks(self.player.sequence.midi_tracks())
+        self.pianola_dialog.set_tracks(self.player.sequence.midi_track_infos())
 
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:

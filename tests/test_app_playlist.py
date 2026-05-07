@@ -282,10 +282,13 @@ def write_many_track_midi(path: Path, total_tracks: int, midi_track_indexes: lis
     header = chunk(b"MThd", struct.pack(">HHH", 1, total_tracks, 480))
     tracks: list[bytes] = []
     for track_index in range(total_tracks):
+        track_name = f"Part {track_index + 1}".encode("ascii")
         if track_index in midi_track_indexes:
             channel = track_index % 16
             payload = b"".join(
                 [
+                    varlen(0),
+                    b"\xff\x03" + varlen(len(track_name)) + track_name,
                     varlen(0),
                     bytes([0x90 | channel, 60 + (track_index % 12), 100]),
                     varlen(120),
@@ -295,7 +298,7 @@ def write_many_track_midi(path: Path, total_tracks: int, midi_track_indexes: lis
                 ]
             )
         else:
-            payload = b"".join([varlen(0), b"\xff\x03\x05Track", varlen(0), b"\xff\x2f\x00"])
+            payload = b"".join([varlen(0), b"\xff\x03" + varlen(len(track_name)) + track_name, varlen(0), b"\xff\x2f\x00"])
         tracks.append(chunk(b"MTrk", payload))
     path.write_bytes(header + b"".join(tracks))
 
@@ -790,9 +793,11 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_pianola_dialog()
                 tab = dialog.tabs.widget(0)
                 labels = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_track_label_")]
+                details = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_track_detail_")]
 
                 self.assertEqual(dialog.tabs.count(), 1)
-                self.assertEqual(labels, ["Track 2", "Track 4"])
+                self.assertEqual(labels, ["Track 2 - Part 2", "Track 4 - Part 4"])
+                self.assertEqual(details, ["Channels: 2", "Channels: 4"])
 
     def test_pianola_dialog_splits_tracks_into_tabs_of_eight(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

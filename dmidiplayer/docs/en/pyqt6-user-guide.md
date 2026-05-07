@@ -194,9 +194,9 @@ are split across tabs with up to 8 tracks per tab:
 - tracks 9-16 appear in the second tab when needed
 - later tracks continue in a third tab when needed
 
-Each visible row shows a track label and a keyboard. During playback, note
-activity is reflected in the keyboards for tracks whose MIDI channels are
-active.
+Each visible row shows a track label, a channel summary, and a keyboard.
+During playback, note activity is reflected in the keyboards for tracks whose
+MIDI channels are active.
 
 ## Lyrics Window
 

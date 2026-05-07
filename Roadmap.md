@@ -205,7 +205,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] If the file has more than 16 MIDI tracks, show the remaining tracks in a third tab.
   - [x] Each tab must let the user click and view the instruments/tracks they need.
 - [x] Show one row per MIDI-bearing track in the current Pianola window slice.
-- [x] Each row should have track label and keyboard in the current Pianola window slice.
+- [x] Each row should have track label, channel summary, and keyboard in the current Pianola window slice.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
 - [ ] Allow customizable colors per channel/state.
 - [ ] Allow velocity tinting.

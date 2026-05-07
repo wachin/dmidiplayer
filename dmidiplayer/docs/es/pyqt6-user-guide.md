@@ -198,9 +198,9 @@ pistas por pestaña:
 - las pistas 9-16 aparecen en la segunda pestaña cuando hace falta
 - las pistas posteriores continúan en una tercera pestaña cuando hace falta
 
-Cada fila visible muestra una etiqueta de pista y un teclado. Durante la
-reproduccion, la actividad de notas se refleja en los teclados de las pistas
-cuyos canales MIDI estan activos.
+Cada fila visible muestra una etiqueta de pista, un resumen de canales y un
+teclado. Durante la reproduccion, la actividad de notas se refleja en los
+teclados de las pistas cuyos canales MIDI estan activos.
 
 ## Ventana de letras
 
