@@ -5,6 +5,8 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtGui import QKeyEvent, QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 from drumstick_py import PianoKeyboard
@@ -94,6 +96,48 @@ class PianoKeyboardTest(unittest.TestCase):
         keyboard.set_octave_offset(-2)
 
         self.assertEqual(keyboard.note_label(60), "C3")
+
+    def test_mapped_key_note_uses_keyboard_layout(self) -> None:
+        keyboard = PianoKeyboard()
+        keyboard.set_note_range(48, 72)
+
+        self.assertEqual(keyboard.mapped_key_note(Qt.Key.Key_Z), 48)
+        self.assertEqual(keyboard.mapped_key_note(Qt.Key.Key_M), 59)
+        self.assertIsNone(keyboard.mapped_key_note(Qt.Key.Key_Q))
+
+    def test_mouse_and_keyboard_events_emit_note_signals(self) -> None:
+        keyboard = PianoKeyboard()
+        keyboard.set_note_range(48, 60)
+        keyboard.resize(240, 72)
+        pressed: list[tuple[int, int]] = []
+        released: list[int] = []
+        keyboard.notePressed.connect(lambda note, velocity: pressed.append((note, velocity)))
+        keyboard.noteReleased.connect(lambda note: released.append(note))
+
+        mouse_press = QMouseEvent(
+            QMouseEvent.Type.MouseButtonPress,
+            QPointF(10, 40),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        keyboard.mousePressEvent(mouse_press)
+        keyboard.mouseReleaseEvent(
+            QMouseEvent(
+                QMouseEvent.Type.MouseButtonRelease,
+                QPointF(10, 40),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+        )
+
+        keyboard.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Z, Qt.KeyboardModifier.NoModifier))
+        keyboard.keyReleaseEvent(QKeyEvent(QKeyEvent.Type.KeyRelease, Qt.Key.Key_Z, Qt.KeyboardModifier.NoModifier))
+
+        self.assertEqual(pressed[0][0], 48)
+        self.assertEqual(pressed[1], (48, 100))
+        self.assertEqual(released, [48, 48])
 
 
 if __name__ == "__main__":

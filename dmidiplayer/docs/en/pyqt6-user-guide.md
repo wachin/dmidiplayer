@@ -228,6 +228,10 @@ the track view reads more like a real piano layout.
 Active notes are also tinted by velocity, so softer and stronger hits are a
 little easier to distinguish at a glance during playback.
 
+You can also play notes directly from the keyboards:
+- click keys with the mouse
+- use the lower QWERTY row (`Z`, `S`, `X`, `D`, and so on) when a keyboard has focus
+
 ## Lyrics Window
 
 The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI

@@ -985,6 +985,44 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertNotEqual(keyboard_one._white_high_color.name(), keyboard_two._white_high_color.name())
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player colors: By channel")
 
+    def test_main_keyboard_manual_notes_send_midi_events(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.keyboard.notePressed.emit(60, 96)
+            window.keyboard.noteReleased.emit(60)
+
+            self.assertEqual(window.output.events[-2].kind, "note_on")
+            self.assertEqual(window.output.events[-2].channel, 0)
+            self.assertEqual(window.output.events[-2].data, bytes([60, 96]))
+            self.assertEqual(window.output.events[-1].kind, "note_off")
+            self.assertEqual(window.output.events[-1].data, bytes([60, 0]))
+
+    def test_pianola_manual_notes_send_midi_events_on_track_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+
+                keyboard.notePressed.emit(61, 88)
+                keyboard.noteReleased.emit(61)
+
+                self.assertEqual(window.output.events[-2].kind, "note_on")
+                self.assertEqual(window.output.events[-2].channel, 1)
+                self.assertEqual(window.output.events[-2].data, bytes([61, 88]))
+                self.assertEqual(window.output.events[-1].kind, "note_off")
+                self.assertEqual(window.output.events[-1].channel, 1)
+
     def test_pianola_dialog_can_hide_individual_track_keyboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")

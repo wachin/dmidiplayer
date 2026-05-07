@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from drumstick_py import BackendManager, MidiFileError, MidiOutputError, PianoKeyboard
+from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard
 from .i18n import install_translator
 from .player import SequencePlayer
 from .settings import AppSettings
@@ -459,6 +459,8 @@ class PianolaDialog(QDialog):
     noteLabelModeChanged = pyqtSignal(str)
     colorModeChanged = pyqtSignal(str)
     octaveDesignationChanged = pyqtSignal(str)
+    manualNoteOn = pyqtSignal(int, int, int)
+    manualNoteOff = pyqtSignal(int, int)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -604,6 +606,14 @@ class PianolaDialog(QDialog):
                 self._track_keyboard_containers[track_number] = keyboard_container
                 self._track_note_ranges[track_number] = (min_note, max_note)
                 self._track_primary_channels[track_number] = min(channels) if channels else None
+                primary_channel = self._track_primary_channels[track_number]
+                if primary_channel is not None:
+                    keyboard.notePressed.connect(
+                        lambda note, velocity, channel=primary_channel: self.manualNoteOn.emit(channel, note, velocity)
+                    )
+                    keyboard.noteReleased.connect(
+                        lambda note, channel=primary_channel: self.manualNoteOff.emit(channel, note)
+                    )
                 visible_checkbox.toggled.connect(
                     lambda checked, track=track_number: self._set_track_visible(track, checked, emit_signal=True)
                 )
@@ -1011,6 +1021,8 @@ class MainWindow(QMainWindow):
         self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.rhythm_view = RhythmView()
         self.keyboard = PianoKeyboard()
+        self.keyboard.notePressed.connect(lambda note, velocity: self._manual_note_on(0, note, velocity, "Keyboard"))
+        self.keyboard.noteReleased.connect(lambda note: self._manual_note_off(0, note, "Keyboard"))
         self.event_label = QLabel(self.tr("MIDI output: {name}").format(name=self.output.name))
         self.connection_combo = QComboBox()
         self.connection_combo.setMinimumWidth(260)
@@ -1694,6 +1706,12 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.noteLabelModeChanged.connect(self._pianola_note_label_mode_changed)
             self.pianola_dialog.colorModeChanged.connect(self._pianola_color_mode_changed)
             self.pianola_dialog.octaveDesignationChanged.connect(self._pianola_octave_designation_changed)
+            self.pianola_dialog.manualNoteOn.connect(
+                lambda channel, note, velocity: self._manual_note_on(channel, note, velocity, "Piano Player")
+            )
+            self.pianola_dialog.manualNoteOff.connect(
+                lambda channel, note: self._manual_note_off(channel, note, "Piano Player")
+            )
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1762,6 +1780,52 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             self.tr("Piano Player octaves: {mode}").format(mode=labels.get(mode, mode)),
             3000,
+        )
+
+    def _manual_note_on(self, channel: int, note: int, velocity: int, source: str) -> None:
+        try:
+            self.output.send_event(
+                MidiEvent(
+                    tick=self.position.value(),
+                    kind="note_on",
+                    channel=max(0, min(15, channel)),
+                    data=bytes([max(0, min(127, note)), max(1, min(127, velocity))]),
+                )
+            )
+        except MidiOutputError as exc:
+            self._output_error(str(exc))
+            return
+        if self.channels_dialog is not None:
+            self.channels_dialog.set_channel_level(channel, velocity)
+        self.event_label.setText(
+            self.tr("{source} note_on channel={channel} data={data}").format(
+                source=source,
+                channel=channel,
+                data=bytes([note, velocity]).hex(" "),
+            )
+        )
+
+    def _manual_note_off(self, channel: int, note: int, source: str) -> None:
+        try:
+            self.output.send_event(
+                MidiEvent(
+                    tick=self.position.value(),
+                    kind="note_off",
+                    channel=max(0, min(15, channel)),
+                    data=bytes([max(0, min(127, note)), 0]),
+                )
+            )
+        except MidiOutputError as exc:
+            self._output_error(str(exc))
+            return
+        if self.channels_dialog is not None:
+            self.channels_dialog.set_channel_level(channel, 0)
+        self.event_label.setText(
+            self.tr("{source} note_off channel={channel} data={data}").format(
+                source=source,
+                channel=channel,
+                data=bytes([note, 0]).hex(" "),
+            )
         )
 
     def _ensure_lyrics_dialog(self) -> LyricsDialog:

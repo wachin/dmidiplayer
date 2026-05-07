@@ -234,6 +234,10 @@ de modo que la vista de pista se parece mas a un teclado de piano real.
 Las notas activas tambien se tiñen segun la velocidad, para que durante la
 reproduccion sea un poco mas facil distinguir golpes suaves y fuertes.
 
+Tambien puedes tocar notas directamente desde los teclados:
+- haz clic sobre las teclas con el raton
+- usa la fila inferior del teclado QWERTY (`Z`, `S`, `X`, `D`, etc.) cuando el teclado tenga el foco
+
 ## Ventana de letras
 
 La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI
