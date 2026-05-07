@@ -163,6 +163,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Activity/level indicator per channel.
 - [x] Volume slider per channel.
 - [ ] Patch lock to prevent program changes sent by the file.
+- [x] Patch/program selector.
 - [ ] Patch/program selector using General MIDI names.
 - [x] Synchronize channel changes with realtime playback.
 

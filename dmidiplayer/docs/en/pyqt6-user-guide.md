@@ -170,11 +170,13 @@ Each row currently includes:
 - `Mute`: silences that channel during playback
 - `Solo`: keeps that channel at full level while reducing the others according
   to the current solo reduction preference
+- `Program`: sends a program change for that channel and overrides later
+  program-change events from the file
 - `Volume`: adjusts the playback level for that channel from `0%` to `200%`
 - `Level`: a live activity meter that follows note velocity while playback runs
 
-This is still an early Python port slice of the channels view, so patch/program
-controls are still pending.
+This is still an early Python port slice of the channels view, so General MIDI
+program names and patch locking are still pending.
 
 ## MIDI Destination Row
 

@@ -78,3 +78,13 @@ class Sequence(QObject):
         if self.midi is None:
             return []
         return sorted({event.channel for event in self.midi.events if event.channel is not None})
+
+    def initial_programs(self) -> dict[int, int]:
+        programs: dict[int, int] = {}
+        if self.midi is None:
+            return programs
+        for event in self.midi.events:
+            if event.channel is None or event.kind != "program_change" or not event.data:
+                continue
+            programs.setdefault(event.channel, event.data[0])
+        return programs

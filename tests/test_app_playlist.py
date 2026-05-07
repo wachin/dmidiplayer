@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QDialog
 from PyQt6.QtWidgets import QSlider
+from PyQt6.QtWidgets import QSpinBox
 from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection
@@ -178,6 +179,10 @@ def write_multichannel_midi(path: Path) -> None:
         [
             varlen(0),
             b"\xff\x51\x03\x07\xa1\x20",
+            varlen(0),
+            bytes([0xC0, 10]),
+            varlen(0),
+            bytes([0xC1, 20]),
             varlen(0),
             bytes([0x90, 60, 100]),
             varlen(0),
@@ -625,7 +630,10 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertTrue(bool(dialog.table.item(0, 1).flags() & Qt.ItemFlag.ItemIsEditable))
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
-                self.assertIsInstance(dialog.table.cellWidget(0, 4), QSlider)
+                self.assertIsInstance(dialog.table.cellWidget(0, 4), QSpinBox)
+                self.assertIsInstance(dialog.table.cellWidget(0, 5), QSlider)
+                self.assertEqual(dialog.table.cellWidget(0, 4).value(), 10)
+                self.assertEqual(dialog.table.cellWidget(1, 4).value(), 20)
 
     def test_channels_dialog_level_updates_from_played_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -640,7 +648,7 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_channels_dialog()
 
                 window._event_played(type("Evt", (), {"kind": "note_on", "channel": 1, "data": bytes([64, 80])})())
-                level = dialog.table.cellWidget(1, 5)
+                level = dialog.table.cellWidget(1, 6)
                 self.assertEqual(level.value(), 80)
 
                 window._event_played(type("Evt", (), {"kind": "note_off", "channel": 1, "data": bytes([64, 0])})())
@@ -682,6 +690,24 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn(1, window.player.solo_channels())
                 self.assertEqual(window.statusBar().currentMessage(), "Channel 2 solo")
 
+    def test_channels_dialog_program_spinbox_updates_player(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+                program_spinbox = dialog.table.cellWidget(0, 4)
+
+                program_spinbox.setValue(33)
+
+                self.assertEqual(window.player.channel_program(0), 33)
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 1 program 33")
+
     def test_channels_dialog_volume_slider_updates_player(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "multi.mid")
@@ -693,7 +719,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_channels_dialog()
-                volume_slider = dialog.table.cellWidget(0, 4)
+                volume_slider = dialog.table.cellWidget(0, 5)
 
                 volume_slider.setValue(60)
 

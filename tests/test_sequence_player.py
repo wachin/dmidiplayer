@@ -265,6 +265,27 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(output.events[0].channel, 2)
         self.assertEqual(output.events[0].data, bytes([7, 75]))
 
+    def test_channel_program_override_rewrites_program_change_event(self) -> None:
+        player = SequencePlayer(OutputStub())
+        player.set_channel_program(0, 40)
+
+        event = MidiEvent(tick=0, kind="program_change", channel=0, data=bytes([10]))
+        patched = player._playable_event(event)
+
+        self.assertIsNotNone(patched)
+        self.assertEqual(patched.data, bytes([40]))
+
+    def test_set_channel_program_sends_immediate_program_change(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        player.set_channel_program(3, 55)
+
+        self.assertEqual(len(output.events), 1)
+        self.assertEqual(output.events[0].kind, "program_change")
+        self.assertEqual(output.events[0].channel, 3)
+        self.assertEqual(output.events[0].data, bytes([55]))
+
     def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
