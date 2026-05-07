@@ -207,10 +207,11 @@ selector controls whether the file is written as `UTF-8`, `Latin-1`, or
 `CP1252`.
 
 Use `Copy` to place the currently filtered text into the clipboard. Use `Font`
-to choose a more comfortable display font for the lyrics pane.
+to choose a more comfortable display font for the lyrics pane. Use
+`Fullscreen` to expand the lyrics window for rehearsal or singing along, and
+press `Esc` to return to the normal window.
 
-Encoding detection/manual override, printing, and fullscreen behavior are still
-pending.
+Encoding detection/manual override and printing are still pending.
 
 ## MIDI Destination Row
 

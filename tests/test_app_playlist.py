@@ -9,6 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
@@ -977,6 +978,48 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(save_path.read_text(encoding="latin-1"), "Lyric: Canción")
                 self.assertEqual(window.statusBar().currentMessage(), "Saved lyrics to lyrics-latin1.txt (latin-1)")
+
+    def test_lyrics_dialog_fullscreen_button_toggles_window_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.show()
+
+                dialog.fullscreen_button.click()
+
+                self.assertTrue(dialog.isFullScreen())
+                self.assertEqual(dialog.fullscreen_button.text(), "Window")
+
+                dialog.fullscreen_button.click()
+
+                self.assertFalse(dialog.isFullScreen())
+                self.assertEqual(dialog.fullscreen_button.text(), "Fullscreen")
+
+    def test_lyrics_dialog_escape_exits_fullscreen(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.show()
+                dialog.fullscreen_button.setChecked(True)
+
+                dialog.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier))
+
+                self.assertFalse(dialog.isFullScreen())
+                self.assertFalse(dialog.fullscreen_button.isChecked())
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (

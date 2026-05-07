@@ -488,6 +488,11 @@ class LyricsDialog(QDialog):
         self.font_button.setObjectName("lyrics_font_button")
         self.font_button.clicked.connect(self.choose_font)
         button_row.addWidget(self.font_button)
+        self.fullscreen_button = QPushButton(self.tr("Fullscreen"), self)
+        self.fullscreen_button.setObjectName("lyrics_fullscreen_button")
+        self.fullscreen_button.setCheckable(True)
+        self.fullscreen_button.toggled.connect(self.set_fullscreen_enabled)
+        button_row.addWidget(self.fullscreen_button)
         layout.addLayout(button_row)
         self.resize(560, 420)
 
@@ -570,6 +575,14 @@ class LyricsDialog(QDialog):
         if accepted:
             self.browser.setFont(font)
 
+    def set_fullscreen_enabled(self, enabled: bool) -> None:
+        if enabled:
+            self.showFullScreen()
+            self.fullscreen_button.setText(self.tr("Window"))
+        else:
+            self.showNormal()
+            self.fullscreen_button.setText(self.tr("Fullscreen"))
+
     def save_to_file(self) -> None:
         file_name, _ = QFileDialog.getSaveFileName(
             self,
@@ -586,6 +599,12 @@ class LyricsDialog(QDialog):
             QMessageBox.warning(self, self.tr("Save Lyrics"), str(exc))
             return
         self.textSaved.emit(file_name, encoding)
+
+    def keyPressEvent(self, event: object) -> None:
+        if getattr(event, "key", lambda: None)() == int(Qt.Key.Key_Escape) and self.isFullScreen():
+            self.fullscreen_button.setChecked(False)
+            return
+        super().keyPressEvent(event)
 
 
 class MainWindow(QMainWindow):

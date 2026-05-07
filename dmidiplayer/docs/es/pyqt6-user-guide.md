@@ -210,10 +210,11 @@ Usa `Save` para guardar en un archivo el texto filtrado actual. El selector
 `CP1252`.
 
 Usa `Copy` para llevar al portapapeles el texto filtrado actual. Usa `Font`
-para elegir una fuente mas comoda para el panel de letras.
+para elegir una fuente mas comoda para el panel de letras. Usa `Fullscreen`
+para ampliar la ventana de letras durante el ensayo o el canto, y pulsa `Esc`
+para volver a la ventana normal.
 
-Todavia faltan la deteccion/anulacion manual de codificacion, la impresion y el
-modo de pantalla completa.
+Todavia faltan la deteccion/anulacion manual de codificacion y la impresion.
 
 ## Fila de destino MIDI
 
