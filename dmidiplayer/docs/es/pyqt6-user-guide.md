@@ -221,7 +221,9 @@ para elegir una fuente mas comoda para el panel de letras. Usa `Fullscreen`
 para ampliar la ventana de letras durante el ensayo o el canto, y pulsa `Esc`
 para volver a la ventana normal.
 
-Todavia falta el resaltado de letras pasadas y futuras.
+Durante la reproduccion, las lineas visibles se resaltan por estado: las lineas
+anteriores se atenúan, la linea actual se enfatiza y las siguientes quedan
+faciles de distinguir.
 
 ## Fila de destino MIDI
 

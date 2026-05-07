@@ -259,6 +259,23 @@ def write_cp1252_text_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track))
 
 
+def write_timed_lyrics_midi(path: Path) -> None:
+    header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0")
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x05\x05Line1",
+            varlen(120),
+            b"\xff\x05\x05Line2",
+            varlen(120),
+            b"\xff\x05\x05Line3",
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -1064,6 +1081,30 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog.encoding_combo.setCurrentIndex(dialog.encoding_combo.findData("latin-1"))
 
                 self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Precio \x8010")
+
+    def test_lyrics_dialog_highlights_past_current_and_future_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "timed-lyrics.mid")
+            write_timed_lyrics_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
+
+                self.assertEqual(dialog._event_state(0, dialog._visible_events), "current")
+                self.assertEqual(dialog._event_state(1, dialog._visible_events), "future")
+
+                window._update_position(120, 240)
+                self.assertEqual(dialog._event_state(0, dialog._visible_events), "past")
+                self.assertEqual(dialog._event_state(1, dialog._visible_events), "current")
+                self.assertEqual(dialog._event_state(2, dialog._visible_events), "future")
+
+                window._update_position(240, 240)
+                self.assertEqual(dialog._event_state(2, dialog._visible_events), "current")
 
     def test_lyrics_dialog_print_button_prints_filtered_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -450,6 +450,8 @@ class LyricsDialog(QDialog):
         self.setWindowTitle(self.tr("Lyrics"))
         self._text_events: list[object] = []
         self._track_counts: dict[int, int] = {}
+        self._current_tick = 0
+        self._visible_events: list[object] = []
         layout = QVBoxLayout(self)
         filter_row = QHBoxLayout()
         filter_row.addWidget(QLabel(self.tr("Track:")))
@@ -506,18 +508,20 @@ class LyricsDialog(QDialog):
 
     def set_text_events(self, text_events: list[object]) -> None:
         self._text_events = list(text_events)
+        self._current_tick = 0
         self._track_counts = self._count_tracks()
         self._rebuild_track_filter()
+        self._apply_filter()
+
+    def set_current_tick(self, tick: int) -> None:
+        self._current_tick = max(0, tick)
         self._apply_filter()
 
     def _apply_filter(self) -> None:
         category = self.filter_combo.currentData()
         track = self.track_combo.currentData()
-        lines = [
-            self._format_text_event(event)
-            for event in self._filtered_text_events(track, category)
-        ]
-        self.browser.setPlainText("\n".join(lines))
+        self._visible_events = self._filtered_text_events(track, category)
+        self.browser.setHtml(self._highlighted_html(self._visible_events))
 
     def _count_tracks(self) -> dict[int, int]:
         counts: dict[int, int] = {}
@@ -571,6 +575,46 @@ class LyricsDialog(QDialog):
         if track is None or len(self._track_counts) <= 1 or self.track_combo.currentData() is not None:
             return f"{label}: {text}"
         return self.tr("Track {number} - {label}: {text}").format(number=track + 1, label=label, text=text)
+
+    def _event_state(self, index: int, events: list[object]) -> str:
+        if not events:
+            return "future"
+        current_index = None
+        for candidate, event in enumerate(events):
+            if getattr(event, "tick", 0) <= self._current_tick:
+                current_index = candidate
+            else:
+                break
+        if current_index is None:
+            return "future"
+        if index < current_index:
+            return "past"
+        if index == current_index:
+            return "current"
+        return "future"
+
+    def _highlighted_html(self, events: list[object]) -> str:
+        blocks = [
+            "<html><body style='font-family:sans-serif;'>",
+            "<style>"
+            ".lyrics-line { margin: 0 0 8px 0; }"
+            ".past { color: #6b7280; }"
+            ".current { color: #111827; background-color: #fde68a; font-weight: 700; }"
+            ".future { color: #2563eb; }"
+            "</style>",
+        ]
+        for index, event in enumerate(events):
+            state = self._event_state(index, events)
+            text = self._format_text_event(event)
+            escaped = (
+                text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br/>")
+            )
+            blocks.append(f"<p class='lyrics-line {state}'>{escaped}</p>")
+        blocks.append("</body></html>")
+        return "".join(blocks)
 
     def _decoded_text(self, event: object) -> str:
         preferred_encoding = self.selected_encoding()
@@ -1361,6 +1405,7 @@ class MainWindow(QMainWindow):
         if self.lyrics_dialog is None:
             return
         self.lyrics_dialog.set_text_events(self.player.sequence.text_events())
+        self.lyrics_dialog.set_current_tick(self.position.value())
 
     def _lyrics_text_saved(self, file_name: str, encoding: str) -> None:
         self.statusBar().showMessage(
@@ -1844,6 +1889,8 @@ class MainWindow(QMainWindow):
         self.position.setValue(min(tick, maximum))
         self._updating_position = False
         self._update_time_label(tick, maximum)
+        if self.lyrics_dialog is not None:
+            self.lyrics_dialog.set_current_tick(tick)
 
     def _seek_to_slider(self) -> None:
         if self._updating_position:

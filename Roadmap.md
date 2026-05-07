@@ -203,7 +203,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] other relevant types;
   - [x] all.
 - [x] Detect encoding automatically and allow manual override.
-- [ ] Highlight past/future lyrics with configurable colors.
+- [x] Highlight past/future lyrics with configurable colors.
 - [x] Copy lyrics to clipboard.
 - [x] Save lyrics to a file with selected encoding.
 - [x] Print lyrics.

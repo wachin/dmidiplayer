@@ -217,7 +217,8 @@ to choose a more comfortable display font for the lyrics pane. Use
 `Fullscreen` to expand the lyrics window for rehearsal or singing along, and
 press `Esc` to return to the normal window.
 
-Highlighting past/future lyrics is still pending.
+During playback, the visible lines are highlighted by state: earlier lines fade,
+the current line is emphasized, and upcoming lines remain easy to spot.
 
 ## MIDI Destination Row
 
