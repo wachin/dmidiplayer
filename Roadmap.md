@@ -843,8 +843,8 @@ Goal: replace `library/widgets`.
 Tasks:
 
 - [ ] Complete `PianoKeyboard`:
-  - [ ] black keys;
-  - [ ] configurable range;
+  - [x] black keys;
+  - [x] configurable range;
   - [ ] colors by channel/state;
   - [ ] mouse/keyboard events needed by vpiano.
 - [ ] Port configuration dialogs:

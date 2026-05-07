@@ -206,6 +206,9 @@ En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
 pista realmente usa, de modo que las partes graves y agudas no comparten todas
 el mismo rango sobredimensionado.
 
+El widget de teclado ahora incluye teclas negras dentro de ese rango reducido,
+de modo que la vista de pista se parece mas a un teclado de piano real.
+
 ## Ventana de letras
 
 La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI

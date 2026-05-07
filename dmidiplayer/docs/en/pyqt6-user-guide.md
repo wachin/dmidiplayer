@@ -202,6 +202,9 @@ In the current slice, each track keyboard is narrowed to the note range that
 track actually uses, so low and high parts do not all share the same oversized
 span.
 
+The keyboard widget now includes black keys as part of that reduced range, so
+the track view reads more like a real piano layout.
+
 ## Lyrics Window
 
 The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI
