@@ -190,14 +190,25 @@ class ChannelsDialog(QDialog):
         self.setWindowTitle(self.tr("Channels"))
         self.channel_rows: dict[int, int] = {}
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 3, self)
+        self.table = QTableWidget(0, 5, self)
         self.table.setObjectName("channels_table")
-        self.table.setHorizontalHeaderLabels([self.tr("Channel"), self.tr("Label"), self.tr("Level")])
+        self.table.setHorizontalHeaderLabels(
+            [self.tr("Channel"), self.tr("Label"), self.tr("Mute"), self.tr("Solo"), self.tr("Level")]
+        )
         self.table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.table)
         self.resize(420, 320)
 
-    def set_channels(self, channels: list[int]) -> None:
+    def set_channels(
+        self,
+        channels: list[int],
+        muted_channels: set[int] | None = None,
+        solo_channels: set[int] | None = None,
+        mute_changed: object | None = None,
+        solo_changed: object | None = None,
+    ) -> None:
+        muted_channels = muted_channels or set()
+        solo_channels = solo_channels or set()
         self.table.setRowCount(0)
         self.channel_rows.clear()
         for row, channel in enumerate(channels):
@@ -206,11 +217,21 @@ class ChannelsDialog(QDialog):
             channel_item.setFlags(channel_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 0, channel_item)
             self.table.setItem(row, 1, QTableWidgetItem(self.tr("Channel {number}").format(number=channel + 1)))
+            mute_checkbox = QCheckBox(self.table)
+            mute_checkbox.setChecked(channel in muted_channels)
+            if mute_changed is not None:
+                mute_checkbox.toggled.connect(lambda checked, ch=channel: mute_changed(ch, checked))
+            self.table.setCellWidget(row, 2, mute_checkbox)
+            solo_checkbox = QCheckBox(self.table)
+            solo_checkbox.setChecked(channel in solo_channels)
+            if solo_changed is not None:
+                solo_checkbox.toggled.connect(lambda checked, ch=channel: solo_changed(ch, checked))
+            self.table.setCellWidget(row, 3, solo_checkbox)
             level = QProgressBar(self.table)
             level.setRange(0, 127)
             level.setValue(0)
             level.setFormat("%v")
-            self.table.setCellWidget(row, 2, level)
+            self.table.setCellWidget(row, 4, level)
             self.channel_rows[channel] = row
 
     def clear_levels(self) -> None:
@@ -223,7 +244,7 @@ class ChannelsDialog(QDialog):
         row = self.channel_rows.get(channel)
         if row is None:
             return
-        level = self.table.cellWidget(row, 2)
+        level = self.table.cellWidget(row, 4)
         if isinstance(level, QProgressBar):
             level.setValue(max(0, min(127, value)))
 
@@ -241,6 +262,7 @@ class MainWindow(QMainWindow):
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
         self.player.set_send_reset_before_playback(self.settings.midi_reset_before_playback())
+        self.player.set_solo_volume_reduction(self.settings.solo_volume_reduction())
         self.player.started.connect(self._playback_started)
         self.player.stopped.connect(self._playback_stopped)
         self.player.positionChanged.connect(self._update_position)
@@ -862,7 +884,33 @@ class MainWindow(QMainWindow):
     def _refresh_channels_dialog(self) -> None:
         if self.channels_dialog is None:
             return
-        self.channels_dialog.set_channels(self.player.sequence.used_channels())
+        self.channels_dialog.set_channels(
+            self.player.sequence.used_channels(),
+            muted_channels=self.player.muted_channels(),
+            solo_channels=self.player.solo_channels(),
+            mute_changed=self._set_channel_muted,
+            solo_changed=self._set_channel_solo,
+        )
+
+    def _set_channel_muted(self, channel: int, muted: bool) -> None:
+        self.player.set_channel_muted(channel, muted)
+        self.statusBar().showMessage(
+            self.tr("Channel {number} {state}").format(
+                number=channel + 1,
+                state=self.tr("muted") if muted else self.tr("unmuted"),
+            ),
+            3000,
+        )
+
+    def _set_channel_solo(self, channel: int, solo: bool) -> None:
+        self.player.set_channel_solo(channel, solo)
+        self.statusBar().showMessage(
+            self.tr("Channel {number} {state}").format(
+                number=channel + 1,
+                state=self.tr("solo") if solo else self.tr("normal"),
+            ),
+            3000,
+        )
         self.channels_dialog.clear_levels()
 
     def _create_preferences_dialog(self) -> PreferencesDialog:
@@ -879,6 +927,7 @@ class MainWindow(QMainWindow):
         self.percussion_channel_control.setValue(percussion_channel)
         self.solo_volume_reduction = solo_volume_reduction
         self.settings.set_solo_volume_reduction(solo_volume_reduction)
+        self.player.set_solo_volume_reduction(solo_volume_reduction)
         self.auto_play_on_load_action.setChecked(auto_play_on_load)
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
         self.player.set_send_reset_before_playback(midi_reset_before_playback)

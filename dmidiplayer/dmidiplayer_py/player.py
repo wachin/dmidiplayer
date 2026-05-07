@@ -37,6 +37,9 @@ class SequencePlayer(QObject):
         self._volume_percent = 100
         self._percussion_channel = 9
         self._send_reset_before_playback = False
+        self._muted_channels: set[int] = set()
+        self._solo_channels: set[int] = set()
+        self._solo_volume_reduction = 50
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
@@ -179,6 +182,43 @@ class SequencePlayer(QObject):
         self._send_reset_before_playback = bool(enabled)
 
     @property
+    def solo_volume_reduction(self) -> int:
+        return self._solo_volume_reduction
+
+    def set_solo_volume_reduction(self, value: int) -> None:
+        self._solo_volume_reduction = max(0, min(100, value))
+
+    def muted_channels(self) -> set[int]:
+        return set(self._muted_channels)
+
+    def solo_channels(self) -> set[int]:
+        return set(self._solo_channels)
+
+    def set_channel_muted(self, channel: int, muted: bool) -> None:
+        channel = max(0, min(15, channel))
+        if muted:
+            if channel in self._muted_channels:
+                return
+            self._muted_channels.add(channel)
+        else:
+            if channel not in self._muted_channels:
+                return
+            self._muted_channels.remove(channel)
+        self.output.all_notes_off()
+
+    def set_channel_solo(self, channel: int, solo: bool) -> None:
+        channel = max(0, min(15, channel))
+        if solo:
+            if channel in self._solo_channels:
+                return
+            self._solo_channels.add(channel)
+        else:
+            if channel not in self._solo_channels:
+                return
+            self._solo_channels.remove(channel)
+        self.output.all_notes_off()
+
+    @property
     def loop_enabled(self) -> bool:
         return self._loop_enabled
 
@@ -240,6 +280,9 @@ class SequencePlayer(QObject):
 
     def _playable_event(self, event: MidiEvent) -> MidiEvent | None:
         event = self._volume_event(event)
+        event = self._channel_mix_event(event)
+        if event is None:
+            return None
         if self._pitch_shift == 0:
             return event
         if event.channel is None or event.channel == self._percussion_channel:
@@ -270,6 +313,51 @@ class SequencePlayer(QObject):
             data=bytes([event.data[0], value]) + event.data[2:],
             meta_type=event.meta_type,
         )
+
+    def _channel_mix_event(self, event: MidiEvent) -> MidiEvent | None:
+        if event.channel is None:
+            return event
+        if event.channel in self._muted_channels:
+            if event.kind in ("note_off", "note_on") and event.data:
+                return MidiEvent(
+                    tick=event.tick,
+                    kind=event.kind,
+                    channel=event.channel,
+                    data=bytes([event.data[0], 0]) + event.data[2:],
+                    meta_type=event.meta_type,
+                )
+            return None
+        if not self._solo_channels or event.channel in self._solo_channels:
+            return event
+        if self._solo_volume_reduction <= 0:
+            if event.kind in ("note_off", "note_on") and event.data:
+                return MidiEvent(
+                    tick=event.tick,
+                    kind=event.kind,
+                    channel=event.channel,
+                    data=bytes([event.data[0], 0]) + event.data[2:],
+                    meta_type=event.meta_type,
+                )
+            return None
+        if event.kind == "note_on" and len(event.data) >= 2 and event.data[1] > 0:
+            value = min(127, max(0, event.data[1] * self._solo_volume_reduction // 100))
+            return MidiEvent(
+                tick=event.tick,
+                kind=event.kind,
+                channel=event.channel,
+                data=bytes([event.data[0], value]) + event.data[2:],
+                meta_type=event.meta_type,
+            )
+        if event.kind == "control_change" and len(event.data) >= 2 and event.data[0] == 7:
+            value = min(127, max(0, event.data[1] * self._solo_volume_reduction // 100))
+            return MidiEvent(
+                tick=event.tick,
+                kind=event.kind,
+                channel=event.channel,
+                data=bytes([event.data[0], value]) + event.data[2:],
+                meta_type=event.meta_type,
+            )
+        return event
 
     def _send_global_volume(self) -> None:
         value = min(127, 100 * self._volume_percent // 100)

@@ -9,6 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QDialog
 from PyQt6.QtCore import Qt
 
@@ -621,6 +622,8 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.table.item(1, 0).text(), "2")
                 self.assertEqual(dialog.table.item(0, 1).text(), "Channel 1")
                 self.assertTrue(bool(dialog.table.item(0, 1).flags() & Qt.ItemFlag.ItemIsEditable))
+                self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
+                self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
 
     def test_channels_dialog_level_updates_from_played_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -635,11 +638,47 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_channels_dialog()
 
                 window._event_played(type("Evt", (), {"kind": "note_on", "channel": 1, "data": bytes([64, 80])})())
-                level = dialog.table.cellWidget(1, 2)
+                level = dialog.table.cellWidget(1, 4)
                 self.assertEqual(level.value(), 80)
 
                 window._event_played(type("Evt", (), {"kind": "note_off", "channel": 1, "data": bytes([64, 0])})())
                 self.assertEqual(level.value(), 0)
+
+    def test_channels_dialog_mute_checkbox_updates_player(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+                mute_checkbox = dialog.table.cellWidget(0, 2)
+
+                mute_checkbox.setChecked(True)
+
+                self.assertIn(0, window.player.muted_channels())
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 1 muted")
+
+    def test_channels_dialog_solo_checkbox_updates_player(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+                solo_checkbox = dialog.table.cellWidget(1, 3)
+
+                solo_checkbox.setChecked(True)
+
+                self.assertIn(1, window.player.solo_channels())
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 2 solo")
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (

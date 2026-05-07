@@ -168,11 +168,14 @@ Cada fila incluye actualmente:
 
 - `Channel`: el número de canal MIDI
 - `Label`: una etiqueta de texto editable para ese canal
+- `Mute`: silencia ese canal durante la reproducción
+- `Solo`: mantiene ese canal a nivel completo mientras reduce los otros según
+  la preferencia actual de reducción de solo
 - `Level`: un medidor de actividad en vivo que sigue la velocidad de las notas
   mientras la reproducción está en marcha
 
-Este es el primer tramo del port de la vista de canales, así que todavía faltan
-silencio, solo, volumen por canal y controles de patch.
+Este sigue siendo un tramo temprano del port de la vista de canales, así que
+todavía faltan el volumen por canal y los controles de patch.
 
 ## Fila de destino MIDI
 

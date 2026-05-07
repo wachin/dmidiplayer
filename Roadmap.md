@@ -158,8 +158,8 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [x] Show up to 16 rows, one per used MIDI channel.
 - [x] Show channel number and editable label.
-- [ ] Mute per channel.
-- [ ] Solo per channel, reducing other channels according to preference.
+- [x] Mute per channel.
+- [x] Solo per channel, reducing other channels according to preference.
 - [x] Activity/level indicator per channel.
 - [ ] Volume slider per channel.
 - [ ] Patch lock to prevent program changes sent by the file.

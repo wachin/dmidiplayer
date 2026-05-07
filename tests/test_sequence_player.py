@@ -213,6 +213,36 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(len(output.events), 16)
         self.assertEqual(output.events[0].data, bytes([7, 80]))
 
+    def test_muted_channel_converts_note_on_to_silence(self) -> None:
+        player = SequencePlayer(OutputStub())
+        player.set_channel_muted(0, True)
+
+        event = MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100]))
+        muted = player._playable_event(event)
+
+        self.assertIsNotNone(muted)
+        self.assertEqual(muted.data, bytes([60, 0]))
+
+    def test_solo_reduces_non_solo_note_velocity(self) -> None:
+        player = SequencePlayer(OutputStub())
+        player.set_solo_volume_reduction(25)
+        player.set_channel_solo(1, True)
+
+        event = MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100]))
+        reduced = player._playable_event(event)
+
+        self.assertIsNotNone(reduced)
+        self.assertEqual(reduced.data, bytes([60, 25]))
+
+    def test_solo_keeps_solo_channel_note_velocity(self) -> None:
+        player = SequencePlayer(OutputStub())
+        player.set_solo_volume_reduction(25)
+        player.set_channel_solo(1, True)
+
+        event = MidiEvent(tick=0, kind="note_on", channel=1, data=bytes([60, 100]))
+
+        self.assertEqual(player._playable_event(event).data, bytes([60, 100]))
+
     def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)

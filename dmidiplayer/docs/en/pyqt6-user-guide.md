@@ -167,10 +167,13 @@ Each row currently includes:
 
 - `Channel`: the MIDI channel number
 - `Label`: an editable text label for that channel
+- `Mute`: silences that channel during playback
+- `Solo`: keeps that channel at full level while reducing the others according
+  to the current solo reduction preference
 - `Level`: a live activity meter that follows note velocity while playback runs
 
-This is the first Python port slice of the channels view, so mute, solo,
-per-channel volume, and patch controls are still pending.
+This is still an early Python port slice of the channels view, so per-channel
+volume and patch controls are still pending.
 
 ## MIDI Destination Row
 
