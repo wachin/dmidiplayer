@@ -891,6 +891,27 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 60))
                 self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 84))
 
+    def test_pianola_dialog_can_expand_ranges_to_used_octaves(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "ranges.mid")
+            write_track_range_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                range_mode_combo = dialog.findChild(QComboBox, "pianola_range_mode_combo")
+
+                range_mode_combo.setCurrentIndex(range_mode_combo.findData("octaves"))
+
+                self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 71))
+                self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 95))
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player range: Used octaves")
+
     def test_pianola_dialog_can_hide_individual_track_keyboard(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")

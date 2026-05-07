@@ -209,6 +209,10 @@ In the current slice, each track keyboard is narrowed to the note range that
 track actually uses, so low and high parts do not all share the same oversized
 span.
 
+Use the `Range` selector to switch between the exact note span of each track
+and `Used octaves`, which expands the display to complete octaves for a more
+comfortable reading layout.
+
 The keyboard widget now includes black keys as part of that reduced range, so
 the track view reads more like a real piano layout.
 

@@ -436,6 +436,7 @@ class ChannelsDialog(QDialog):
 class PianolaDialog(QDialog):
     trackVisibilityChanged = pyqtSignal(int, bool)
     allTracksVisibilityChanged = pyqtSignal(bool)
+    rangeModeChanged = pyqtSignal(str)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -445,8 +446,17 @@ class PianolaDialog(QDialog):
         self._track_channels: dict[int, set[int]] = {}
         self._track_visibility: dict[int, QCheckBox] = {}
         self._track_keyboard_containers: dict[int, QWidget] = {}
+        self._track_note_ranges: dict[int, tuple[int, int]] = {}
+        self._range_mode = "exact"
         layout = QVBoxLayout(self)
         button_row = QHBoxLayout()
+        button_row.addWidget(QLabel(self.tr("Range:"), self))
+        self.range_mode_combo = QComboBox(self)
+        self.range_mode_combo.setObjectName("pianola_range_mode_combo")
+        self.range_mode_combo.addItem(self.tr("Exact"), "exact")
+        self.range_mode_combo.addItem(self.tr("Used octaves"), "octaves")
+        self.range_mode_combo.currentIndexChanged.connect(self._range_mode_changed)
+        button_row.addWidget(self.range_mode_combo)
         button_row.addStretch(1)
         self.show_all_button = QPushButton(self.tr("Show All"), self)
         self.show_all_button.setObjectName("pianola_show_all_button")
@@ -476,10 +486,16 @@ class PianolaDialog(QDialog):
         labels = ", ".join(str(channel + 1) for channel in sorted(channels))
         return self.tr("Channels: {channels}").format(channels=labels)
 
+    def _effective_note_range(self, min_note: int, max_note: int) -> tuple[int, int]:
+        if self._range_mode == "octaves":
+            return ((min_note // 12) * 12, min(127, ((max_note // 12) * 12) + 11))
+        return (min_note, max_note)
+
     def set_tracks(self, tracks: list[dict[str, object]]) -> None:
         self._track_keyboards.clear()
         self._track_visibility.clear()
         self._track_keyboard_containers.clear()
+        self._track_note_ranges.clear()
         self._track_channels = {
             int(track["track"]): set(track["channels"]) for track in tracks
         }
@@ -500,6 +516,7 @@ class PianolaDialog(QDialog):
                 title = str(track.get("title", ""))
                 min_note = int(track.get("min_note", 21))
                 max_note = int(track.get("max_note", 108))
+                display_min_note, display_max_note = self._effective_note_range(min_note, max_note)
                 row = QWidget(page)
                 row_layout = QVBoxLayout(row)
                 row_layout.setContentsMargins(0, 0, 0, 0)
@@ -526,13 +543,14 @@ class PianolaDialog(QDialog):
                 keyboard_layout.setSpacing(0)
                 keyboard = PianoKeyboard(row)
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
-                keyboard.set_note_range(min_note, max_note)
+                keyboard.set_note_range(display_min_note, display_max_note)
                 keyboard_layout.addWidget(keyboard)
                 row_layout.addWidget(keyboard_container)
                 page_layout.addWidget(row)
                 self._track_keyboards[track_number] = keyboard
                 self._track_visibility[track_number] = visible_checkbox
                 self._track_keyboard_containers[track_number] = keyboard_container
+                self._track_note_ranges[track_number] = (min_note, max_note)
                 visible_checkbox.toggled.connect(
                     lambda checked, track=track_number: self._set_track_visible(track, checked, emit_signal=True)
                 )
@@ -562,6 +580,17 @@ class PianolaDialog(QDialog):
         for track_number in list(self._track_visibility):
             self._set_track_visible(track_number, False, emit_signal=False)
         self.allTracksVisibilityChanged.emit(False)
+
+    def _range_mode_changed(self, index: int) -> None:
+        self._range_mode = str(self.range_mode_combo.itemData(index) or "exact")
+        self._apply_track_ranges()
+        self.rangeModeChanged.emit(self._range_mode)
+
+    def _apply_track_ranges(self) -> None:
+        for track_number, keyboard in self._track_keyboards.items():
+            min_note, max_note = self._track_note_ranges.get(track_number, (21, 108))
+            display_min_note, display_max_note = self._effective_note_range(min_note, max_note)
+            keyboard.set_note_range(display_min_note, display_max_note)
 
     def set_fullscreen_enabled(self, enabled: bool) -> None:
         if enabled:
@@ -1569,6 +1598,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog = self._create_pianola_dialog()
             self.pianola_dialog.trackVisibilityChanged.connect(self._pianola_track_visibility_changed)
             self.pianola_dialog.allTracksVisibilityChanged.connect(self._pianola_all_tracks_visibility_changed)
+            self.pianola_dialog.rangeModeChanged.connect(self._pianola_range_mode_changed)
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1597,6 +1627,13 @@ class MainWindow(QMainWindow):
             self.tr("Piano Player tracks {state}").format(
                 state=self.tr("shown") if visible else self.tr("hidden"),
             ),
+            3000,
+        )
+
+    def _pianola_range_mode_changed(self, mode: str) -> None:
+        mode_label = self.tr("Used octaves") if mode == "octaves" else self.tr("Exact")
+        self.statusBar().showMessage(
+            self.tr("Piano Player range: {mode}").format(mode=mode_label),
             3000,
         )
 

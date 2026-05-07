@@ -214,6 +214,10 @@ En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
 pista realmente usa, de modo que las partes graves y agudas no comparten todas
 el mismo rango sobredimensionado.
 
+Usa el selector `Range` para cambiar entre el rango exacto de notas de cada
+pista y `Used octaves`, que amplia la vista a octavas completas para una
+lectura mas comoda.
+
 El widget de teclado ahora incluye teclas negras dentro de ese rango reducido,
 de modo que la vista de pista se parece mas a un teclado de piano real.
 

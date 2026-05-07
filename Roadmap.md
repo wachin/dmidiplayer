@@ -220,7 +220,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Allow manual note playing with computer keyboard and mouse where appropriate.
 - [ ] Window menu:
   - [x] fullscreen;
-  - [ ] adjust key range to actually used octaves;
+  - [x] adjust key range to actually used octaves;
   - [ ] more detailed visibility/view controls if the original window requires them.
 - [x] Current Pianola slice already narrows each keyboard to the used note range of its track.
 
