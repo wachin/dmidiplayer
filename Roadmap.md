@@ -301,12 +301,12 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] future text color;
   - [ ] past text color.
 - [ ] Player Piano tab:
-  - [ ] highlight palettes;
+  - [x] highlight palettes;
   - [ ] single highlight color;
   - [ ] velocity tinting;
   - [ ] note-name font;
-  - [ ] note-name display mode;
-  - [ ] octave designation.
+  - [x] note-name display mode;
+  - [x] octave designation.
 - [x] Persist basic application preferences with `QSettings`.
 
 ### Toolbar Customization

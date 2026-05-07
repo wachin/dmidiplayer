@@ -196,6 +196,33 @@ class AppSettingsTest(unittest.TestCase):
             settings.set_solo_volume_reduction(-10)
             self.assertEqual(AppSettings(base_dir).solo_volume_reduction(), 0)
 
+    def test_pianola_preferences_are_saved_and_validated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            self.assertEqual(settings.pianola_color_mode(), "blue")
+            self.assertEqual(settings.pianola_note_label_mode(), "never")
+            self.assertEqual(settings.pianola_octave_designation(), "scientific")
+
+            settings.set_pianola_color_mode("channel")
+            settings.set_pianola_note_label_mode("always")
+            settings.set_pianola_octave_designation("yamaha")
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.pianola_color_mode(), "channel")
+            self.assertEqual(restored.pianola_note_label_mode(), "always")
+            self.assertEqual(restored.pianola_octave_designation(), "yamaha")
+
+            settings.set_pianola_color_mode("bogus")
+            settings.set_pianola_note_label_mode("bogus")
+            settings.set_pianola_octave_designation("bogus")
+
+            restored = AppSettings(base_dir)
+            self.assertEqual(restored.pianola_color_mode(), "blue")
+            self.assertEqual(restored.pianola_note_label_mode(), "never")
+            self.assertEqual(restored.pianola_octave_designation(), "scientific")
+
     def test_unwritable_app_data_falls_back_to_temp(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             blocking_file = Path(tmpdir, "not-a-directory")

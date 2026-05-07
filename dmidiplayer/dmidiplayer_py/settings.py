@@ -17,6 +17,9 @@ class AppSettings:
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
+    DEFAULT_PIANOLA_COLOR_MODE = "blue"
+    DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
+    DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -121,6 +124,37 @@ class AppSettings:
 
     def set_midi_reset_before_playback(self, enabled: bool) -> None:
         self._settings.setValue("general/midi_reset_before_playback", bool(enabled))
+        self._settings.sync()
+
+    def pianola_color_mode(self) -> str:
+        value = self._settings.value("pianola/color_mode", self.DEFAULT_PIANOLA_COLOR_MODE, str)
+        return value if value in {"blue", "channel"} else self.DEFAULT_PIANOLA_COLOR_MODE
+
+    def set_pianola_color_mode(self, mode: str) -> None:
+        value = mode if mode in {"blue", "channel"} else self.DEFAULT_PIANOLA_COLOR_MODE
+        self._settings.setValue("pianola/color_mode", value)
+        self._settings.sync()
+
+    def pianola_note_label_mode(self) -> str:
+        value = self._settings.value("pianola/note_label_mode", self.DEFAULT_PIANOLA_NOTE_LABEL_MODE, str)
+        return value if value in {"never", "minimal", "active", "always"} else self.DEFAULT_PIANOLA_NOTE_LABEL_MODE
+
+    def set_pianola_note_label_mode(self, mode: str) -> None:
+        value = mode if mode in {"never", "minimal", "active", "always"} else self.DEFAULT_PIANOLA_NOTE_LABEL_MODE
+        self._settings.setValue("pianola/note_label_mode", value)
+        self._settings.sync()
+
+    def pianola_octave_designation(self) -> str:
+        value = self._settings.value(
+            "pianola/octave_designation",
+            self.DEFAULT_PIANOLA_OCTAVE_DESIGNATION,
+            str,
+        )
+        return value if value in {"scientific", "yamaha"} else self.DEFAULT_PIANOLA_OCTAVE_DESIGNATION
+
+    def set_pianola_octave_designation(self, mode: str) -> None:
+        value = mode if mode in {"scientific", "yamaha"} else self.DEFAULT_PIANOLA_OCTAVE_DESIGNATION
+        self._settings.setValue("pianola/octave_designation", value)
         self._settings.sync()
 
     def playlist_path(self) -> Path | None:

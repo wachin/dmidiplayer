@@ -319,6 +319,13 @@ La pestaña `General` actual incluye:
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
 - `Send GM reset before playback`
+
+La pestaña `Player Piano` actual incluye:
+
+- `Highlight colors`: `Blue` o `By channel`
+- `Note names`: `Never`, `Minimal`, `When active` o `Always`
+- `Octave designation`: `Scientific` o `Yamaha`
+
 - `Restore Defaults`: devuelve las opciones visibles a sus valores por defecto.
 
 ## Atajos útiles

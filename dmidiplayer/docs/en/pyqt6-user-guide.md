@@ -310,6 +310,13 @@ The current `General` tab includes:
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
 - `Send GM reset before playback`
+
+The current `Player Piano` tab includes:
+
+- `Highlight colors`: `Blue` or `By channel`
+- `Note names`: `Never`, `Minimal`, `When active`, or `Always`
+- `Octave designation`: `Scientific` or `Yamaha`
+
 - `Restore Defaults`: return the visible options to their default values.
 
 ## Useful Shortcuts

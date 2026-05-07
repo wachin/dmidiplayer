@@ -40,12 +40,18 @@ class FakeSettings:
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
+    DEFAULT_PIANOLA_COLOR_MODE = "blue"
+    DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
+    DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
     midi_destination_value = ""
     percussion_channel_value = 10
     auto_play_on_load_value = False
     playlist_auto_advance_value = True
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
+    pianola_color_mode_value = "blue"
+    pianola_note_label_mode_value = "never"
+    pianola_octave_designation_value = "scientific"
     playlist_path_value: Path | None = None
     window_geometry_value: tuple[int, int, int, int] | None = None
 
@@ -115,6 +121,24 @@ class FakeSettings:
 
     def set_midi_reset_before_playback(self, enabled: bool) -> None:
         type(self).midi_reset_before_playback_value = enabled
+
+    def pianola_color_mode(self) -> str:
+        return type(self).pianola_color_mode_value
+
+    def set_pianola_color_mode(self, mode: str) -> None:
+        type(self).pianola_color_mode_value = mode
+
+    def pianola_note_label_mode(self) -> str:
+        return type(self).pianola_note_label_mode_value
+
+    def set_pianola_note_label_mode(self, mode: str) -> None:
+        type(self).pianola_note_label_mode_value = mode
+
+    def pianola_octave_designation(self) -> str:
+        return type(self).pianola_octave_designation_value
+
+    def set_pianola_octave_designation(self, mode: str) -> None:
+        type(self).pianola_octave_designation_value = mode
 
     def playlist_path(self) -> Path | None:
         return type(self).playlist_path_value
@@ -353,6 +377,9 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.playlist_auto_advance_value = True
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
+        FakeSettings.pianola_color_mode_value = "blue"
+        FakeSettings.pianola_note_label_mode_value = "never"
+        FakeSettings.pianola_octave_designation_value = "scientific"
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
 
@@ -1982,6 +2009,9 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.auto_play_on_load_value = True
         FakeSettings.playlist_auto_advance_value = False
         FakeSettings.midi_reset_before_playback_value = True
+        FakeSettings.pianola_color_mode_value = "channel"
+        FakeSettings.pianola_note_label_mode_value = "always"
+        FakeSettings.pianola_octave_designation_value = "yamaha"
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
@@ -1991,11 +2021,15 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertIsInstance(dialog, PreferencesDialog)
             self.assertEqual(dialog.tabs.tabText(0), "General")
+            self.assertEqual(dialog.tabs.tabText(1), "Player Piano")
             self.assertEqual(dialog.general_percussion_channel.value(), 3)
             self.assertEqual(dialog.general_solo_volume_reduction.value(), 35)
             self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
             self.assertTrue(dialog.general_midi_reset_before_playback.isChecked())
+            self.assertEqual(dialog.pianola_color_mode.currentData(), "channel")
+            self.assertEqual(dialog.pianola_note_label_mode.currentData(), "always")
+            self.assertEqual(dialog.pianola_octave_designation.currentData(), "yamaha")
 
             dialog.restore_defaults()
 
@@ -2004,6 +2038,9 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertFalse(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
             self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
+            self.assertEqual(dialog.pianola_color_mode.currentData(), "blue")
+            self.assertEqual(dialog.pianola_note_label_mode.currentData(), "never")
+            self.assertEqual(dialog.pianola_octave_designation.currentData(), "scientific")
 
     def test_preferences_dialog_applies_values_to_window_and_settings(self) -> None:
         with (
@@ -2012,7 +2049,7 @@ class AppPlaylistTest(unittest.TestCase):
         ):
             window = MainWindow([])
 
-            window._apply_preferences(12, 40, True, False, True)
+            window._apply_preferences(12, 40, True, False, True, "channel", "minimal", "yamaha")
 
             self.assertEqual(window.player.percussion_channel, 12)
             self.assertEqual(window.percussion_channel_control.value(), 12)
@@ -2020,12 +2057,40 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
             self.assertTrue(window.player.send_reset_before_playback)
+            self.assertEqual(window.pianola_color_mode, "channel")
+            self.assertEqual(window.pianola_note_label_mode, "minimal")
+            self.assertEqual(window.pianola_octave_designation, "yamaha")
             self.assertEqual(FakeSettings.percussion_channel_value, 12)
             self.assertEqual(FakeSettings.solo_volume_reduction_value, 40)
             self.assertTrue(FakeSettings.auto_play_on_load_value)
             self.assertFalse(FakeSettings.playlist_auto_advance_value)
             self.assertTrue(FakeSettings.midi_reset_before_playback_value)
+            self.assertEqual(FakeSettings.pianola_color_mode_value, "channel")
+            self.assertEqual(FakeSettings.pianola_note_label_mode_value, "minimal")
+            self.assertEqual(FakeSettings.pianola_octave_designation_value, "yamaha")
             self.assertEqual(window.statusBar().currentMessage(), "Preferences updated")
+
+    def test_pianola_dialog_uses_saved_display_preferences(self) -> None:
+        FakeSettings.pianola_color_mode_value = "channel"
+        FakeSettings.pianola_note_label_mode_value = "minimal"
+        FakeSettings.pianola_octave_designation_value = "yamaha"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "ranges.mid")
+            write_track_range_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+
+                self.assertEqual(dialog.color_mode_combo.currentData(), "channel")
+                self.assertEqual(dialog.note_labels_combo.currentData(), "minimal")
+                self.assertEqual(dialog.octave_designation_combo.currentData(), "yamaha")
+                self.assertEqual(keyboard_one._note_label_mode, "minimal")
+                self.assertEqual(keyboard_one.note_label(60), "C3")
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
