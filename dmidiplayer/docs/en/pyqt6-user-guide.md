@@ -216,6 +216,9 @@ comfortable reading layout.
 The keyboard widget now includes black keys as part of that reduced range, so
 the track view reads more like a real piano layout.
 
+Active notes are also tinted by velocity, so softer and stronger hits are a
+little easier to distinguish at a glance during playback.
+
 ## Lyrics Window
 
 The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI

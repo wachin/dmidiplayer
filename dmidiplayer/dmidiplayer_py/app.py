@@ -600,10 +600,10 @@ class PianolaDialog(QDialog):
             self.showNormal()
             self.fullscreen_button.setText(self.tr("Fullscreen"))
 
-    def note_on(self, channel: int, note: int) -> None:
+    def note_on(self, channel: int, note: int, velocity: int = 127) -> None:
         for track_number, channels in self._track_channels.items():
             if channel in channels and track_number in self._track_keyboards:
-                self._track_keyboards[track_number].note_on(note)
+                self._track_keyboards[track_number].note_on(note, velocity)
 
     def note_off(self, channel: int, note: int) -> None:
         for track_number, channels in self._track_channels.items():
@@ -2280,11 +2280,11 @@ class MainWindow(QMainWindow):
             )
         )
         if kind == "note_on" and len(data) >= 2 and data[1] > 0:
-            self.keyboard.note_on(data[0])
+            self.keyboard.note_on(data[0], data[1])
             if channel is not None and self.channels_dialog is not None:
                 self.channels_dialog.set_channel_level(channel, data[1])
             if channel is not None and self.pianola_dialog is not None:
-                self.pianola_dialog.note_on(channel, data[0])
+                self.pianola_dialog.note_on(channel, data[0], data[1])
         elif kind in ("note_off", "note_on") and data:
             self.keyboard.note_off(data[0])
             if channel is not None and self.channels_dialog is not None:

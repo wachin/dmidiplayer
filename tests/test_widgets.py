@@ -29,6 +29,30 @@ class PianoKeyboardTest(unittest.TestCase):
         self.assertEqual(keyboard.visible_white_notes()[0], 0)
         self.assertEqual(keyboard.visible_black_notes()[-1], 126)
 
+    def test_note_on_stores_velocity_and_note_off_clears_it(self) -> None:
+        keyboard = PianoKeyboard()
+
+        keyboard.note_on(60, 45)
+
+        self.assertIn(60, keyboard._active)
+        self.assertEqual(keyboard._active_velocities[60], 45)
+
+        keyboard.note_off(60)
+
+        self.assertNotIn(60, keyboard._active)
+        self.assertNotIn(60, keyboard._active_velocities)
+
+    def test_active_note_color_changes_with_velocity(self) -> None:
+        keyboard = PianoKeyboard()
+
+        keyboard.note_on(60, 20)
+        soft = keyboard.active_note_color(60)
+
+        keyboard.note_on(61, 120)
+        loud = keyboard.active_note_color(61)
+
+        self.assertNotEqual(soft.name(), loud.name())
+
 
 if __name__ == "__main__":
     unittest.main()

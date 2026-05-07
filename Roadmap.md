@@ -210,7 +210,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Allow show/hide individual track keyboards in the current Pianola window slice.
 - [x] Allow show all / hide all track keyboards in the current Pianola window slice.
 - [ ] Allow customizable colors per channel/state.
-- [ ] Allow velocity tinting.
+- [x] Allow velocity tinting.
 - [ ] Show note names according to preference:
   - [ ] never;
   - [ ] minimal;

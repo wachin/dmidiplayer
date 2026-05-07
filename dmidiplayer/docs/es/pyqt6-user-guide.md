@@ -221,6 +221,9 @@ lectura mas comoda.
 El widget de teclado ahora incluye teclas negras dentro de ese rango reducido,
 de modo que la vista de pista se parece mas a un teclado de piano real.
 
+Las notas activas tambien se tiñen segun la velocidad, para que durante la
+reproduccion sea un poco mas facil distinguir golpes suaves y fuertes.
+
 ## Ventana de letras
 
 La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI

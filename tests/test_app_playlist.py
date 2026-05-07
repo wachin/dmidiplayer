@@ -870,9 +870,11 @@ class AppPlaylistTest(unittest.TestCase):
 
                 window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
                 self.assertIn(60, keyboard._active)
+                self.assertEqual(keyboard._active_velocities[60], 100)
 
                 window._event_played(MidiEvent(tick=120, kind="note_off", channel=0, data=bytes([60, 0])))
                 self.assertNotIn(60, keyboard._active)
+                self.assertNotIn(60, keyboard._active_velocities)
 
     def test_pianola_dialog_keyboards_follow_used_note_ranges(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
