@@ -190,10 +190,10 @@ class ChannelsDialog(QDialog):
         self.setWindowTitle(self.tr("Channels"))
         self.channel_rows: dict[int, int] = {}
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 5, self)
+        self.table = QTableWidget(0, 6, self)
         self.table.setObjectName("channels_table")
         self.table.setHorizontalHeaderLabels(
-            [self.tr("Channel"), self.tr("Label"), self.tr("Mute"), self.tr("Solo"), self.tr("Level")]
+            [self.tr("Channel"), self.tr("Label"), self.tr("Mute"), self.tr("Solo"), self.tr("Volume"), self.tr("Level")]
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.table)
@@ -204,11 +204,14 @@ class ChannelsDialog(QDialog):
         channels: list[int],
         muted_channels: set[int] | None = None,
         solo_channels: set[int] | None = None,
+        channel_volumes: dict[int, int] | None = None,
         mute_changed: object | None = None,
         solo_changed: object | None = None,
+        volume_changed: object | None = None,
     ) -> None:
         muted_channels = muted_channels or set()
         solo_channels = solo_channels or set()
+        channel_volumes = channel_volumes or {}
         self.table.setRowCount(0)
         self.channel_rows.clear()
         for row, channel in enumerate(channels):
@@ -227,16 +230,22 @@ class ChannelsDialog(QDialog):
             if solo_changed is not None:
                 solo_checkbox.toggled.connect(lambda checked, ch=channel: solo_changed(ch, checked))
             self.table.setCellWidget(row, 3, solo_checkbox)
+            volume_slider = QSlider(Qt.Orientation.Horizontal, self.table)
+            volume_slider.setRange(0, 200)
+            volume_slider.setValue(channel_volumes.get(channel, 100))
+            if volume_changed is not None:
+                volume_slider.valueChanged.connect(lambda value, ch=channel: volume_changed(ch, value))
+            self.table.setCellWidget(row, 4, volume_slider)
             level = QProgressBar(self.table)
             level.setRange(0, 127)
             level.setValue(0)
             level.setFormat("%v")
-            self.table.setCellWidget(row, 4, level)
+            self.table.setCellWidget(row, 5, level)
             self.channel_rows[channel] = row
 
     def clear_levels(self) -> None:
         for row in self.channel_rows.values():
-            level = self.table.cellWidget(row, 2)
+            level = self.table.cellWidget(row, 5)
             if isinstance(level, QProgressBar):
                 level.setValue(0)
 
@@ -244,7 +253,7 @@ class ChannelsDialog(QDialog):
         row = self.channel_rows.get(channel)
         if row is None:
             return
-        level = self.table.cellWidget(row, 4)
+        level = self.table.cellWidget(row, 5)
         if isinstance(level, QProgressBar):
             level.setValue(max(0, min(127, value)))
 
@@ -888,8 +897,10 @@ class MainWindow(QMainWindow):
             self.player.sequence.used_channels(),
             muted_channels=self.player.muted_channels(),
             solo_channels=self.player.solo_channels(),
+            channel_volumes={channel: self.player.channel_volume_percent(channel) for channel in self.player.sequence.used_channels()},
             mute_changed=self._set_channel_muted,
             solo_changed=self._set_channel_solo,
+            volume_changed=self._set_channel_volume,
         )
 
     def _set_channel_muted(self, channel: int, muted: bool) -> None:
@@ -909,6 +920,13 @@ class MainWindow(QMainWindow):
                 number=channel + 1,
                 state=self.tr("solo") if solo else self.tr("normal"),
             ),
+            3000,
+        )
+
+    def _set_channel_volume(self, channel: int, value: int) -> None:
+        self.player.set_channel_volume_percent(channel, value)
+        self.statusBar().showMessage(
+            self.tr("Channel {number} volume {value}%").format(number=channel + 1, value=value),
             3000,
         )
         self.channels_dialog.clear_levels()

@@ -40,6 +40,7 @@ class SequencePlayer(QObject):
         self._muted_channels: set[int] = set()
         self._solo_channels: set[int] = set()
         self._solo_volume_reduction = 50
+        self._channel_volume_percents: dict[int, int] = {}
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
@@ -218,6 +219,23 @@ class SequencePlayer(QObject):
             self._solo_channels.remove(channel)
         self.output.all_notes_off()
 
+    def channel_volume_percent(self, channel: int) -> int:
+        channel = max(0, min(15, channel))
+        return self._channel_volume_percents.get(channel, 100)
+
+    def set_channel_volume_percent(self, channel: int, value: int) -> None:
+        channel = max(0, min(15, channel))
+        value = max(0, min(200, value))
+        if value == 100:
+            if channel not in self._channel_volume_percents:
+                return
+            del self._channel_volume_percents[channel]
+        else:
+            if self._channel_volume_percents.get(channel, 100) == value:
+                return
+            self._channel_volume_percents[channel] = value
+        self._send_channel_volume(channel)
+
     @property
     def loop_enabled(self) -> bool:
         return self._loop_enabled
@@ -279,10 +297,11 @@ class SequencePlayer(QObject):
         return self._base_position_us + elapsed
 
     def _playable_event(self, event: MidiEvent) -> MidiEvent | None:
-        event = self._volume_event(event)
         event = self._channel_mix_event(event)
         if event is None:
             return None
+        event = self._channel_volume_event(event)
+        event = self._volume_event(event)
         if self._pitch_shift == 0:
             return event
         if event.channel is None or event.channel == self._percussion_channel:
@@ -306,6 +325,23 @@ class SequencePlayer(QObject):
         if event.kind != "control_change" or len(event.data) < 2 or event.data[0] != 7:
             return event
         value = min(127, max(0, event.data[1] * self._volume_percent // 100))
+        return MidiEvent(
+            tick=event.tick,
+            kind=event.kind,
+            channel=event.channel,
+            data=bytes([event.data[0], value]) + event.data[2:],
+            meta_type=event.meta_type,
+        )
+
+    def _channel_volume_event(self, event: MidiEvent) -> MidiEvent:
+        if event.channel is None:
+            return event
+        channel_percent = self.channel_volume_percent(event.channel)
+        if channel_percent == 100:
+            return event
+        if event.kind != "control_change" or len(event.data) < 2 or event.data[0] != 7:
+            return event
+        value = min(127, max(0, event.data[1] * channel_percent // 100))
         return MidiEvent(
             tick=event.tick,
             kind=event.kind,
@@ -360,8 +396,8 @@ class SequencePlayer(QObject):
         return event
 
     def _send_global_volume(self) -> None:
-        value = min(127, 100 * self._volume_percent // 100)
         for channel in range(16):
+            value = self._effective_channel_volume(channel)
             try:
                 self.output.send_event(
                     MidiEvent(tick=self._position, kind="control_change", channel=channel, data=bytes([7, value]))
@@ -369,6 +405,22 @@ class SequencePlayer(QObject):
             except MidiOutputError as exc:
                 self.outputError.emit(str(exc))
                 return
+
+    def _send_channel_volume(self, channel: int) -> None:
+        try:
+            self.output.send_event(
+                MidiEvent(
+                    tick=self._position,
+                    kind="control_change",
+                    channel=channel,
+                    data=bytes([7, self._effective_channel_volume(channel)]),
+                )
+            )
+        except MidiOutputError as exc:
+            self.outputError.emit(str(exc))
+
+    def _effective_channel_volume(self, channel: int) -> int:
+        return min(127, max(0, 100 * self.channel_volume_percent(channel) * self._volume_percent // 10_000))
 
     def _loop_end_microseconds(self) -> int:
         return self.sequence.tick_to_microseconds(self._loop_end_tick)

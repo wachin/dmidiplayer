@@ -243,6 +243,28 @@ class SequencePlayerTest(unittest.TestCase):
 
         self.assertEqual(player._playable_event(event).data, bytes([60, 100]))
 
+    def test_channel_volume_scales_cc7_before_global_volume(self) -> None:
+        player = SequencePlayer(OutputStub())
+        player.set_channel_volume_percent(0, 50)
+        player.set_volume_percent(150)
+
+        event = MidiEvent(tick=0, kind="control_change", channel=0, data=bytes([7, 80]))
+        scaled = player._playable_event(event)
+
+        self.assertEqual(scaled.data, bytes([7, 60]))
+
+    def test_set_channel_volume_sends_immediate_cc7_for_channel(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player.set_volume_percent(150)
+        output.events.clear()
+
+        player.set_channel_volume_percent(2, 50)
+
+        self.assertEqual(len(output.events), 1)
+        self.assertEqual(output.events[0].channel, 2)
+        self.assertEqual(output.events[0].data, bytes([7, 75]))
+
     def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)

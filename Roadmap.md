@@ -161,7 +161,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Mute per channel.
 - [x] Solo per channel, reducing other channels according to preference.
 - [x] Activity/level indicator per channel.
-- [ ] Volume slider per channel.
+- [x] Volume slider per channel.
 - [ ] Patch lock to prevent program changes sent by the file.
 - [ ] Patch/program selector using General MIDI names.
 - [x] Synchronize channel changes with realtime playback.
