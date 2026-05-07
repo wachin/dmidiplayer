@@ -206,12 +206,15 @@ Use `Save` to write the currently filtered text to a file. The `Encoding`
 selector controls whether the file is written as `UTF-8`, `Latin-1`, or
 `CP1252`.
 
+Use `Print` to send the currently filtered text to a printer through the
+standard Qt print dialog.
+
 Use `Copy` to place the currently filtered text into the clipboard. Use `Font`
 to choose a more comfortable display font for the lyrics pane. Use
 `Fullscreen` to expand the lyrics window for rehearsal or singing along, and
 press `Esc` to return to the normal window.
 
-Encoding detection/manual override and printing are still pending.
+Encoding detection/manual override is still pending.
 
 ## MIDI Destination Row
 

@@ -1021,6 +1021,47 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertFalse(dialog.isFullScreen())
                 self.assertFalse(dialog.fullscreen_button.isChecked())
 
+    def test_lyrics_dialog_print_button_prints_filtered_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+            printed: list[str] = []
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.QPrintDialog.exec", return_value=int(QDialog.DialogCode.Accepted)),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.filter_combo.setCurrentIndex(1)
+                dialog._print_document = lambda printer: printed.append(dialog.current_text())
+
+                dialog.print_button.click()
+
+                self.assertEqual(printed, ["Lyric: Sing!\n"])
+                self.assertEqual(window.statusBar().currentMessage(), "Printed lyrics")
+
+    def test_lyrics_dialog_print_button_respects_cancelled_dialog(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+            printed: list[str] = []
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.QPrintDialog.exec", return_value=int(QDialog.DialogCode.Rejected)),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog._print_document = lambda printer: printed.append(dialog.current_text())
+
+                dialog.print_button.click()
+
+                self.assertEqual(printed, [])
+                self.assertNotEqual(window.statusBar().currentMessage(), "Printed lyrics")
+
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),

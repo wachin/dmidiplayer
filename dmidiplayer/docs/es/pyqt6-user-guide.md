@@ -209,12 +209,15 @@ Usa `Save` para guardar en un archivo el texto filtrado actual. El selector
 `Encoding` controla si el archivo se escribe como `UTF-8`, `Latin-1` o
 `CP1252`.
 
+Usa `Print` para enviar el texto filtrado actual a una impresora mediante el
+cuadro de impresion estandar de Qt.
+
 Usa `Copy` para llevar al portapapeles el texto filtrado actual. Usa `Font`
 para elegir una fuente mas comoda para el panel de letras. Usa `Fullscreen`
 para ampliar la ventana de letras durante el ensayo o el canto, y pulsa `Esc`
 para volver a la ventana normal.
 
-Todavia faltan la deteccion/anulacion manual de codificacion y la impresion.
+Todavia falta la deteccion/anulacion manual de codificacion.
 
 ## Fila de destino MIDI
 

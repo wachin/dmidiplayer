@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
+from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -433,6 +434,7 @@ class ChannelsDialog(QDialog):
 
 
 class LyricsDialog(QDialog):
+    textPrinted = pyqtSignal()
     textSaved = pyqtSignal(str, str)
     FILTERS = (
         ("all", "All"),
@@ -480,6 +482,10 @@ class LyricsDialog(QDialog):
         self.save_button.setObjectName("lyrics_save_button")
         self.save_button.clicked.connect(self.save_to_file)
         button_row.addWidget(self.save_button)
+        self.print_button = QPushButton(self.tr("Print"), self)
+        self.print_button.setObjectName("lyrics_print_button")
+        self.print_button.clicked.connect(self.print_text)
+        button_row.addWidget(self.print_button)
         self.copy_button = QPushButton(self.tr("Copy"), self)
         self.copy_button.setObjectName("lyrics_copy_button")
         self.copy_button.clicked.connect(self.copy_to_clipboard)
@@ -599,6 +605,17 @@ class LyricsDialog(QDialog):
             QMessageBox.warning(self, self.tr("Save Lyrics"), str(exc))
             return
         self.textSaved.emit(file_name, encoding)
+
+    def _print_document(self, printer: QPrinter) -> None:
+        self.browser.document().print(printer)
+
+    def print_text(self) -> None:
+        printer = QPrinter()
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        self._print_document(printer)
+        self.textPrinted.emit()
 
     def keyPressEvent(self, event: object) -> None:
         if getattr(event, "key", lambda: None)() == int(Qt.Key.Key_Escape) and self.isFullScreen():
@@ -1318,6 +1335,7 @@ class MainWindow(QMainWindow):
         if self.lyrics_dialog is None:
             self.lyrics_dialog = self._create_lyrics_dialog()
             self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
+            self.lyrics_dialog.textPrinted.connect(self._lyrics_text_printed)
             self._refresh_lyrics_dialog()
         return self.lyrics_dialog
 
@@ -1340,6 +1358,9 @@ class MainWindow(QMainWindow):
             ),
             5000,
         )
+
+    def _lyrics_text_printed(self) -> None:
+        self.statusBar().showMessage(self.tr("Printed lyrics"), 5000)
 
     def _set_channel_muted(self, channel: int, muted: bool) -> None:
         self.player.set_channel_muted(channel, muted)
