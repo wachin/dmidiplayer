@@ -164,7 +164,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Volume slider per channel.
 - [x] Patch lock to prevent program changes sent by the file.
 - [x] Patch/program selector.
-- [ ] Patch/program selector using General MIDI names.
+- [x] Patch/program selector using General MIDI names.
 - [x] Synchronize channel changes with realtime playback.
 
 ### Player Piano / Pianola

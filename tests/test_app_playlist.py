@@ -10,9 +10,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
+from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QDialog
 from PyQt6.QtWidgets import QSlider
-from PyQt6.QtWidgets import QSpinBox
 from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection
@@ -630,11 +630,12 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertTrue(bool(dialog.table.item(0, 1).flags() & Qt.ItemFlag.ItemIsEditable))
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
-                self.assertIsInstance(dialog.table.cellWidget(0, 4), QSpinBox)
+                self.assertIsInstance(dialog.table.cellWidget(0, 4), QComboBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 5), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 6), QSlider)
-                self.assertEqual(dialog.table.cellWidget(0, 4).value(), 10)
-                self.assertEqual(dialog.table.cellWidget(1, 4).value(), 20)
+                self.assertEqual(dialog.table.cellWidget(0, 4).currentIndex(), 10)
+                self.assertEqual(dialog.table.cellWidget(1, 4).currentIndex(), 20)
+                self.assertIn("Music Box", dialog.table.cellWidget(0, 4).currentText())
 
     def test_channels_dialog_level_updates_from_played_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -702,9 +703,9 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_channels_dialog()
-                program_spinbox = dialog.table.cellWidget(0, 4)
+                program_combo = dialog.table.cellWidget(0, 4)
 
-                program_spinbox.setValue(33)
+                program_combo.setCurrentIndex(33)
 
                 self.assertEqual(window.player.channel_program(0), 33)
                 self.assertEqual(window.statusBar().currentMessage(), "Channel 1 program 33")

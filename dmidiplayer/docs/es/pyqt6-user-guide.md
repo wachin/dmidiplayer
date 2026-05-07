@@ -172,14 +172,15 @@ Cada fila incluye actualmente:
 - `Solo`: mantiene ese canal a nivel completo mientras reduce los otros según
   la preferencia actual de reducción de solo
 - `Program`: envía un cambio de programa para ese canal y reemplaza los cambios
-  de programa posteriores que vengan desde el archivo
+  de programa posteriores que vengan desde el archivo. El selector ahora muestra
+  nombres de instrumentos General MIDI en lugar de solo números
 - `Lock`: ignora los cambios de programa posteriores que vengan desde el archivo
 - `Volume`: ajusta el nivel de reproducción de ese canal entre `0%` y `200%`
 - `Level`: un medidor de actividad en vivo que sigue la velocidad de las notas
   mientras la reproducción está en marcha
 
 Este sigue siendo un tramo temprano del port de la vista de canales, así que
-todavía faltan los nombres General MIDI.
+todavía faltan comportamientos de canal más avanzados.
 
 ## Fila de destino MIDI
 
