@@ -198,6 +198,10 @@ Each visible row shows a track label, a channel summary, and a keyboard.
 During playback, note activity is reflected in the keyboards for tracks whose
 MIDI channels are active.
 
+In the current slice, each track keyboard is narrowed to the note range that
+track actually uses, so low and high parts do not all share the same oversized
+span.
+
 ## Lyrics Window
 
 The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI

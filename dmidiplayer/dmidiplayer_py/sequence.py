@@ -113,11 +113,23 @@ class Sequence(QObject):
             if not channels:
                 continue
             title = ""
+            notes: list[int] = []
             for event in track.events:
                 if event.kind == "meta" and event.meta_type in (0x03, 0x04):
                     text = event.text.strip()
                     if text:
                         title = text
-                        break
-            tracks.append({"track": track_number, "channels": channels, "title": title})
+                if event.kind in ("note_on", "note_off", "key_pressure") and event.data:
+                    notes.append(event.data[0])
+            min_note = min(notes, default=21)
+            max_note = max(notes, default=108)
+            tracks.append(
+                {
+                    "track": track_number,
+                    "channels": channels,
+                    "title": title,
+                    "min_note": min_note,
+                    "max_note": max_note,
+                }
+            )
         return tracks

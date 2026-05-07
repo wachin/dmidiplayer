@@ -222,6 +222,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] hide all channels;
   - [ ] adjust key range to actually used octaves;
   - [ ] show/hide individual channels.
+- [x] Current Pianola slice already narrows each keyboard to the used note range of its track.
 
 ### Lyrics And Karaoke
 

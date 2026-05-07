@@ -202,6 +202,10 @@ Cada fila visible muestra una etiqueta de pista, un resumen de canales y un
 teclado. Durante la reproduccion, la actividad de notas se refleja en los
 teclados de las pistas cuyos canales MIDI estan activos.
 
+En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
+pista realmente usa, de modo que las partes graves y agudas no comparten todas
+el mismo rango sobredimensionado.
+
 ## Ventana de letras
 
 La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI
