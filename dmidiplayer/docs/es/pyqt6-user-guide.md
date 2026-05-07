@@ -173,12 +173,13 @@ Cada fila incluye actualmente:
   la preferencia actual de reducción de solo
 - `Program`: envía un cambio de programa para ese canal y reemplaza los cambios
   de programa posteriores que vengan desde el archivo
+- `Lock`: ignora los cambios de programa posteriores que vengan desde el archivo
 - `Volume`: ajusta el nivel de reproducción de ese canal entre `0%` y `200%`
 - `Level`: un medidor de actividad en vivo que sigue la velocidad de las notas
   mientras la reproducción está en marcha
 
 Este sigue siendo un tramo temprano del port de la vista de canales, así que
-todavía faltan los nombres General MIDI y el bloqueo de patch.
+todavía faltan los nombres General MIDI.
 
 ## Fila de destino MIDI
 

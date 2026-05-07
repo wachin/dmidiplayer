@@ -631,7 +631,8 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 4), QSpinBox)
-                self.assertIsInstance(dialog.table.cellWidget(0, 5), QSlider)
+                self.assertIsInstance(dialog.table.cellWidget(0, 5), QCheckBox)
+                self.assertIsInstance(dialog.table.cellWidget(0, 6), QSlider)
                 self.assertEqual(dialog.table.cellWidget(0, 4).value(), 10)
                 self.assertEqual(dialog.table.cellWidget(1, 4).value(), 20)
 
@@ -648,7 +649,7 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_channels_dialog()
 
                 window._event_played(type("Evt", (), {"kind": "note_on", "channel": 1, "data": bytes([64, 80])})())
-                level = dialog.table.cellWidget(1, 6)
+                level = dialog.table.cellWidget(1, 7)
                 self.assertEqual(level.value(), 80)
 
                 window._event_played(type("Evt", (), {"kind": "note_off", "channel": 1, "data": bytes([64, 0])})())
@@ -708,6 +709,24 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.player.channel_program(0), 33)
                 self.assertEqual(window.statusBar().currentMessage(), "Channel 1 program 33")
 
+    def test_channels_dialog_lock_checkbox_updates_player(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+                lock_checkbox = dialog.table.cellWidget(0, 5)
+
+                lock_checkbox.setChecked(True)
+
+                self.assertIn(0, window.player.locked_channels())
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 1 locked")
+
     def test_channels_dialog_volume_slider_updates_player(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "multi.mid")
@@ -719,7 +738,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_channels_dialog()
-                volume_slider = dialog.table.cellWidget(0, 5)
+                volume_slider = dialog.table.cellWidget(0, 6)
 
                 volume_slider.setValue(60)
 

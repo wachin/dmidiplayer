@@ -42,6 +42,7 @@ class SequencePlayer(QObject):
         self._solo_volume_reduction = 50
         self._channel_volume_percents: dict[int, int] = {}
         self._channel_program_overrides: dict[int, int] = {}
+        self._locked_channels: set[int] = set()
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
@@ -60,6 +61,7 @@ class SequencePlayer(QObject):
         self._loop_start_tick = 0
         self._loop_end_tick = self.sequence.length_ticks
         self._channel_program_overrides.clear()
+        self._locked_channels.clear()
         self.positionChanged.emit(self._position, self.sequence.length_ticks)
 
     def clear(self) -> None:
@@ -74,6 +76,7 @@ class SequencePlayer(QObject):
         self._loop_start_tick = 0
         self._loop_end_tick = 0
         self._channel_program_overrides.clear()
+        self._locked_channels.clear()
         self.positionChanged.emit(0, 0)
 
     def play(self) -> None:
@@ -251,6 +254,21 @@ class SequencePlayer(QObject):
         self._channel_program_overrides[channel] = program
         self._send_channel_program(channel, program)
 
+    def locked_channels(self) -> set[int]:
+        return set(self._locked_channels)
+
+    def set_channel_locked(self, channel: int, locked: bool) -> None:
+        channel = max(0, min(15, channel))
+        if locked:
+            if channel in self._locked_channels:
+                return
+            self._locked_channels.add(channel)
+        else:
+            if channel not in self._locked_channels:
+                return
+            self._locked_channels.remove(channel)
+        self.output.all_notes_off()
+
     @property
     def loop_enabled(self) -> bool:
         return self._loop_enabled
@@ -316,6 +334,8 @@ class SequencePlayer(QObject):
         if event is None:
             return None
         event = self._channel_program_event(event)
+        if event is None:
+            return None
         event = self._channel_volume_event(event)
         event = self._volume_event(event)
         if self._pitch_shift == 0:
@@ -369,6 +389,17 @@ class SequencePlayer(QObject):
     def _channel_program_event(self, event: MidiEvent) -> MidiEvent:
         if event.channel is None or event.kind != "program_change":
             return event
+        if event.channel in self._locked_channels:
+            program = self.channel_program(event.channel)
+            if program is None:
+                return None
+            return MidiEvent(
+                tick=event.tick,
+                kind=event.kind,
+                channel=event.channel,
+                data=bytes([program]) + event.data[1:],
+                meta_type=event.meta_type,
+            )
         program = self.channel_program(event.channel)
         if program is None or not event.data or event.data[0] == program:
             return event

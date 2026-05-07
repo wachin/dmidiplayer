@@ -172,11 +172,12 @@ Each row currently includes:
   to the current solo reduction preference
 - `Program`: sends a program change for that channel and overrides later
   program-change events from the file
+- `Lock`: ignores later program changes from the file for that channel
 - `Volume`: adjusts the playback level for that channel from `0%` to `200%`
 - `Level`: a live activity meter that follows note velocity while playback runs
 
 This is still an early Python port slice of the channels view, so General MIDI
-program names and patch locking are still pending.
+program names are still pending.
 
 ## MIDI Destination Row
 
