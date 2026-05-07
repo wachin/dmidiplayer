@@ -50,6 +50,7 @@ abras un archivo MIDI o una lista `.lst`.
 
 ## Menú View
 
+- `Channels`: abre la ventana de actividad de canales.
 - `Toolbar`: muestra u oculta la barra de herramientas.
 - `Status bar`: muestra u oculta la barra de estado.
 - `Keyboard`: muestra u oculta la vista del teclado.
@@ -157,6 +158,21 @@ El panel de ritmo muestra información musical en tiempo real:
 
 Este panel se actualiza durante la reproducción y también cuando haces una
 búsqueda manual.
+
+## Ventana de canales
+
+La ventana `Channels` se abre desde el menú `View`. Muestra una fila por cada
+canal MIDI usado por la canción cargada.
+
+Cada fila incluye actualmente:
+
+- `Channel`: el número de canal MIDI
+- `Label`: una etiqueta de texto editable para ese canal
+- `Level`: un medidor de actividad en vivo que sigue la velocidad de las notas
+  mientras la reproducción está en marcha
+
+Este es el primer tramo del port de la vista de canales, así que todavía faltan
+silencio, solo, volumen por canal y controles de patch.
 
 ## Fila de destino MIDI
 

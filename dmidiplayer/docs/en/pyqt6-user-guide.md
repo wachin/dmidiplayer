@@ -50,6 +50,7 @@ to open a MIDI file or playlist.
 
 ## View Menu
 
+- `Channels`: open the channel activity window.
 - `Toolbar`: show or hide the main toolbar.
 - `Status bar`: show or hide the status bar at the bottom.
 - `Keyboard`: show or hide the piano keyboard view.
@@ -156,6 +157,20 @@ The rhythm panel shows live musical position information:
 - a beat strip where the active beat is highlighted
 
 This panel updates while the song plays and also when you seek manually.
+
+## Channels Window
+
+The `Channels` window is opened from the `View` menu. It shows one row for each
+MIDI channel used by the loaded song.
+
+Each row currently includes:
+
+- `Channel`: the MIDI channel number
+- `Label`: an editable text label for that channel
+- `Level`: a live activity meter that follows note velocity while playback runs
+
+This is the first Python port slice of the channels view, so mute, solo,
+per-channel volume, and patch controls are still pending.
 
 ## MIDI Destination Row
 

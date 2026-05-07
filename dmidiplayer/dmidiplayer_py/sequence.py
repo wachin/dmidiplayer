@@ -73,3 +73,8 @@ class Sequence(QObject):
             numerator = signature.numerator
             denominator = signature.denominator
         return (numerator, denominator)
+
+    def used_channels(self) -> list[int]:
+        if self.midi is None:
+            return []
+        return sorted({event.channel for event in self.midi.events if event.channel is not None})

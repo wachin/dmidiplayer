@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QDialog
+from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection
 from dmidiplayer_py.app import MainWindow, PreferencesDialog
@@ -163,6 +164,27 @@ def write_two_bar_midi(path: Path) -> None:
             varlen(1920),
             bytes([0x80, 60, 0]),
             varlen(1920),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
+def write_multichannel_midi(path: Path) -> None:
+    header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0")
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x51\x03\x07\xa1\x20",
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(0),
+            bytes([0x91, 64, 80]),
+            varlen(480),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            bytes([0x81, 64, 0]),
+            varlen(0),
             b"\xff\x2f\x00",
         ]
     )
@@ -452,6 +474,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.save_playlist_as_action), "save_playlist_as_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
             self.assertIsNotNone(window.findChild(type(window.statusbar_action), "toggle_statusbar_action"))
+            self.assertIsNotNone(window.findChild(type(window.channels_action), "channels_action"))
             self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
             self.assertIsNotNone(window.findChild(type(window.rhythm_action), "toggle_rhythm_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
@@ -551,6 +574,24 @@ class AppPlaylistTest(unittest.TestCase):
             window.keyboard_action.setChecked(True)
             self.assertFalse(window.keyboard.isHidden())
 
+    def test_channels_action_opens_dialog(self) -> None:
+        shown: list[str] = []
+
+        def fake_show(dialog: object) -> None:
+            shown.append(getattr(dialog, "windowTitle")())
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.ChannelsDialog.show", fake_show),
+            patch("dmidiplayer_py.app.ChannelsDialog.raise_", lambda dialog: None),
+            patch("dmidiplayer_py.app.ChannelsDialog.activateWindow", lambda dialog: None),
+        ):
+            window = MainWindow([])
+            window.channels_action.trigger()
+
+            self.assertEqual(shown, ["Channels"])
+
     def test_view_menu_toggles_rhythm_panel(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
@@ -562,6 +603,43 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.rhythm_view.isHidden())
             window.rhythm_action.setChecked(True)
             self.assertFalse(window.rhythm_view.isHidden())
+
+    def test_channels_dialog_lists_used_channels_with_editable_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+
+                self.assertEqual(dialog.table.rowCount(), 2)
+                self.assertEqual(dialog.table.item(0, 0).text(), "1")
+                self.assertEqual(dialog.table.item(1, 0).text(), "2")
+                self.assertEqual(dialog.table.item(0, 1).text(), "Channel 1")
+                self.assertTrue(bool(dialog.table.item(0, 1).flags() & Qt.ItemFlag.ItemIsEditable))
+
+    def test_channels_dialog_level_updates_from_played_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+
+                window._event_played(type("Evt", (), {"kind": "note_on", "channel": 1, "data": bytes([64, 80])})())
+                level = dialog.table.cellWidget(1, 2)
+                self.assertEqual(level.value(), 80)
+
+                window._event_played(type("Evt", (), {"kind": "note_off", "channel": 1, "data": bytes([64, 0])})())
+                self.assertEqual(level.value(), 0)
 
     def test_playback_actions_have_keyboard_shortcuts(self) -> None:
         with (

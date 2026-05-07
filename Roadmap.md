@@ -156,15 +156,15 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Channel View
 
-- [ ] Show up to 16 rows, one per used MIDI channel.
-- [ ] Show channel number and editable label.
+- [x] Show up to 16 rows, one per used MIDI channel.
+- [x] Show channel number and editable label.
 - [ ] Mute per channel.
 - [ ] Solo per channel, reducing other channels according to preference.
-- [ ] Activity/level indicator per channel.
+- [x] Activity/level indicator per channel.
 - [ ] Volume slider per channel.
 - [ ] Patch lock to prevent program changes sent by the file.
 - [ ] Patch/program selector using General MIDI names.
-- [ ] Synchronize channel changes with realtime playback.
+- [x] Synchronize channel changes with realtime playback.
 
 ### Player Piano / Pianola
 
@@ -291,7 +291,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [ ] Port File menu, View menu, tools, status bar, and main dialogs.
 - [ ] Independent views:
-  - [ ] Channels;
+  - [x] Channels;
   - [ ] Lyrics;
   - [ ] Piano Player.
 - [ ] Embedded views that can be shown/hidden:

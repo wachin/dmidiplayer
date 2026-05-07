@@ -23,9 +23,12 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QProgressBar,
     QSlider,
     QSpinBox,
     QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QTextBrowser,
     QToolButton,
     QToolBar,
@@ -181,6 +184,50 @@ class RhythmView(QWidget):
         self.update_state(4, 4, 1, 1, 120.0)
 
 
+class ChannelsDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Channels"))
+        self.channel_rows: dict[int, int] = {}
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(0, 3, self)
+        self.table.setObjectName("channels_table")
+        self.table.setHorizontalHeaderLabels([self.tr("Channel"), self.tr("Label"), self.tr("Level")])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+        self.resize(420, 320)
+
+    def set_channels(self, channels: list[int]) -> None:
+        self.table.setRowCount(0)
+        self.channel_rows.clear()
+        for row, channel in enumerate(channels):
+            self.table.insertRow(row)
+            channel_item = QTableWidgetItem(str(channel + 1))
+            channel_item.setFlags(channel_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(row, 0, channel_item)
+            self.table.setItem(row, 1, QTableWidgetItem(self.tr("Channel {number}").format(number=channel + 1)))
+            level = QProgressBar(self.table)
+            level.setRange(0, 127)
+            level.setValue(0)
+            level.setFormat("%v")
+            self.table.setCellWidget(row, 2, level)
+            self.channel_rows[channel] = row
+
+    def clear_levels(self) -> None:
+        for row in self.channel_rows.values():
+            level = self.table.cellWidget(row, 2)
+            if isinstance(level, QProgressBar):
+                level.setValue(0)
+
+    def set_channel_level(self, channel: int, value: int) -> None:
+        row = self.channel_rows.get(channel)
+        if row is None:
+            return
+        level = self.table.cellWidget(row, 2)
+        if isinstance(level, QProgressBar):
+            level.setValue(max(0, min(127, value)))
+
+
 class MainWindow(QMainWindow):
     def __init__(self, start_files: list[str]) -> None:
         super().__init__()
@@ -207,6 +254,7 @@ class MainWindow(QMainWindow):
         self._current_file: str | None = None
         self._current_playlist_path: Path | None = None
         self._playlist_modified = False
+        self.channels_dialog: ChannelsDialog | None = None
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
@@ -493,6 +541,10 @@ class MainWindow(QMainWindow):
         self.keyboard_action.setCheckable(True)
         self.keyboard_action.setChecked(True)
         self.keyboard_action.toggled.connect(self.keyboard.setVisible)
+        self.channels_action = QAction(self.tr("Channels"), self)
+        self.channels_action.setObjectName("channels_action")
+        self.channels_action.triggered.connect(self._show_channels_dialog)
+        view_menu.addAction(self.channels_action)
         view_menu.addAction(self.keyboard_action)
         self.rhythm_action = QAction(self.tr("Rhythm"), self)
         self.rhythm_action.setObjectName("toggle_rhythm_action")
@@ -553,6 +605,8 @@ class MainWindow(QMainWindow):
         self.event_label.setText(self.tr("No file loaded"))
         self.rhythm_view.clear()
         self.keyboard.clear()
+        if self.channels_dialog is not None:
+            self.channels_dialog.set_channels([])
         self._update_midi_output_label()
         self._update_action_state()
         self._update_window_title()
@@ -790,6 +844,27 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(self.tr("Loaded help from {name}").format(name=path.name), 5000)
         dialog.exec()
 
+    def _create_channels_dialog(self) -> ChannelsDialog:
+        return ChannelsDialog(self)
+
+    def _ensure_channels_dialog(self) -> ChannelsDialog:
+        if self.channels_dialog is None:
+            self.channels_dialog = self._create_channels_dialog()
+            self._refresh_channels_dialog()
+        return self.channels_dialog
+
+    def _show_channels_dialog(self) -> None:
+        dialog = self._ensure_channels_dialog()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _refresh_channels_dialog(self) -> None:
+        if self.channels_dialog is None:
+            return
+        self.channels_dialog.set_channels(self.player.sequence.used_channels())
+        self.channels_dialog.clear_levels()
+
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
 
@@ -834,6 +909,8 @@ class MainWindow(QMainWindow):
     def _playback_stopped(self) -> None:
         message = self.tr("Paused") if self._pause_requested else self.tr("Stopped")
         self.statusBar().showMessage(message)
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
         self._pause_requested = False
 
     def _restore_window_geometry(self) -> None:
@@ -1147,6 +1224,7 @@ class MainWindow(QMainWindow):
         self._select_playlist_file(file_name)
         self._update_time_label(0, midi.length_ticks)
         self.keyboard.clear()
+        self._refresh_channels_dialog()
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._current_file = file_name
@@ -1216,6 +1294,8 @@ class MainWindow(QMainWindow):
             return
         self.player.seek(self.position.value())
         self.keyboard.clear()
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
 
     def previous_bar(self) -> None:
         self._seek_to_bar_delta(-1)
@@ -1244,6 +1324,8 @@ class MainWindow(QMainWindow):
                 self.jump_bar.setValue(target_bar)
         self.player.seek(sequence.tick_for_bar(target_bar))
         self.keyboard.clear()
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
 
     def _jump_bar_value_changed(self, value: int) -> None:
         if self.player.sequence.midi is None:
@@ -1339,8 +1421,12 @@ class MainWindow(QMainWindow):
         )
         if kind == "note_on" and len(data) >= 2 and data[1] > 0:
             self.keyboard.note_on(data[0])
+            if channel is not None and self.channels_dialog is not None:
+                self.channels_dialog.set_channel_level(channel, data[1])
         elif kind in ("note_off", "note_on") and data:
             self.keyboard.note_off(data[0])
+            if channel is not None and self.channels_dialog is not None:
+                self.channels_dialog.set_channel_level(channel, 0)
 
     def _finished(self) -> None:
         next_row = self._next_playlist_row() if self.auto_advance_playlist else None
@@ -1349,6 +1435,8 @@ class MainWindow(QMainWindow):
         self.event_label.setText(self.tr("End of sequence"))
         self.statusBar().showMessage(self.tr("End of sequence"))
         self.keyboard.clear()
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
         self._update_action_state()
 
     def _output_error(self, message: str) -> None:
