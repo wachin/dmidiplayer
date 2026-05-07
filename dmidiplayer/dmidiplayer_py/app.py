@@ -434,6 +434,8 @@ class ChannelsDialog(QDialog):
 
 
 class PianolaDialog(QDialog):
+    trackVisibilityChanged = pyqtSignal(int, bool)
+    allTracksVisibilityChanged = pyqtSignal(bool)
     TRACKS_PER_TAB = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -441,7 +443,20 @@ class PianolaDialog(QDialog):
         self.setWindowTitle(self.tr("Piano Player"))
         self._track_keyboards: dict[int, PianoKeyboard] = {}
         self._track_channels: dict[int, set[int]] = {}
+        self._track_visibility: dict[int, QCheckBox] = {}
+        self._track_keyboard_containers: dict[int, QWidget] = {}
         layout = QVBoxLayout(self)
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        self.show_all_button = QPushButton(self.tr("Show All"), self)
+        self.show_all_button.setObjectName("pianola_show_all_button")
+        self.show_all_button.clicked.connect(self.show_all_tracks)
+        button_row.addWidget(self.show_all_button)
+        self.hide_all_button = QPushButton(self.tr("Hide All"), self)
+        self.hide_all_button.setObjectName("pianola_hide_all_button")
+        self.hide_all_button.clicked.connect(self.hide_all_tracks)
+        button_row.addWidget(self.hide_all_button)
+        layout.addLayout(button_row)
         self.tabs = QTabWidget(self)
         self.tabs.setObjectName("pianola_tabs")
         layout.addWidget(self.tabs)
@@ -458,6 +473,8 @@ class PianolaDialog(QDialog):
 
     def set_tracks(self, tracks: list[dict[str, object]]) -> None:
         self._track_keyboards.clear()
+        self._track_visibility.clear()
+        self._track_keyboard_containers.clear()
         self._track_channels = {
             int(track["track"]): set(track["channels"]) for track in tracks
         }
@@ -482,23 +499,64 @@ class PianolaDialog(QDialog):
                 row_layout = QVBoxLayout(row)
                 row_layout.setContentsMargins(0, 0, 0, 0)
                 row_layout.setSpacing(2)
+                header = QWidget(row)
+                header_layout = QHBoxLayout(header)
+                header_layout.setContentsMargins(0, 0, 0, 0)
+                header_layout.setSpacing(6)
+                visible_checkbox = QCheckBox(self.tr("Show"), header)
+                visible_checkbox.setObjectName(f"pianola_track_visible_{track_number + 1}")
+                visible_checkbox.setChecked(True)
+                header_layout.addWidget(visible_checkbox)
                 label = QLabel(self._format_track_heading(track_number, title), row)
                 label.setObjectName(f"pianola_track_label_{track_number + 1}")
+                header_layout.addWidget(label)
+                header_layout.addStretch(1)
                 detail = QLabel(self._format_channel_summary(channels), row)
                 detail.setObjectName(f"pianola_track_detail_{track_number + 1}")
+                header_layout.addWidget(detail)
+                row_layout.addWidget(header)
+                keyboard_container = QWidget(row)
+                keyboard_layout = QVBoxLayout(keyboard_container)
+                keyboard_layout.setContentsMargins(0, 0, 0, 0)
+                keyboard_layout.setSpacing(0)
                 keyboard = PianoKeyboard(row)
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
                 keyboard.set_note_range(min_note, max_note)
-                row_layout.addWidget(label)
-                row_layout.addWidget(detail)
-                row_layout.addWidget(keyboard)
+                keyboard_layout.addWidget(keyboard)
+                row_layout.addWidget(keyboard_container)
                 page_layout.addWidget(row)
                 self._track_keyboards[track_number] = keyboard
+                self._track_visibility[track_number] = visible_checkbox
+                self._track_keyboard_containers[track_number] = keyboard_container
+                visible_checkbox.toggled.connect(
+                    lambda checked, track=track_number: self._set_track_visible(track, checked, emit_signal=True)
+                )
             page_layout.addStretch(1)
             start = tab_index + 1
             end = tab_index + len(chunk)
             self.tabs.addTab(page, self.tr("Tracks {start}-{end}").format(start=start, end=end))
         self.tabs.setCurrentIndex(0)
+
+    def _set_track_visible(self, track_number: int, visible: bool, emit_signal: bool) -> None:
+        checkbox = self._track_visibility.get(track_number)
+        if checkbox is not None and checkbox.isChecked() != visible:
+            with QSignalBlocker(checkbox):
+                checkbox.setChecked(visible)
+        container = self._track_keyboard_containers.get(track_number)
+        if container is not None:
+            container.setVisible(visible)
+        if emit_signal:
+            self.trackVisibilityChanged.emit(track_number, visible)
+
+    def show_all_tracks(self) -> None:
+        for track_number in list(self._track_visibility):
+            self._set_track_visible(track_number, True, emit_signal=False)
+        self.allTracksVisibilityChanged.emit(True)
+
+    def hide_all_tracks(self) -> None:
+        for track_number in list(self._track_visibility):
+            self._set_track_visible(track_number, False, emit_signal=False)
+        self.allTracksVisibilityChanged.emit(False)
 
     def note_on(self, channel: int, note: int) -> None:
         for track_number, channels in self._track_channels.items():
@@ -1490,6 +1548,8 @@ class MainWindow(QMainWindow):
     def _ensure_pianola_dialog(self) -> PianolaDialog:
         if self.pianola_dialog is None:
             self.pianola_dialog = self._create_pianola_dialog()
+            self.pianola_dialog.trackVisibilityChanged.connect(self._pianola_track_visibility_changed)
+            self.pianola_dialog.allTracksVisibilityChanged.connect(self._pianola_all_tracks_visibility_changed)
             self._refresh_pianola_dialog()
         return self.pianola_dialog
 
@@ -1503,6 +1563,23 @@ class MainWindow(QMainWindow):
         if self.pianola_dialog is None:
             return
         self.pianola_dialog.set_tracks(self.player.sequence.midi_track_infos())
+
+    def _pianola_track_visibility_changed(self, track_number: int, visible: bool) -> None:
+        self.statusBar().showMessage(
+            self.tr("Track {number} {state} in Piano Player").format(
+                number=track_number + 1,
+                state=self.tr("shown") if visible else self.tr("hidden"),
+            ),
+            3000,
+        )
+
+    def _pianola_all_tracks_visibility_changed(self, visible: bool) -> None:
+        self.statusBar().showMessage(
+            self.tr("Piano Player tracks {state}").format(
+                state=self.tr("shown") if visible else self.tr("hidden"),
+            ),
+            3000,
+        )
 
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
@@ -1628,6 +1705,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message)
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.clear()
         self._pause_requested = False
 
     def _restore_window_geometry(self) -> None:
@@ -2017,8 +2096,6 @@ class MainWindow(QMainWindow):
         self.keyboard.clear()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
-        if self.pianola_dialog is not None:
-            self.pianola_dialog.clear()
         if self.pianola_dialog is not None:
             self.pianola_dialog.clear()
 

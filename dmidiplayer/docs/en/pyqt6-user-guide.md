@@ -198,6 +198,10 @@ Each visible row shows a track label, a channel summary, and a keyboard.
 During playback, note activity is reflected in the keyboards for tracks whose
 MIDI channels are active.
 
+Each row also has a `Show` checkbox so you can collapse that track's keyboard
+without removing the track heading. The window includes `Show All` and `Hide
+All` buttons for quick visibility changes across every displayed track.
+
 In the current slice, each track keyboard is narrowed to the note range that
 track actually uses, so low and high parts do not all share the same oversized
 span.

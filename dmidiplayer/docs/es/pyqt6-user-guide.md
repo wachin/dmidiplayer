@@ -202,6 +202,11 @@ Cada fila visible muestra una etiqueta de pista, un resumen de canales y un
 teclado. Durante la reproduccion, la actividad de notas se refleja en los
 teclados de las pistas cuyos canales MIDI estan activos.
 
+Cada fila tambien tiene una casilla `Show` para ocultar o mostrar el teclado
+de esa pista sin perder el encabezado. La ventana incluye botones `Show All`
+y `Hide All` para cambiar rapidamente la visibilidad de todas las pistas
+mostradas.
+
 En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
 pista realmente usa, de modo que las partes graves y agudas no comparten todas
 el mismo rango sobredimensionado.

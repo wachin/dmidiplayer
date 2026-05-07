@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QDialog
 from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QSlider
 from PyQt6.QtCore import Qt
 
@@ -889,6 +890,79 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 60))
                 self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 84))
+
+    def test_pianola_dialog_can_hide_individual_track_keyboard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                checkbox = dialog.findChild(QCheckBox, "pianola_track_visible_1")
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+
+                checkbox.setChecked(False)
+
+                self.assertTrue(keyboard.parentWidget().isHidden())
+                self.assertEqual(window.statusBar().currentMessage(), "Track 1 hidden in Piano Player")
+
+                checkbox.setChecked(True)
+
+                self.assertFalse(keyboard.parentWidget().isHidden())
+                self.assertEqual(window.statusBar().currentMessage(), "Track 1 shown in Piano Player")
+
+    def test_pianola_dialog_show_all_and_hide_all_buttons_toggle_track_keyboards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=4, midi_track_indexes=[0, 1, 2])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                show_all_button = dialog.findChild(QPushButton, "pianola_show_all_button")
+                hide_all_button = dialog.findChild(QPushButton, "pianola_hide_all_button")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+
+                hide_all_button.click()
+
+                self.assertTrue(keyboard_one.parentWidget().isHidden())
+                self.assertTrue(keyboard_two.parentWidget().isHidden())
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player tracks hidden")
+
+                show_all_button.click()
+
+                self.assertFalse(keyboard_one.parentWidget().isHidden())
+                self.assertFalse(keyboard_two.parentWidget().isHidden())
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player tracks shown")
+
+    def test_stop_clears_pianola_track_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=3, midi_track_indexes=[0, 1])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+
+                window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
+                self.assertIn(60, keyboard._active)
+
+                window.stop()
+                window._playback_stopped()
+
+                self.assertNotIn(60, keyboard._active)
 
     def test_channels_dialog_level_updates_from_played_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

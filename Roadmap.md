@@ -207,6 +207,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Show one row per MIDI-bearing track in the current Pianola window slice.
 - [x] Each row should have track label, channel summary, and keyboard in the current Pianola window slice.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
+- [x] Allow show/hide individual track keyboards in the current Pianola window slice.
+- [x] Allow show all / hide all track keyboards in the current Pianola window slice.
 - [ ] Allow customizable colors per channel/state.
 - [ ] Allow velocity tinting.
 - [ ] Show note names according to preference:
@@ -218,10 +220,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Allow manual note playing with computer keyboard and mouse where appropriate.
 - [ ] Window menu:
   - [ ] fullscreen;
-  - [ ] show all channels;
-  - [ ] hide all channels;
   - [ ] adjust key range to actually used octaves;
-  - [ ] show/hide individual channels.
+  - [ ] more detailed visibility/view controls if the original window requires them.
 - [x] Current Pianola slice already narrows each keyboard to the used note range of its track.
 
 ### Lyrics And Karaoke
