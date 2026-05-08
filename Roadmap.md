@@ -164,23 +164,23 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Per-Song Settings
 
-- [ ] Save and load per-song settings in `$HOME/.dmidiplayer`.
-- [ ] Use the song name plus `.cfg` suffix.
-- [ ] Allow automatic load/save depending on preferences.
-- [ ] Allow manual load/save from the menu.
-- [ ] Save:
-  - [ ] text/lyrics encoding;
-  - [ ] MIDI file path;
-  - [ ] transpose;
-  - [ ] tempo variation;
-  - [ ] global volume variation.
-- [ ] Save per channel:
-  - [ ] volume variation;
-  - [ ] editable label;
-  - [ ] MIDI patch/program;
-  - [ ] solo state;
-  - [ ] mute state;
-  - [ ] lock state.
+- [x] Save and load per-song settings in `$HOME/.dmidiplayer`.
+- [x] Use the song name plus `.cfg` suffix.
+- [x] Allow automatic load/save depending on preferences.
+- [x] Allow manual load/save from the menu.
+- [x] Save:
+  - [x] text/lyrics encoding;
+  - [x] MIDI file path;
+  - [x] transpose;
+  - [x] tempo variation;
+  - [x] global volume variation.
+- [x] Save per channel:
+  - [x] volume variation;
+  - [x] editable label;
+  - [x] MIDI patch/program;
+  - [x] solo state;
+  - [x] mute state;
+  - [x] lock state.
 
 ### Channel View
 
@@ -290,7 +290,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] solo volume reduction percentage, default 50%;
   - [x] auto-play on load;
   - [x] playlist auto-advance;
-  - [ ] auto-load/save song settings;
+  - [x] auto-load/save song settings;
   - [ ] sticky window borders, if kept for Windows;
   - [ ] force dark mode where applicable;
   - [ ] use internal icon theme;

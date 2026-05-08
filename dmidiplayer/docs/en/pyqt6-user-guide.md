@@ -309,7 +309,12 @@ The current `General` tab includes:
 - `Solo volume reduction`: reserved setting for upcoming channel-solo behavior.
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
+- `Automatically load and save song settings`
 - `Send GM reset before playback`
+
+From the `File` menu, the current port also includes `Song Settings -> Load`
+and `Song Settings -> Save`. These store a `.cfg` file in
+`$HOME/.dmidiplayer` using the loaded song filename plus `.cfg`.
 
 The current `Lyrics` tab includes:
 

@@ -15,6 +15,7 @@ class AppSettings:
     DEFAULT_PERCUSSION_CHANNEL = 10
     DEFAULT_AUTO_PLAY_ON_LOAD = False
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
+    DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -113,6 +114,13 @@ class AppSettings:
 
     def set_playlist_auto_advance(self, enabled: bool) -> None:
         self._settings.setValue("playback/playlist_auto_advance", bool(enabled))
+        self._settings.sync()
+
+    def auto_song_settings(self) -> bool:
+        return self._settings.value("general/auto_song_settings", self.DEFAULT_AUTO_SONG_SETTINGS, bool)
+
+    def set_auto_song_settings(self, enabled: bool) -> None:
+        self._settings.setValue("general/auto_song_settings", bool(enabled))
         self._settings.sync()
 
     def solo_volume_reduction(self) -> int:

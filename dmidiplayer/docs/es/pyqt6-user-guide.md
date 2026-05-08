@@ -318,7 +318,12 @@ La pestaña `General` actual incluye:
   solo por canal.
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
+- `Automatically load and save song settings`
 - `Send GM reset before playback`
+
+Desde el menú `File`, el port actual también incluye `Song Settings -> Load`
+y `Song Settings -> Save`. Esto guarda un archivo `.cfg` en
+`$HOME/.dmidiplayer` usando el nombre del archivo MIDI cargado más `.cfg`.
 
 La pestaña `Lyrics` actual incluye:
 

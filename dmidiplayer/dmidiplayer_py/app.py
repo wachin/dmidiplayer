@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import os
 import random
 import sys
@@ -279,6 +280,10 @@ class PreferencesDialog(QDialog):
         self.general_playlist_auto_advance.setObjectName("general_playlist_auto_advance")
         general_form.addRow("", self.general_playlist_auto_advance)
 
+        self.general_auto_song_settings = QCheckBox(self.tr("Automatically load and save song settings"), general_tab)
+        self.general_auto_song_settings.setObjectName("general_auto_song_settings")
+        general_form.addRow("", self.general_auto_song_settings)
+
         self.general_midi_reset_before_playback = QCheckBox(self.tr("Send GM reset before playback"), general_tab)
         self.general_midi_reset_before_playback.setObjectName("general_midi_reset_before_playback")
         general_form.addRow("", self.general_midi_reset_before_playback)
@@ -366,6 +371,7 @@ class PreferencesDialog(QDialog):
         self.general_solo_volume_reduction.setValue(self._settings.solo_volume_reduction())
         self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
+        self.general_auto_song_settings.setChecked(self._settings.auto_song_settings())
         self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
         self.lyrics_font_family.setCurrentFont(QFont(self._settings.lyrics_font_family()))
         self.lyrics_font_size.setValue(self._settings.lyrics_font_size())
@@ -392,6 +398,7 @@ class PreferencesDialog(QDialog):
         self.general_solo_volume_reduction.setValue(AppSettings.DEFAULT_SOLO_VOLUME_REDUCTION)
         self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
+        self.general_auto_song_settings.setChecked(AppSettings.DEFAULT_AUTO_SONG_SETTINGS)
         self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
         self.lyrics_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_LYRICS_FONT_FAMILY))
         self.lyrics_font_size.setValue(AppSettings.DEFAULT_LYRICS_FONT_SIZE)
@@ -415,12 +422,13 @@ class PreferencesDialog(QDialog):
             self.pianola_octave_designation.findData(AppSettings.DEFAULT_PIANOLA_OCTAVE_DESIGNATION)
         )
 
-    def preferences(self) -> tuple[int, int, bool, bool, bool, str, int, str, str, str, str, str, str, int]:
+    def preferences(self) -> tuple[object, ...]:
         return (
             self.general_percussion_channel.value(),
             self.general_solo_volume_reduction.value(),
             self.general_auto_play_on_load.isChecked(),
             self.general_playlist_auto_advance.isChecked(),
+            self.general_auto_song_settings.isChecked(),
             self.general_midi_reset_before_playback.isChecked(),
             self.lyrics_font_family.currentFont().family(),
             self.lyrics_font_size.value(),
@@ -499,6 +507,7 @@ class ChannelsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Channels"))
         self.channel_rows: dict[int, int] = {}
+        self._label_changed_callback: object | None = None
         layout = QVBoxLayout(self)
         self.table = QTableWidget(0, 8, self)
         self.table.setObjectName("channels_table")
@@ -515,6 +524,7 @@ class ChannelsDialog(QDialog):
             ]
         )
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.itemChanged.connect(self._item_changed)
         layout.addWidget(self.table)
         self.resize(420, 320)
 
@@ -526,6 +536,8 @@ class ChannelsDialog(QDialog):
         channel_programs: dict[int, int] | None = None,
         locked_channels: set[int] | None = None,
         channel_volumes: dict[int, int] | None = None,
+        channel_labels: dict[int, str] | None = None,
+        label_changed: object | None = None,
         mute_changed: object | None = None,
         solo_changed: object | None = None,
         program_changed: object | None = None,
@@ -537,48 +549,65 @@ class ChannelsDialog(QDialog):
         channel_programs = channel_programs or {}
         locked_channels = locked_channels or set()
         channel_volumes = channel_volumes or {}
-        self.table.setRowCount(0)
-        self.channel_rows.clear()
-        for row, channel in enumerate(channels):
-            self.table.insertRow(row)
-            channel_item = QTableWidgetItem(str(channel + 1))
-            channel_item.setFlags(channel_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(row, 0, channel_item)
-            self.table.setItem(row, 1, QTableWidgetItem(self.tr("Channel {number}").format(number=channel + 1)))
-            mute_checkbox = QCheckBox(self.table)
-            mute_checkbox.setChecked(channel in muted_channels)
-            if mute_changed is not None:
-                mute_checkbox.toggled.connect(lambda checked, ch=channel: mute_changed(ch, checked))
-            self.table.setCellWidget(row, 2, mute_checkbox)
-            solo_checkbox = QCheckBox(self.table)
-            solo_checkbox.setChecked(channel in solo_channels)
-            if solo_changed is not None:
-                solo_checkbox.toggled.connect(lambda checked, ch=channel: solo_changed(ch, checked))
-            self.table.setCellWidget(row, 3, solo_checkbox)
-            program_combo = QComboBox(self.table)
-            for program in range(128):
-                program_combo.addItem(gm_program_label(program), program)
-            program_combo.setCurrentIndex(channel_programs.get(channel, 0))
-            if program_changed is not None:
-                program_combo.currentIndexChanged.connect(lambda value, ch=channel: program_changed(ch, value))
-            self.table.setCellWidget(row, 4, program_combo)
-            lock_checkbox = QCheckBox(self.table)
-            lock_checkbox.setChecked(channel in locked_channels)
-            if lock_changed is not None:
-                lock_checkbox.toggled.connect(lambda checked, ch=channel: lock_changed(ch, checked))
-            self.table.setCellWidget(row, 5, lock_checkbox)
-            volume_slider = QSlider(Qt.Orientation.Horizontal, self.table)
-            volume_slider.setRange(0, 200)
-            volume_slider.setValue(channel_volumes.get(channel, 100))
-            if volume_changed is not None:
-                volume_slider.valueChanged.connect(lambda value, ch=channel: volume_changed(ch, value))
-            self.table.setCellWidget(row, 6, volume_slider)
-            level = QProgressBar(self.table)
-            level.setRange(0, 127)
-            level.setValue(0)
-            level.setFormat("%v")
-            self.table.setCellWidget(row, 7, level)
-            self.channel_rows[channel] = row
+        channel_labels = channel_labels or {}
+        self._label_changed_callback = label_changed
+        with QSignalBlocker(self.table):
+            self.table.setRowCount(0)
+            self.channel_rows.clear()
+            for row, channel in enumerate(channels):
+                self.table.insertRow(row)
+                channel_item = QTableWidgetItem(str(channel + 1))
+                channel_item.setFlags(channel_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.table.setItem(row, 0, channel_item)
+                self.table.setItem(
+                    row,
+                    1,
+                    QTableWidgetItem(
+                        channel_labels.get(channel, self.tr("Channel {number}").format(number=channel + 1))
+                    ),
+                )
+                mute_checkbox = QCheckBox(self.table)
+                mute_checkbox.setChecked(channel in muted_channels)
+                if mute_changed is not None:
+                    mute_checkbox.toggled.connect(lambda checked, ch=channel: mute_changed(ch, checked))
+                self.table.setCellWidget(row, 2, mute_checkbox)
+                solo_checkbox = QCheckBox(self.table)
+                solo_checkbox.setChecked(channel in solo_channels)
+                if solo_changed is not None:
+                    solo_checkbox.toggled.connect(lambda checked, ch=channel: solo_changed(ch, checked))
+                self.table.setCellWidget(row, 3, solo_checkbox)
+                program_combo = QComboBox(self.table)
+                for program in range(128):
+                    program_combo.addItem(gm_program_label(program), program)
+                program_combo.setCurrentIndex(channel_programs.get(channel, 0))
+                if program_changed is not None:
+                    program_combo.currentIndexChanged.connect(lambda value, ch=channel: program_changed(ch, value))
+                self.table.setCellWidget(row, 4, program_combo)
+                lock_checkbox = QCheckBox(self.table)
+                lock_checkbox.setChecked(channel in locked_channels)
+                if lock_changed is not None:
+                    lock_checkbox.toggled.connect(lambda checked, ch=channel: lock_changed(ch, checked))
+                self.table.setCellWidget(row, 5, lock_checkbox)
+                volume_slider = QSlider(Qt.Orientation.Horizontal, self.table)
+                volume_slider.setRange(0, 200)
+                volume_slider.setValue(channel_volumes.get(channel, 100))
+                if volume_changed is not None:
+                    volume_slider.valueChanged.connect(lambda value, ch=channel: volume_changed(ch, value))
+                self.table.setCellWidget(row, 6, volume_slider)
+                level = QProgressBar(self.table)
+                level.setRange(0, 127)
+                level.setValue(0)
+                level.setFormat("%v")
+                self.table.setCellWidget(row, 7, level)
+                self.channel_rows[channel] = row
+
+    def _item_changed(self, item: QTableWidgetItem) -> None:
+        if item.column() != 1 or self._label_changed_callback is None:
+            return
+        for channel, row in self.channel_rows.items():
+            if row == item.row():
+                self._label_changed_callback(channel, item.text())
+                return
 
     def clear_levels(self) -> None:
         for row in self.channel_rows.values():
@@ -1118,6 +1147,10 @@ class LyricsDialog(QDialog):
     def selected_encoding(self) -> str | None:
         return self.encoding_combo.currentData()
 
+    def set_selected_encoding(self, encoding: str | None) -> None:
+        index = self.encoding_combo.findData(encoding)
+        self.encoding_combo.setCurrentIndex(max(0, index))
+
     def copy_to_clipboard(self) -> None:
         QApplication.clipboard().setText(self.current_text())
 
@@ -1191,6 +1224,7 @@ class MainWindow(QMainWindow):
         self.player.finished.connect(self._finished)
         self.auto_play_on_load = self.settings.auto_play_on_load()
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
+        self.auto_song_settings = self.settings.auto_song_settings()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
         self.lyrics_font_size = self.settings.lyrics_font_size()
@@ -1205,6 +1239,8 @@ class MainWindow(QMainWindow):
         self.pianola_octave_designation = self.settings.pianola_octave_designation()
         self._pause_requested = False
         self._current_file: str | None = None
+        self.channel_labels: dict[int, str] = {}
+        self.lyrics_encoding: str | None = None
         self._current_playlist_path: Path | None = None
         self._playlist_modified = False
         self.channels_dialog: ChannelsDialog | None = None
@@ -1269,6 +1305,12 @@ class MainWindow(QMainWindow):
         self.save_playlist_as_action.setObjectName("save_playlist_as_action")
         self.save_playlist_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         self.save_playlist_as_action.triggered.connect(self.save_playlist_as)
+        self.load_song_settings_action = QAction(self.tr("Load"), self)
+        self.load_song_settings_action.setObjectName("load_song_settings_action")
+        self.load_song_settings_action.triggered.connect(self.load_song_settings)
+        self.save_song_settings_action = QAction(self.tr("Save"), self)
+        self.save_song_settings_action.setObjectName("save_song_settings_action")
+        self.save_song_settings_action.triggered.connect(self.save_song_settings)
 
         self.exit_action = QAction(self.tr("Exit"), self)
         self.exit_action.setObjectName("exit_action")
@@ -1392,6 +1434,8 @@ class MainWindow(QMainWindow):
         self.clear_playlist_action.setEnabled(self.playlist.count() > 0)
         self.save_playlist_action.setEnabled(self.playlist.count() > 0)
         self.save_playlist_as_action.setEnabled(self.playlist.count() > 0)
+        self.load_song_settings_action.setEnabled(has_file)
+        self.save_song_settings_action.setEnabled(has_file)
 
     def _update_window_title(self) -> None:
         midi = self.player.sequence.midi
@@ -1447,6 +1491,11 @@ class MainWindow(QMainWindow):
         self.recent_files_menu = file_menu.addMenu(self.tr("Open Recent"))
         self.recent_files_menu.setObjectName("recent_files_menu")
         self._refresh_recent_files_menu()
+        file_menu.addSeparator()
+        song_settings_menu = file_menu.addMenu(self.tr("Song Settings"))
+        song_settings_menu.setObjectName("song_settings_menu")
+        song_settings_menu.addAction(self.load_song_settings_action)
+        song_settings_menu.addAction(self.save_song_settings_action)
         file_menu.addSeparator()
         file_menu.addAction(self.save_playlist_action)
         file_menu.addAction(self.save_playlist_as_action)
@@ -1564,6 +1613,8 @@ class MainWindow(QMainWindow):
 
     def _reset_loaded_file_state(self, status_message: str) -> None:
         self._current_file = None
+        self.channel_labels = {}
+        self.lyrics_encoding = None
         self.position.setEnabled(False)
         self.title_label.setText(self.tr("No file loaded"))
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
@@ -1886,6 +1937,8 @@ class MainWindow(QMainWindow):
             channel_programs=channel_programs,
             locked_channels=self.player.locked_channels(),
             channel_volumes={channel: self.player.channel_volume_percent(channel) for channel in self.player.sequence.used_channels()},
+            channel_labels=self.channel_labels,
+            label_changed=self._set_channel_label,
             mute_changed=self._set_channel_muted,
             solo_changed=self._set_channel_solo,
             program_changed=self._set_channel_program,
@@ -2048,6 +2101,7 @@ class MainWindow(QMainWindow):
                 self.lyrics_future_color,
                 self.lyrics_past_color,
             )
+            self.lyrics_dialog.set_selected_encoding(self.lyrics_encoding)
             self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
             self.lyrics_dialog.textPrinted.connect(self._lyrics_text_printed)
             self._refresh_lyrics_dialog()
@@ -2062,6 +2116,7 @@ class MainWindow(QMainWindow):
     def _refresh_lyrics_dialog(self) -> None:
         if self.lyrics_dialog is None:
             return
+        self.lyrics_dialog.set_selected_encoding(self.lyrics_encoding)
         self.lyrics_dialog.set_text_events(self.player.sequence.text_events())
         self.lyrics_dialog.set_current_tick(self.position.value())
 
@@ -2122,6 +2177,104 @@ class MainWindow(QMainWindow):
         )
         self.channels_dialog.clear_levels()
 
+    def _set_channel_label(self, channel: int, label: str) -> None:
+        text = label.strip() or self.tr("Channel {number}").format(number=channel + 1)
+        self.channel_labels[channel] = text
+        self.statusBar().showMessage(
+            self.tr("Channel {number} label updated").format(number=channel + 1),
+            3000,
+        )
+
+    def _default_channel_label(self, channel: int) -> str:
+        return self.tr("Channel {number}").format(number=channel + 1)
+
+    def _reset_channel_labels(self) -> None:
+        self.channel_labels = {
+            channel: self._default_channel_label(channel) for channel in self.player.sequence.used_channels()
+        }
+
+    def _song_settings_dir(self) -> Path:
+        return Path.home() / ".dmidiplayer"
+
+    def _song_settings_path(self, file_name: str | None = None) -> Path | None:
+        target = file_name or self._current_file
+        if not target:
+            return None
+        return self._song_settings_dir() / f"{Path(target).name}.cfg"
+
+    def _current_lyrics_encoding(self) -> str | None:
+        if self.lyrics_dialog is not None:
+            self.lyrics_encoding = self.lyrics_dialog.selected_encoding()
+        return self.lyrics_encoding
+
+    def _current_song_settings(self) -> configparser.ConfigParser:
+        config = configparser.ConfigParser()
+        current_file = self._current_file or ""
+        encoding = self._current_lyrics_encoding() or "auto"
+        config["song"] = {
+            "file": current_file,
+            "encoding": encoding,
+            "transpose": str(self.player.pitch_shift),
+            "tempo": str(self.player.tempo_percent),
+            "volume": str(self.player.volume_percent),
+        }
+        for channel in self.player.sequence.used_channels():
+            section = f"channel{channel + 1}"
+            program = self.player.channel_program(channel)
+            config[section] = {
+                "label": self.channel_labels.get(channel, self._default_channel_label(channel)),
+                "volume": str(self.player.channel_volume_percent(channel)),
+                "program": str(0 if program is None else program),
+                "solo": str(channel in self.player.solo_channels()).lower(),
+                "mute": str(channel in self.player.muted_channels()).lower(),
+                "lock": str(channel in self.player.locked_channels()).lower(),
+            }
+        return config
+
+    def save_song_settings(self) -> None:
+        path = self._song_settings_path()
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        config = self._current_song_settings()
+        with path.open("w", encoding="utf-8") as handle:
+            config.write(handle)
+        self.statusBar().showMessage(self.tr("Saved song settings to {name}").format(name=path.name), 5000)
+
+    def load_song_settings(self) -> None:
+        path = self._song_settings_path()
+        if path is None or not path.exists():
+            if path is not None:
+                self.statusBar().showMessage(self.tr("Song settings not found: {name}").format(name=path.name), 5000)
+            return
+        config = configparser.ConfigParser()
+        config.read(path, encoding="utf-8")
+        song = config["song"] if config.has_section("song") else {}
+        encoding = song.get("encoding", "auto")
+        self.lyrics_encoding = None if encoding == "auto" else encoding
+        self.pitch_control.setValue(int(song.get("transpose", self.player.pitch_shift)))
+        self.tempo_control.setValue(int(song.get("tempo", self.player.tempo_percent)))
+        self.volume_control.setValue(int(song.get("volume", self.player.volume_percent)))
+        self._reset_channel_labels()
+        for channel in self.player.sequence.used_channels():
+            section = f"channel{channel + 1}"
+            if not config.has_section(section):
+                self.player.set_channel_muted(channel, False)
+                self.player.set_channel_solo(channel, False)
+                self.player.set_channel_locked(channel, False)
+                self.player.set_channel_volume_percent(channel, 100)
+                continue
+            channel_data = config[section]
+            self.channel_labels[channel] = channel_data.get("label", self._default_channel_label(channel))
+            self.player.set_channel_volume_percent(channel, channel_data.getint("volume", fallback=100))
+            self.player.set_channel_program(channel, channel_data.getint("program", fallback=0))
+            self.player.set_channel_solo(channel, channel_data.getboolean("solo", fallback=False))
+            self.player.set_channel_muted(channel, channel_data.getboolean("mute", fallback=False))
+            self.player.set_channel_locked(channel, channel_data.getboolean("lock", fallback=False))
+        self._refresh_channels_dialog()
+        self._refresh_lyrics_dialog()
+        self.statusBar().showMessage(self.tr("Loaded song settings from {name}").format(name=path.name), 5000)
+
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
 
@@ -2131,6 +2284,7 @@ class MainWindow(QMainWindow):
         solo_volume_reduction: int,
         auto_play_on_load: bool,
         playlist_auto_advance: bool,
+        auto_song_settings: bool,
         midi_reset_before_playback: bool,
         lyrics_font_family: str,
         lyrics_font_size: int,
@@ -2150,6 +2304,8 @@ class MainWindow(QMainWindow):
         self.player.set_solo_volume_reduction(solo_volume_reduction)
         self.auto_play_on_load_action.setChecked(auto_play_on_load)
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
+        self.auto_song_settings = auto_song_settings
+        self.settings.set_auto_song_settings(auto_song_settings)
         self.player.set_send_reset_before_playback(midi_reset_before_playback)
         self.settings.set_midi_reset_before_playback(midi_reset_before_playback)
         self.lyrics_font_family = lyrics_font_family
@@ -2221,6 +2377,8 @@ class MainWindow(QMainWindow):
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
             self.pianola_dialog.clear()
+        if not self._pause_requested and self.auto_song_settings and self._current_file is not None:
+            self.save_song_settings()
         self._pause_requested = False
 
     def _restore_window_geometry(self) -> None:
@@ -2540,6 +2698,12 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._current_file = file_name
+        self.lyrics_encoding = None
+        self._reset_channel_labels()
+        if self.auto_song_settings:
+            self.load_song_settings()
+        self._refresh_channels_dialog()
+        self._refresh_lyrics_dialog()
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))
@@ -2761,6 +2925,8 @@ class MainWindow(QMainWindow):
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
             self.pianola_dialog.clear()
+        if self.auto_song_settings and self._current_file is not None:
+            self.save_song_settings()
         self._update_action_state()
 
     def _output_error(self, message: str) -> None:

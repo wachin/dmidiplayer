@@ -167,13 +167,16 @@ class AppSettingsTest(unittest.TestCase):
             settings = AppSettings(base_dir)
             self.assertFalse(settings.auto_play_on_load())
             self.assertTrue(settings.playlist_auto_advance())
+            self.assertFalse(settings.auto_song_settings())
 
             settings.set_auto_play_on_load(True)
             settings.set_playlist_auto_advance(False)
+            settings.set_auto_song_settings(True)
             restored = AppSettings(base_dir)
 
             self.assertTrue(restored.auto_play_on_load())
             self.assertFalse(restored.playlist_auto_advance())
+            self.assertTrue(restored.auto_song_settings())
 
     def test_general_preferences_are_saved_and_clamped(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

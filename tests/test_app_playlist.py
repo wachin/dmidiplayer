@@ -38,6 +38,7 @@ class FakeSettings:
     DEFAULT_PERCUSSION_CHANNEL = 10
     DEFAULT_AUTO_PLAY_ON_LOAD = False
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
+    DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
@@ -55,6 +56,7 @@ class FakeSettings:
     percussion_channel_value = 10
     auto_play_on_load_value = False
     playlist_auto_advance_value = True
+    auto_song_settings_value = False
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
     lyrics_font_family_value = "Sans Serif"
@@ -125,6 +127,12 @@ class FakeSettings:
 
     def set_playlist_auto_advance(self, enabled: bool) -> None:
         type(self).playlist_auto_advance_value = enabled
+
+    def auto_song_settings(self) -> bool:
+        return type(self).auto_song_settings_value
+
+    def set_auto_song_settings(self, enabled: bool) -> None:
+        type(self).auto_song_settings_value = enabled
 
     def solo_volume_reduction(self) -> int:
         return type(self).solo_volume_reduction_value
@@ -439,6 +447,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.percussion_channel_value = 10
         FakeSettings.auto_play_on_load_value = False
         FakeSettings.playlist_auto_advance_value = True
+        FakeSettings.auto_song_settings_value = False
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.lyrics_font_family_value = "Sans Serif"
@@ -2104,6 +2113,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.solo_volume_reduction_value = 35
         FakeSettings.auto_play_on_load_value = True
         FakeSettings.playlist_auto_advance_value = False
+        FakeSettings.auto_song_settings_value = True
         FakeSettings.midi_reset_before_playback_value = True
         FakeSettings.lyrics_font_family_value = "Monospace"
         FakeSettings.lyrics_font_size_value = 18
@@ -2131,6 +2141,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(dialog.general_solo_volume_reduction.value(), 35)
             self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
+            self.assertTrue(dialog.general_auto_song_settings.isChecked())
             self.assertTrue(dialog.general_midi_reset_before_playback.isChecked())
             self.assertIn("Mono", dialog.lyrics_font_family.currentFont().family())
             self.assertEqual(dialog.lyrics_font_size.value(), 18)
@@ -2150,6 +2161,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(dialog.general_solo_volume_reduction.value(), 50)
             self.assertFalse(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
+            self.assertFalse(dialog.general_auto_song_settings.isChecked())
             self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
             self.assertIn("Sans", dialog.lyrics_font_family.currentFont().family())
             self.assertEqual(dialog.lyrics_font_size.value(), 10)
@@ -2176,6 +2188,7 @@ class AppPlaylistTest(unittest.TestCase):
                 True,
                 False,
                 True,
+                True,
                 "Monospace",
                 16,
                 "#16a34a",
@@ -2194,6 +2207,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.solo_volume_reduction, 40)
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
+            self.assertTrue(window.auto_song_settings)
             self.assertTrue(window.player.send_reset_before_playback)
             self.assertEqual(window.lyrics_font_family, "Monospace")
             self.assertEqual(window.lyrics_font_size, 16)
@@ -2210,6 +2224,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(FakeSettings.solo_volume_reduction_value, 40)
             self.assertTrue(FakeSettings.auto_play_on_load_value)
             self.assertFalse(FakeSettings.playlist_auto_advance_value)
+            self.assertTrue(FakeSettings.auto_song_settings_value)
             self.assertTrue(FakeSettings.midi_reset_before_playback_value)
             self.assertEqual(FakeSettings.lyrics_font_family_value, "Monospace")
             self.assertEqual(FakeSettings.lyrics_font_size_value, 16)
@@ -2281,6 +2296,108 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn("Mono", keyboard_one._note_label_font.family())
                 self.assertEqual(keyboard_one._note_label_font.pointSize(), 13)
                 self.assertEqual(keyboard_one.note_label(60), "C3")
+
+    def test_song_settings_can_be_saved_and_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "song.mid")
+            write_multichannel_midi(path)
+            settings_dir = Path(tmpdir, ".dmidiplayer")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch.object(MainWindow, "_song_settings_dir", return_value=settings_dir),
+            ):
+                window = MainWindow([str(path)])
+                window.pitch_control.setValue(-2)
+                window.tempo_control.setValue(120)
+                window.volume_control.setValue(90)
+                window.lyrics_encoding = "latin-1"
+                window._set_channel_label(0, "Piano")
+                window.player.set_channel_volume_percent(0, 80)
+                window.player.set_channel_program(0, 10)
+                window.player.set_channel_solo(0, True)
+                window.player.set_channel_muted(1, True)
+                window.player.set_channel_locked(1, True)
+
+                window.save_song_settings()
+
+                cfg_path = settings_dir / "song.mid.cfg"
+                self.assertTrue(cfg_path.exists())
+                text = cfg_path.read_text(encoding="utf-8")
+                self.assertIn("encoding = latin-1", text)
+                self.assertIn(f"file = {path}", text)
+                self.assertIn("label = Piano", text)
+
+                window.pitch_control.setValue(3)
+                window.tempo_control.setValue(105)
+                window.volume_control.setValue(110)
+                window.lyrics_encoding = None
+                window._set_channel_label(0, "Changed")
+                window.player.set_channel_volume_percent(0, 100)
+                window.player.set_channel_program(0, 22)
+                window.player.set_channel_solo(0, False)
+                window.player.set_channel_muted(1, False)
+                window.player.set_channel_locked(1, False)
+
+                window.load_song_settings()
+
+                self.assertEqual(window.player.pitch_shift, -2)
+                self.assertEqual(window.player.tempo_percent, 120)
+                self.assertEqual(window.player.volume_percent, 90)
+                self.assertEqual(window.lyrics_encoding, "latin-1")
+                self.assertEqual(window.channel_labels[0], "Piano")
+                self.assertEqual(window.player.channel_volume_percent(0), 80)
+                self.assertEqual(window.player.channel_program(0), 10)
+                self.assertEqual(window.player.solo_channels(), {0})
+                self.assertEqual(window.player.muted_channels(), {1})
+                self.assertEqual(window.player.locked_channels(), {1})
+
+    def test_song_settings_can_auto_load_for_a_song(self) -> None:
+        FakeSettings.auto_song_settings_value = True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "song.mid")
+            write_multichannel_midi(path)
+            settings_dir = Path(tmpdir, ".dmidiplayer")
+            settings_dir.mkdir(parents=True, exist_ok=True)
+            (settings_dir / "song.mid.cfg").write_text(
+                "\n".join(
+                    [
+                        "[song]",
+                        f"file = {path}",
+                        "encoding = cp1252",
+                        "transpose = -1",
+                        "tempo = 115",
+                        "volume = 85",
+                        "",
+                        "[channel1]",
+                        "label = Lead",
+                        "volume = 75",
+                        "program = 12",
+                        "solo = true",
+                        "mute = false",
+                        "lock = true",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch.object(MainWindow, "_song_settings_dir", return_value=settings_dir),
+            ):
+                window = MainWindow([str(path)])
+
+                self.assertEqual(window.player.pitch_shift, -1)
+                self.assertEqual(window.player.tempo_percent, 115)
+                self.assertEqual(window.player.volume_percent, 85)
+                self.assertEqual(window.lyrics_encoding, "cp1252")
+                self.assertEqual(window.channel_labels[0], "Lead")
+                self.assertEqual(window.player.channel_volume_percent(0), 75)
+                self.assertEqual(window.player.channel_program(0), 12)
+                self.assertEqual(window.player.solo_channels(), {0})
+                self.assertEqual(window.player.locked_channels(), {0})
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
