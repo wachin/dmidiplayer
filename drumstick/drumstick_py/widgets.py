@@ -41,6 +41,7 @@ class PianoKeyboard(QWidget):
         self._note_label_mode = "never"
         self._octave_offset = -1
         self._note_label_font = QFont("Sans Serif", 8)
+        self._velocity_tinting_enabled = True
         self._white_low_color = QColor("#bfdbfe")
         self._white_high_color = QColor("#1d4ed8")
         self._black_low_color = QColor("#1d4ed8")
@@ -85,6 +86,10 @@ class PianoKeyboard(QWidget):
         self._note_label_font = QFont(font)
         self.update()
 
+    def set_velocity_tinting_enabled(self, enabled: bool) -> None:
+        self._velocity_tinting_enabled = bool(enabled)
+        self.update()
+
     def set_active_colors(
         self,
         *,
@@ -124,7 +129,7 @@ class PianoKeyboard(QWidget):
         return {note: self.note_label(note) for note in sorted(notes)}
 
     def active_note_color(self, note: int, black_key: bool = False) -> QColor:
-        velocity = self._active_velocities.get(note, 127)
+        velocity = self._active_velocities.get(note, 127) if self._velocity_tinting_enabled else 127
         if black_key:
             low = self._black_low_color
             high = self._black_high_color

@@ -318,6 +318,9 @@ class PreferencesDialog(QDialog):
         for label, value in PIANOLA_COLOR_PRESETS:
             self.pianola_single_color.addItem(self.tr(label), value)
         pianola_form.addRow(self.tr("Single highlight color:"), self.pianola_single_color)
+        self.pianola_velocity_tinting = QCheckBox(self.tr("Use note velocity for highlight strength"), pianola_tab)
+        self.pianola_velocity_tinting.setObjectName("pianola_velocity_tinting")
+        pianola_form.addRow("", self.pianola_velocity_tinting)
 
         self.pianola_note_label_mode = QComboBox(pianola_tab)
         self.pianola_note_label_mode.setObjectName("pianola_note_label_mode")
@@ -374,6 +377,7 @@ class PreferencesDialog(QDialog):
         self.pianola_single_color.setCurrentIndex(
             self.pianola_single_color.findData(self._settings.pianola_single_color())
         )
+        self.pianola_velocity_tinting.setChecked(self._settings.pianola_velocity_tinting())
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(self._settings.pianola_note_label_mode())
         )
@@ -401,6 +405,7 @@ class PreferencesDialog(QDialog):
         self.pianola_single_color.setCurrentIndex(
             self.pianola_single_color.findData(AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR)
         )
+        self.pianola_velocity_tinting.setChecked(AppSettings.DEFAULT_PIANOLA_VELOCITY_TINTING)
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(AppSettings.DEFAULT_PIANOLA_NOTE_LABEL_MODE)
         )
@@ -423,6 +428,7 @@ class PreferencesDialog(QDialog):
             str(self.lyrics_past_color.currentData()),
             str(self.pianola_color_mode.currentData()),
             str(self.pianola_single_color.currentData()),
+            self.pianola_velocity_tinting.isChecked(),
             str(self.pianola_note_label_mode.currentData()),
             self.pianola_note_font_family.currentFont().family(),
             self.pianola_note_font_size.value(),
@@ -613,6 +619,7 @@ class PianolaDialog(QDialog):
         self._note_label_mode = "never"
         self._color_mode = "blue"
         self._single_highlight_color = AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR
+        self._velocity_tinting = AppSettings.DEFAULT_PIANOLA_VELOCITY_TINTING
         self._octave_designation = "scientific"
         self._note_label_font = QFont("Sans Serif", 8)
         layout = QVBoxLayout(self)
@@ -671,6 +678,7 @@ class PianolaDialog(QDialog):
         self,
         color_mode: str,
         single_highlight_color: str,
+        velocity_tinting: bool,
         note_label_mode: str,
         note_font_family: str,
         note_font_size: int,
@@ -681,6 +689,7 @@ class PianolaDialog(QDialog):
             self.color_mode_combo.setCurrentIndex(max(0, index))
         self._color_mode = color_mode if color_mode in {"blue", "channel"} else "blue"
         self._single_highlight_color = single_highlight_color or AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR
+        self._velocity_tinting = bool(velocity_tinting)
         with QSignalBlocker(self.note_labels_combo):
             index = self.note_labels_combo.findData(note_label_mode)
             self.note_labels_combo.setCurrentIndex(max(0, index))
@@ -693,6 +702,7 @@ class PianolaDialog(QDialog):
         for keyboard in self._track_keyboards.values():
             keyboard.set_note_label_mode(self._note_label_mode)
             keyboard.set_note_label_font(self._note_label_font)
+            keyboard.set_velocity_tinting_enabled(self._velocity_tinting)
             keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
         self._apply_track_colors()
 
@@ -766,6 +776,7 @@ class PianolaDialog(QDialog):
                 keyboard.set_note_range(display_min_note, display_max_note)
                 keyboard.set_note_label_mode(self._note_label_mode)
                 keyboard.set_note_label_font(self._note_label_font)
+                keyboard.set_velocity_tinting_enabled(self._velocity_tinting)
                 keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
                 keyboard_layout.addWidget(keyboard)
                 row_layout.addWidget(keyboard_container)
@@ -1187,6 +1198,7 @@ class MainWindow(QMainWindow):
         self.lyrics_past_color = self.settings.lyrics_past_color()
         self.pianola_color_mode = self.settings.pianola_color_mode()
         self.pianola_single_color = self.settings.pianola_single_color()
+        self.pianola_velocity_tinting = self.settings.pianola_velocity_tinting()
         self.pianola_note_label_mode = self.settings.pianola_note_label_mode()
         self.pianola_note_font_family = self.settings.pianola_note_font_family()
         self.pianola_note_font_size = self.settings.pianola_note_font_size()
@@ -1893,6 +1905,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_single_color,
+                self.pianola_velocity_tinting,
                 self.pianola_note_label_mode,
                 self.pianola_note_font_family,
                 self.pianola_note_font_size,
@@ -2125,6 +2138,7 @@ class MainWindow(QMainWindow):
         lyrics_past_color: str,
         pianola_color_mode: str,
         pianola_single_color: str,
+        pianola_velocity_tinting: bool,
         pianola_note_label_mode: str,
         pianola_note_font_family: str,
         pianola_note_font_size: int,
@@ -2155,12 +2169,14 @@ class MainWindow(QMainWindow):
             )
         self.pianola_color_mode = pianola_color_mode
         self.pianola_single_color = pianola_single_color
+        self.pianola_velocity_tinting = pianola_velocity_tinting
         self.pianola_note_label_mode = pianola_note_label_mode
         self.pianola_note_font_family = pianola_note_font_family
         self.pianola_note_font_size = pianola_note_font_size
         self.pianola_octave_designation = pianola_octave_designation
         self.settings.set_pianola_color_mode(pianola_color_mode)
         self.settings.set_pianola_single_color(pianola_single_color)
+        self.settings.set_pianola_velocity_tinting(pianola_velocity_tinting)
         self.settings.set_pianola_note_label_mode(pianola_note_label_mode)
         self.settings.set_pianola_note_font_family(pianola_note_font_family)
         self.settings.set_pianola_note_font_size(pianola_note_font_size)
@@ -2169,6 +2185,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_single_color,
+                self.pianola_velocity_tinting,
                 self.pianola_note_label_mode,
                 self.pianola_note_font_family,
                 self.pianola_note_font_size,

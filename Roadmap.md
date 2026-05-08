@@ -303,7 +303,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Player Piano tab:
   - [x] highlight palettes;
   - [x] single highlight color;
-  - [ ] velocity tinting;
+  - [x] velocity tinting;
   - [x] note-name font;
   - [x] note-name display mode;
   - [x] octave designation.

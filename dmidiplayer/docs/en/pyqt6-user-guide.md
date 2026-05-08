@@ -322,6 +322,7 @@ The current `Player Piano` tab includes:
 
 - `Highlight colors`: `Single color` or `By channel`
 - `Single highlight color`
+- `Use note velocity for highlight strength`
 - `Note names`: `Never`, `Minimal`, `When active`, or `Always`
 - `Note-name font`
 - `Note-name size`

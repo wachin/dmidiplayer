@@ -55,6 +55,19 @@ class PianoKeyboardTest(unittest.TestCase):
 
         self.assertNotEqual(soft.name(), loud.name())
 
+    def test_velocity_tinting_can_be_disabled(self) -> None:
+        keyboard = PianoKeyboard()
+
+        keyboard.note_on(60, 20)
+        soft = keyboard.active_note_color(60)
+        keyboard.note_on(61, 120)
+        loud = keyboard.active_note_color(61)
+        self.assertNotEqual(soft.name(), loud.name())
+
+        keyboard.set_velocity_tinting_enabled(False)
+
+        self.assertEqual(keyboard.active_note_color(60).name(), keyboard.active_note_color(61).name())
+
     def test_visible_note_labels_follow_selected_mode(self) -> None:
         keyboard = PianoKeyboard()
         keyboard.set_note_range(48, 60)

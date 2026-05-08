@@ -203,6 +203,7 @@ class AppSettingsTest(unittest.TestCase):
             settings = AppSettings(base_dir)
             self.assertEqual(settings.pianola_color_mode(), "blue")
             self.assertEqual(settings.pianola_single_color(), "#1d4ed8")
+            self.assertTrue(settings.pianola_velocity_tinting())
             self.assertEqual(settings.pianola_note_label_mode(), "never")
             self.assertEqual(settings.pianola_octave_designation(), "scientific")
             self.assertEqual(settings.pianola_note_font_family(), "Sans Serif")
@@ -210,6 +211,7 @@ class AppSettingsTest(unittest.TestCase):
 
             settings.set_pianola_color_mode("channel")
             settings.set_pianola_single_color("#16a34a")
+            settings.set_pianola_velocity_tinting(False)
             settings.set_pianola_note_label_mode("always")
             settings.set_pianola_octave_designation("yamaha")
             settings.set_pianola_note_font_family("Monospace")
@@ -218,6 +220,7 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertEqual(restored.pianola_color_mode(), "channel")
             self.assertEqual(restored.pianola_single_color(), "#16a34a")
+            self.assertFalse(restored.pianola_velocity_tinting())
             self.assertEqual(restored.pianola_note_label_mode(), "always")
             self.assertEqual(restored.pianola_octave_designation(), "yamaha")
             self.assertEqual(restored.pianola_note_font_family(), "Monospace")

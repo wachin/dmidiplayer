@@ -46,6 +46,7 @@ class FakeSettings:
     DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
     DEFAULT_PIANOLA_SINGLE_COLOR = "#1d4ed8"
+    DEFAULT_PIANOLA_VELOCITY_TINTING = True
     DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
     DEFAULT_PIANOLA_NOTE_FONT_FAMILY = "Sans Serif"
     DEFAULT_PIANOLA_NOTE_FONT_SIZE = 8
@@ -62,6 +63,7 @@ class FakeSettings:
     lyrics_past_color_value = "#6b7280"
     pianola_color_mode_value = "blue"
     pianola_single_color_value = "#1d4ed8"
+    pianola_velocity_tinting_value = True
     pianola_note_label_mode_value = "never"
     pianola_note_font_family_value = "Sans Serif"
     pianola_note_font_size_value = 8
@@ -171,6 +173,12 @@ class FakeSettings:
 
     def set_pianola_single_color(self, color: str) -> None:
         type(self).pianola_single_color_value = color
+
+    def pianola_velocity_tinting(self) -> bool:
+        return type(self).pianola_velocity_tinting_value
+
+    def set_pianola_velocity_tinting(self, enabled: bool) -> None:
+        type(self).pianola_velocity_tinting_value = enabled
 
     def pianola_note_label_mode(self) -> str:
         return type(self).pianola_note_label_mode_value
@@ -439,6 +447,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.lyrics_past_color_value = "#6b7280"
         FakeSettings.pianola_color_mode_value = "blue"
         FakeSettings.pianola_single_color_value = "#1d4ed8"
+        FakeSettings.pianola_velocity_tinting_value = True
         FakeSettings.pianola_note_label_mode_value = "never"
         FakeSettings.pianola_note_font_family_value = "Sans Serif"
         FakeSettings.pianola_note_font_size_value = 8
@@ -1074,6 +1083,30 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertNotEqual(keyboard_two._white_high_color.name(), default_color)
                 self.assertNotEqual(keyboard_one._white_high_color.name(), keyboard_two._white_high_color.name())
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player colors: By channel")
+
+    def test_pianola_dialog_can_disable_velocity_tinting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "tracks.mid")
+            write_many_track_midi(path, total_tracks=2, midi_track_indexes=[0])
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_pianola_dialog()
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+
+                keyboard_one.note_on(60, 20)
+                soft = keyboard_one.active_note_color(60).name()
+                keyboard_one.note_on(61, 120)
+                loud = keyboard_one.active_note_color(61).name()
+                self.assertNotEqual(soft, loud)
+
+                dialog.set_display_preferences("blue", "#1d4ed8", False, "never", "Sans Serif", 8, "scientific")
+
+                self.assertFalse(keyboard_one._velocity_tinting_enabled)
+                self.assertEqual(keyboard_one.active_note_color(60).name(), keyboard_one.active_note_color(61).name())
 
     def test_main_keyboard_manual_notes_send_midi_events(self) -> None:
         with (
@@ -2078,6 +2111,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.lyrics_past_color_value = "#9ca3af"
         FakeSettings.pianola_color_mode_value = "channel"
         FakeSettings.pianola_single_color_value = "#16a34a"
+        FakeSettings.pianola_velocity_tinting_value = False
         FakeSettings.pianola_note_label_mode_value = "always"
         FakeSettings.pianola_note_font_family_value = "Monospace"
         FakeSettings.pianola_note_font_size_value = 11
@@ -2104,6 +2138,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(dialog.lyrics_past_color.currentData(), "#9ca3af")
             self.assertEqual(dialog.pianola_color_mode.currentData(), "channel")
             self.assertEqual(dialog.pianola_single_color.currentData(), "#16a34a")
+            self.assertFalse(dialog.pianola_velocity_tinting.isChecked())
             self.assertEqual(dialog.pianola_note_label_mode.currentData(), "always")
             self.assertIn("Mono", dialog.pianola_note_font_family.currentFont().family())
             self.assertEqual(dialog.pianola_note_font_size.value(), 11)
@@ -2122,6 +2157,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(dialog.lyrics_past_color.currentData(), "#6b7280")
             self.assertEqual(dialog.pianola_color_mode.currentData(), "blue")
             self.assertEqual(dialog.pianola_single_color.currentData(), "#1d4ed8")
+            self.assertTrue(dialog.pianola_velocity_tinting.isChecked())
             self.assertEqual(dialog.pianola_note_label_mode.currentData(), "never")
             self.assertIn("Sans", dialog.pianola_note_font_family.currentFont().family())
             self.assertEqual(dialog.pianola_note_font_size.value(), 8)
@@ -2146,6 +2182,7 @@ class AppPlaylistTest(unittest.TestCase):
                 "#9ca3af",
                 "channel",
                 "#7c3aed",
+                False,
                 "minimal",
                 "Monospace",
                 12,
@@ -2164,6 +2201,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.lyrics_past_color, "#9ca3af")
             self.assertEqual(window.pianola_color_mode, "channel")
             self.assertEqual(window.pianola_single_color, "#7c3aed")
+            self.assertFalse(window.pianola_velocity_tinting)
             self.assertEqual(window.pianola_note_label_mode, "minimal")
             self.assertEqual(window.pianola_note_font_family, "Monospace")
             self.assertEqual(window.pianola_note_font_size, 12)
@@ -2179,6 +2217,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(FakeSettings.lyrics_past_color_value, "#9ca3af")
             self.assertEqual(FakeSettings.pianola_color_mode_value, "channel")
             self.assertEqual(FakeSettings.pianola_single_color_value, "#7c3aed")
+            self.assertFalse(FakeSettings.pianola_velocity_tinting_value)
             self.assertEqual(FakeSettings.pianola_note_label_mode_value, "minimal")
             self.assertEqual(FakeSettings.pianola_note_font_family_value, "Monospace")
             self.assertEqual(FakeSettings.pianola_note_font_size_value, 12)
@@ -2212,6 +2251,7 @@ class AppPlaylistTest(unittest.TestCase):
     def test_pianola_dialog_uses_saved_display_preferences(self) -> None:
         FakeSettings.pianola_color_mode_value = "blue"
         FakeSettings.pianola_single_color_value = "#16a34a"
+        FakeSettings.pianola_velocity_tinting_value = False
         FakeSettings.pianola_note_label_mode_value = "minimal"
         FakeSettings.pianola_note_font_family_value = "Monospace"
         FakeSettings.pianola_note_font_size_value = 13
@@ -2231,10 +2271,12 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.color_mode_combo.currentData(), "blue")
                 self.assertEqual(dialog.note_labels_combo.currentData(), "minimal")
                 self.assertEqual(dialog._single_highlight_color, "#16a34a")
+                self.assertFalse(dialog._velocity_tinting)
                 self.assertIn("Mono", dialog._note_label_font.family())
                 self.assertEqual(dialog._note_label_font.pointSize(), 13)
                 self.assertEqual(dialog.octave_designation_combo.currentData(), "yamaha")
                 self.assertEqual(keyboard_one._note_label_mode, "minimal")
+                self.assertFalse(keyboard_one._velocity_tinting_enabled)
                 self.assertEqual(keyboard_one._white_high_color.name(), "#16a34a")
                 self.assertIn("Mono", keyboard_one._note_label_font.family())
                 self.assertEqual(keyboard_one._note_label_font.pointSize(), 13)

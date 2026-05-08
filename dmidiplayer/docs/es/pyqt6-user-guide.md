@@ -331,6 +331,7 @@ La pestaña `Player Piano` actual incluye:
 
 - `Highlight colors`: `Single color` o `By channel`
 - `Single highlight color`
+- `Use note velocity for highlight strength`
 - `Note names`: `Never`, `Minimal`, `When active` o `Always`
 - `Note-name font`
 - `Note-name size`
