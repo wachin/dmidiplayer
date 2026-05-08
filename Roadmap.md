@@ -297,9 +297,9 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] Qt Widgets style;
   - [x] MIDI reset SysEx before playback.
 - [ ] Lyrics tab:
-  - [ ] font;
-  - [ ] future text color;
-  - [ ] past text color.
+  - [x] font;
+  - [x] future text color;
+  - [x] past text color.
 - [ ] Player Piano tab:
   - [x] highlight palettes;
   - [ ] single highlight color;

@@ -223,6 +223,33 @@ class AppSettingsTest(unittest.TestCase):
             self.assertEqual(restored.pianola_note_label_mode(), "never")
             self.assertEqual(restored.pianola_octave_designation(), "scientific")
 
+    def test_lyrics_preferences_are_saved_and_clamped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            self.assertEqual(settings.lyrics_font_family(), "Sans Serif")
+            self.assertEqual(settings.lyrics_font_size(), 10)
+            self.assertEqual(settings.lyrics_future_color(), "#2563eb")
+            self.assertEqual(settings.lyrics_past_color(), "#6b7280")
+
+            settings.set_lyrics_font_family("Monospace")
+            settings.set_lyrics_font_size(18)
+            settings.set_lyrics_future_color("#16a34a")
+            settings.set_lyrics_past_color("#9ca3af")
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.lyrics_font_family(), "Monospace")
+            self.assertEqual(restored.lyrics_font_size(), 18)
+            self.assertEqual(restored.lyrics_future_color(), "#16a34a")
+            self.assertEqual(restored.lyrics_past_color(), "#9ca3af")
+
+            settings.set_lyrics_font_size(80)
+            self.assertEqual(AppSettings(base_dir).lyrics_font_size(), 48)
+
+            settings.set_lyrics_font_size(1)
+            self.assertEqual(AppSettings(base_dir).lyrics_font_size(), 6)
+
     def test_unwritable_app_data_falls_back_to_temp(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             blocking_file = Path(tmpdir, "not-a-directory")

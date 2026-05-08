@@ -20,6 +20,10 @@ class AppSettings:
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
     DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
     DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
+    DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
+    DEFAULT_LYRICS_FONT_SIZE = 10
+    DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
+    DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -155,6 +159,38 @@ class AppSettings:
     def set_pianola_octave_designation(self, mode: str) -> None:
         value = mode if mode in {"scientific", "yamaha"} else self.DEFAULT_PIANOLA_OCTAVE_DESIGNATION
         self._settings.setValue("pianola/octave_designation", value)
+        self._settings.sync()
+
+    def lyrics_font_family(self) -> str:
+        value = self._settings.value("lyrics/font_family", self.DEFAULT_LYRICS_FONT_FAMILY, str)
+        return value or self.DEFAULT_LYRICS_FONT_FAMILY
+
+    def set_lyrics_font_family(self, family: str) -> None:
+        self._settings.setValue("lyrics/font_family", family or self.DEFAULT_LYRICS_FONT_FAMILY)
+        self._settings.sync()
+
+    def lyrics_font_size(self) -> int:
+        value = self._settings.value("lyrics/font_size", self.DEFAULT_LYRICS_FONT_SIZE, int)
+        return max(6, min(48, value))
+
+    def set_lyrics_font_size(self, size: int) -> None:
+        self._settings.setValue("lyrics/font_size", max(6, min(48, size)))
+        self._settings.sync()
+
+    def lyrics_future_color(self) -> str:
+        value = self._settings.value("lyrics/future_color", self.DEFAULT_LYRICS_FUTURE_COLOR, str)
+        return value or self.DEFAULT_LYRICS_FUTURE_COLOR
+
+    def set_lyrics_future_color(self, color: str) -> None:
+        self._settings.setValue("lyrics/future_color", color or self.DEFAULT_LYRICS_FUTURE_COLOR)
+        self._settings.sync()
+
+    def lyrics_past_color(self) -> str:
+        value = self._settings.value("lyrics/past_color", self.DEFAULT_LYRICS_PAST_COLOR, str)
+        return value or self.DEFAULT_LYRICS_PAST_COLOR
+
+    def set_lyrics_past_color(self, color: str) -> None:
+        self._settings.setValue("lyrics/past_color", color or self.DEFAULT_LYRICS_PAST_COLOR)
         self._settings.sync()
 
     def playlist_path(self) -> Path | None:

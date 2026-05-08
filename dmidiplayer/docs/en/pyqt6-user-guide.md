@@ -311,6 +311,13 @@ The current `General` tab includes:
 - `Auto-advance to the next playlist item`
 - `Send GM reset before playback`
 
+The current `Lyrics` tab includes:
+
+- `Font`
+- `Font size`
+- `Future text color`
+- `Past text color`
+
 The current `Player Piano` tab includes:
 
 - `Highlight colors`: `Blue` or `By channel`

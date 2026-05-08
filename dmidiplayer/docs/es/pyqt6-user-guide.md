@@ -320,6 +320,13 @@ La pestaña `General` actual incluye:
 - `Auto-advance to the next playlist item`
 - `Send GM reset before playback`
 
+La pestaña `Lyrics` actual incluye:
+
+- `Font`
+- `Font size`
+- `Future text color`
+- `Past text color`
+
 La pestaña `Player Piano` actual incluye:
 
 - `Highlight colors`: `Blue` o `By channel`

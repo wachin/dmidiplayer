@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFontDialog,
+    QFontComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -214,6 +215,15 @@ TEXT_EVENT_LABELS = {
     0x07: "Cue Point",
 }
 
+LYRICS_COLOR_PRESETS = (
+    ("Blue", "#2563eb"),
+    ("Gray", "#6b7280"),
+    ("Slate", "#9ca3af"),
+    ("Green", "#16a34a"),
+    ("Amber", "#d97706"),
+    ("Rose", "#e11d48"),
+)
+
 
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
@@ -252,6 +262,27 @@ class PreferencesDialog(QDialog):
         self.general_midi_reset_before_playback.setObjectName("general_midi_reset_before_playback")
         general_form.addRow("", self.general_midi_reset_before_playback)
         self.tabs.addTab(general_tab, self.tr("General"))
+
+        lyrics_tab = QWidget(self.tabs)
+        lyrics_tab.setObjectName("lyrics_preferences_tab")
+        lyrics_form = QFormLayout(lyrics_tab)
+        self.lyrics_font_family = QFontComboBox(lyrics_tab)
+        self.lyrics_font_family.setObjectName("lyrics_font_family")
+        lyrics_form.addRow(self.tr("Font:"), self.lyrics_font_family)
+        self.lyrics_font_size = QSpinBox(lyrics_tab)
+        self.lyrics_font_size.setObjectName("lyrics_font_size")
+        self.lyrics_font_size.setRange(6, 48)
+        lyrics_form.addRow(self.tr("Font size:"), self.lyrics_font_size)
+        self.lyrics_future_color = QComboBox(lyrics_tab)
+        self.lyrics_future_color.setObjectName("lyrics_future_color")
+        self.lyrics_past_color = QComboBox(lyrics_tab)
+        self.lyrics_past_color.setObjectName("lyrics_past_color")
+        for label, value in LYRICS_COLOR_PRESETS:
+            self.lyrics_future_color.addItem(self.tr(label), value)
+            self.lyrics_past_color.addItem(self.tr(label), value)
+        lyrics_form.addRow(self.tr("Future text color:"), self.lyrics_future_color)
+        lyrics_form.addRow(self.tr("Past text color:"), self.lyrics_past_color)
+        self.tabs.addTab(lyrics_tab, self.tr("Lyrics"))
 
         pianola_tab = QWidget(self.tabs)
         pianola_tab.setObjectName("pianola_preferences_tab")
@@ -299,6 +330,12 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
         self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
+        self.lyrics_font_family.setCurrentFont(QFont(self._settings.lyrics_font_family()))
+        self.lyrics_font_size.setValue(self._settings.lyrics_font_size())
+        self.lyrics_future_color.setCurrentIndex(
+            self.lyrics_future_color.findData(self._settings.lyrics_future_color())
+        )
+        self.lyrics_past_color.setCurrentIndex(self.lyrics_past_color.findData(self._settings.lyrics_past_color()))
         self.pianola_color_mode.setCurrentIndex(self.pianola_color_mode.findData(self._settings.pianola_color_mode()))
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(self._settings.pianola_note_label_mode())
@@ -313,6 +350,12 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
         self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
+        self.lyrics_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_LYRICS_FONT_FAMILY))
+        self.lyrics_font_size.setValue(AppSettings.DEFAULT_LYRICS_FONT_SIZE)
+        self.lyrics_future_color.setCurrentIndex(
+            self.lyrics_future_color.findData(AppSettings.DEFAULT_LYRICS_FUTURE_COLOR)
+        )
+        self.lyrics_past_color.setCurrentIndex(self.lyrics_past_color.findData(AppSettings.DEFAULT_LYRICS_PAST_COLOR))
         self.pianola_color_mode.setCurrentIndex(
             self.pianola_color_mode.findData(AppSettings.DEFAULT_PIANOLA_COLOR_MODE)
         )
@@ -323,13 +366,17 @@ class PreferencesDialog(QDialog):
             self.pianola_octave_designation.findData(AppSettings.DEFAULT_PIANOLA_OCTAVE_DESIGNATION)
         )
 
-    def preferences(self) -> tuple[int, int, bool, bool, bool, str, str, str]:
+    def preferences(self) -> tuple[int, int, bool, bool, bool, str, int, str, str, str, str, str]:
         return (
             self.general_percussion_channel.value(),
             self.general_solo_volume_reduction.value(),
             self.general_auto_play_on_load.isChecked(),
             self.general_playlist_auto_advance.isChecked(),
             self.general_midi_reset_before_playback.isChecked(),
+            self.lyrics_font_family.currentFont().family(),
+            self.lyrics_font_size.value(),
+            str(self.lyrics_future_color.currentData()),
+            str(self.lyrics_past_color.currentData()),
             str(self.pianola_color_mode.currentData()),
             str(self.pianola_note_label_mode.currentData()),
             str(self.pianola_octave_designation.currentData()),
@@ -803,6 +850,8 @@ class LyricsDialog(QDialog):
         self._track_counts: dict[int, int] = {}
         self._current_tick = 0
         self._visible_events: list[object] = []
+        self._past_color = "#6b7280"
+        self._future_color = "#2563eb"
         layout = QVBoxLayout(self)
         filter_row = QHBoxLayout()
         filter_row.addWidget(QLabel(self.tr("Track:")))
@@ -856,6 +905,12 @@ class LyricsDialog(QDialog):
         button_row.addWidget(self.fullscreen_button)
         layout.addLayout(button_row)
         self.resize(560, 420)
+
+    def set_display_preferences(self, font_family: str, font_size: int, future_color: str, past_color: str) -> None:
+        self.browser.setFont(QFont(font_family, max(6, min(48, font_size))))
+        self._future_color = future_color or "#2563eb"
+        self._past_color = past_color or "#6b7280"
+        self._apply_filter()
 
     def set_text_events(self, text_events: list[object]) -> None:
         self._text_events = list(text_events)
@@ -957,9 +1012,9 @@ class LyricsDialog(QDialog):
             "<html><body style='font-family:sans-serif;'>",
             "<style>"
             ".lyrics-line { margin: 0 0 8px 0; }"
-            ".past { color: #6b7280; }"
+            f".past {{ color: {self._past_color}; }}"
             ".current { color: #111827; background-color: #fde68a; font-weight: 700; }"
-            ".future { color: #2563eb; }"
+            f".future {{ color: {self._future_color}; }}"
             "</style>",
         ]
         for index, event in enumerate(events):
@@ -1062,6 +1117,10 @@ class MainWindow(QMainWindow):
         self.auto_play_on_load = self.settings.auto_play_on_load()
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
+        self.lyrics_font_family = self.settings.lyrics_font_family()
+        self.lyrics_font_size = self.settings.lyrics_font_size()
+        self.lyrics_future_color = self.settings.lyrics_future_color()
+        self.lyrics_past_color = self.settings.lyrics_past_color()
         self.pianola_color_mode = self.settings.pianola_color_mode()
         self.pianola_note_label_mode = self.settings.pianola_note_label_mode()
         self.pianola_octave_designation = self.settings.pianola_octave_designation()
@@ -1900,6 +1959,12 @@ class MainWindow(QMainWindow):
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
             self.lyrics_dialog = self._create_lyrics_dialog()
+            self.lyrics_dialog.set_display_preferences(
+                self.lyrics_font_family,
+                self.lyrics_font_size,
+                self.lyrics_future_color,
+                self.lyrics_past_color,
+            )
             self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
             self.lyrics_dialog.textPrinted.connect(self._lyrics_text_printed)
             self._refresh_lyrics_dialog()
@@ -1984,6 +2049,10 @@ class MainWindow(QMainWindow):
         auto_play_on_load: bool,
         playlist_auto_advance: bool,
         midi_reset_before_playback: bool,
+        lyrics_font_family: str,
+        lyrics_font_size: int,
+        lyrics_future_color: str,
+        lyrics_past_color: str,
         pianola_color_mode: str,
         pianola_note_label_mode: str,
         pianola_octave_designation: str,
@@ -1996,6 +2065,21 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
         self.player.set_send_reset_before_playback(midi_reset_before_playback)
         self.settings.set_midi_reset_before_playback(midi_reset_before_playback)
+        self.lyrics_font_family = lyrics_font_family
+        self.lyrics_font_size = lyrics_font_size
+        self.lyrics_future_color = lyrics_future_color
+        self.lyrics_past_color = lyrics_past_color
+        self.settings.set_lyrics_font_family(lyrics_font_family)
+        self.settings.set_lyrics_font_size(lyrics_font_size)
+        self.settings.set_lyrics_future_color(lyrics_future_color)
+        self.settings.set_lyrics_past_color(lyrics_past_color)
+        if self.lyrics_dialog is not None:
+            self.lyrics_dialog.set_display_preferences(
+                self.lyrics_font_family,
+                self.lyrics_font_size,
+                self.lyrics_future_color,
+                self.lyrics_past_color,
+            )
         self.pianola_color_mode = pianola_color_mode
         self.pianola_note_label_mode = pianola_note_label_mode
         self.pianola_octave_designation = pianola_octave_designation

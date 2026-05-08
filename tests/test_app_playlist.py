@@ -40,6 +40,10 @@ class FakeSettings:
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
+    DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
+    DEFAULT_LYRICS_FONT_SIZE = 10
+    DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
+    DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
     DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
     DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
@@ -49,6 +53,10 @@ class FakeSettings:
     playlist_auto_advance_value = True
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
+    lyrics_font_family_value = "Sans Serif"
+    lyrics_font_size_value = 10
+    lyrics_future_color_value = "#2563eb"
+    lyrics_past_color_value = "#6b7280"
     pianola_color_mode_value = "blue"
     pianola_note_label_mode_value = "never"
     pianola_octave_designation_value = "scientific"
@@ -121,6 +129,30 @@ class FakeSettings:
 
     def set_midi_reset_before_playback(self, enabled: bool) -> None:
         type(self).midi_reset_before_playback_value = enabled
+
+    def lyrics_font_family(self) -> str:
+        return type(self).lyrics_font_family_value
+
+    def set_lyrics_font_family(self, family: str) -> None:
+        type(self).lyrics_font_family_value = family
+
+    def lyrics_font_size(self) -> int:
+        return type(self).lyrics_font_size_value
+
+    def set_lyrics_font_size(self, size: int) -> None:
+        type(self).lyrics_font_size_value = size
+
+    def lyrics_future_color(self) -> str:
+        return type(self).lyrics_future_color_value
+
+    def set_lyrics_future_color(self, color: str) -> None:
+        type(self).lyrics_future_color_value = color
+
+    def lyrics_past_color(self) -> str:
+        return type(self).lyrics_past_color_value
+
+    def set_lyrics_past_color(self, color: str) -> None:
+        type(self).lyrics_past_color_value = color
 
     def pianola_color_mode(self) -> str:
         return type(self).pianola_color_mode_value
@@ -377,6 +409,10 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.playlist_auto_advance_value = True
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
+        FakeSettings.lyrics_font_family_value = "Sans Serif"
+        FakeSettings.lyrics_font_size_value = 10
+        FakeSettings.lyrics_future_color_value = "#2563eb"
+        FakeSettings.lyrics_past_color_value = "#6b7280"
         FakeSettings.pianola_color_mode_value = "blue"
         FakeSettings.pianola_note_label_mode_value = "never"
         FakeSettings.pianola_octave_designation_value = "scientific"
@@ -2009,6 +2045,10 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.auto_play_on_load_value = True
         FakeSettings.playlist_auto_advance_value = False
         FakeSettings.midi_reset_before_playback_value = True
+        FakeSettings.lyrics_font_family_value = "Monospace"
+        FakeSettings.lyrics_font_size_value = 18
+        FakeSettings.lyrics_future_color_value = "#16a34a"
+        FakeSettings.lyrics_past_color_value = "#9ca3af"
         FakeSettings.pianola_color_mode_value = "channel"
         FakeSettings.pianola_note_label_mode_value = "always"
         FakeSettings.pianola_octave_designation_value = "yamaha"
@@ -2021,12 +2061,17 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertIsInstance(dialog, PreferencesDialog)
             self.assertEqual(dialog.tabs.tabText(0), "General")
-            self.assertEqual(dialog.tabs.tabText(1), "Player Piano")
+            self.assertEqual(dialog.tabs.tabText(1), "Lyrics")
+            self.assertEqual(dialog.tabs.tabText(2), "Player Piano")
             self.assertEqual(dialog.general_percussion_channel.value(), 3)
             self.assertEqual(dialog.general_solo_volume_reduction.value(), 35)
             self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
             self.assertTrue(dialog.general_midi_reset_before_playback.isChecked())
+            self.assertIn("Mono", dialog.lyrics_font_family.currentFont().family())
+            self.assertEqual(dialog.lyrics_font_size.value(), 18)
+            self.assertEqual(dialog.lyrics_future_color.currentData(), "#16a34a")
+            self.assertEqual(dialog.lyrics_past_color.currentData(), "#9ca3af")
             self.assertEqual(dialog.pianola_color_mode.currentData(), "channel")
             self.assertEqual(dialog.pianola_note_label_mode.currentData(), "always")
             self.assertEqual(dialog.pianola_octave_designation.currentData(), "yamaha")
@@ -2038,6 +2083,10 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertFalse(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
             self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
+            self.assertIn("Sans", dialog.lyrics_font_family.currentFont().family())
+            self.assertEqual(dialog.lyrics_font_size.value(), 10)
+            self.assertEqual(dialog.lyrics_future_color.currentData(), "#2563eb")
+            self.assertEqual(dialog.lyrics_past_color.currentData(), "#6b7280")
             self.assertEqual(dialog.pianola_color_mode.currentData(), "blue")
             self.assertEqual(dialog.pianola_note_label_mode.currentData(), "never")
             self.assertEqual(dialog.pianola_octave_designation.currentData(), "scientific")
@@ -2049,7 +2098,20 @@ class AppPlaylistTest(unittest.TestCase):
         ):
             window = MainWindow([])
 
-            window._apply_preferences(12, 40, True, False, True, "channel", "minimal", "yamaha")
+            window._apply_preferences(
+                12,
+                40,
+                True,
+                False,
+                True,
+                "Monospace",
+                16,
+                "#16a34a",
+                "#9ca3af",
+                "channel",
+                "minimal",
+                "yamaha",
+            )
 
             self.assertEqual(window.player.percussion_channel, 12)
             self.assertEqual(window.percussion_channel_control.value(), 12)
@@ -2057,6 +2119,10 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
             self.assertTrue(window.player.send_reset_before_playback)
+            self.assertEqual(window.lyrics_font_family, "Monospace")
+            self.assertEqual(window.lyrics_font_size, 16)
+            self.assertEqual(window.lyrics_future_color, "#16a34a")
+            self.assertEqual(window.lyrics_past_color, "#9ca3af")
             self.assertEqual(window.pianola_color_mode, "channel")
             self.assertEqual(window.pianola_note_label_mode, "minimal")
             self.assertEqual(window.pianola_octave_designation, "yamaha")
@@ -2065,10 +2131,38 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(FakeSettings.auto_play_on_load_value)
             self.assertFalse(FakeSettings.playlist_auto_advance_value)
             self.assertTrue(FakeSettings.midi_reset_before_playback_value)
+            self.assertEqual(FakeSettings.lyrics_font_family_value, "Monospace")
+            self.assertEqual(FakeSettings.lyrics_font_size_value, 16)
+            self.assertEqual(FakeSettings.lyrics_future_color_value, "#16a34a")
+            self.assertEqual(FakeSettings.lyrics_past_color_value, "#9ca3af")
             self.assertEqual(FakeSettings.pianola_color_mode_value, "channel")
             self.assertEqual(FakeSettings.pianola_note_label_mode_value, "minimal")
             self.assertEqual(FakeSettings.pianola_octave_designation_value, "yamaha")
             self.assertEqual(window.statusBar().currentMessage(), "Preferences updated")
+
+    def test_lyrics_dialog_uses_saved_display_preferences(self) -> None:
+        FakeSettings.lyrics_font_family_value = "Monospace"
+        FakeSettings.lyrics_font_size_value = 17
+        FakeSettings.lyrics_future_color_value = "#16a34a"
+        FakeSettings.lyrics_past_color_value = "#9ca3af"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "timed-lyrics.mid")
+            write_timed_lyrics_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                self.assertEqual(dialog.browser.font().family(), "Monospace")
+                self.assertEqual(dialog.browser.font().pointSize(), 17)
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
+                dialog.set_current_tick(120)
+                html = dialog.browser.toHtml()
+                self.assertIn("#16a34a", html)
+                self.assertIn("#9ca3af", html)
 
     def test_pianola_dialog_uses_saved_display_preferences(self) -> None:
         FakeSettings.pianola_color_mode_value = "channel"
