@@ -18,6 +18,7 @@ class AppSettings:
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
+    DEFAULT_PIANOLA_SINGLE_COLOR = "#1d4ed8"
     DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
     DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
     DEFAULT_PIANOLA_NOTE_FONT_FAMILY = "Sans Serif"
@@ -139,6 +140,14 @@ class AppSettings:
     def set_pianola_color_mode(self, mode: str) -> None:
         value = mode if mode in {"blue", "channel"} else self.DEFAULT_PIANOLA_COLOR_MODE
         self._settings.setValue("pianola/color_mode", value)
+        self._settings.sync()
+
+    def pianola_single_color(self) -> str:
+        value = self._settings.value("pianola/single_color", self.DEFAULT_PIANOLA_SINGLE_COLOR, str)
+        return value or self.DEFAULT_PIANOLA_SINGLE_COLOR
+
+    def set_pianola_single_color(self, color: str) -> None:
+        self._settings.setValue("pianola/single_color", color or self.DEFAULT_PIANOLA_SINGLE_COLOR)
         self._settings.sync()
 
     def pianola_note_label_mode(self) -> str:

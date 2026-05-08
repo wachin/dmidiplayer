@@ -302,7 +302,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] past text color.
 - [ ] Player Piano tab:
   - [x] highlight palettes;
-  - [ ] single highlight color;
+  - [x] single highlight color;
   - [ ] velocity tinting;
   - [x] note-name font;
   - [x] note-name display mode;

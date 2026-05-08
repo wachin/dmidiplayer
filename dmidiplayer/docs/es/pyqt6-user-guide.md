@@ -329,7 +329,8 @@ La pestaña `Lyrics` actual incluye:
 
 La pestaña `Player Piano` actual incluye:
 
-- `Highlight colors`: `Blue` o `By channel`
+- `Highlight colors`: `Single color` o `By channel`
+- `Single highlight color`
 - `Note names`: `Never`, `Minimal`, `When active` o `Always`
 - `Note-name font`
 - `Note-name size`

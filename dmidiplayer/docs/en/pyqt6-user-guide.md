@@ -320,7 +320,8 @@ The current `Lyrics` tab includes:
 
 The current `Player Piano` tab includes:
 
-- `Highlight colors`: `Blue` or `By channel`
+- `Highlight colors`: `Single color` or `By channel`
+- `Single highlight color`
 - `Note names`: `Never`, `Minimal`, `When active`, or `Always`
 - `Note-name font`
 - `Note-name size`

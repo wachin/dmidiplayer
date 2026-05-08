@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
+from PyQt6.QtGui import QAction, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -224,6 +224,27 @@ LYRICS_COLOR_PRESETS = (
     ("Rose", "#e11d48"),
 )
 
+PIANOLA_COLOR_PRESETS = (
+    ("Blue", "#1d4ed8"),
+    ("Green", "#16a34a"),
+    ("Amber", "#d97706"),
+    ("Rose", "#e11d48"),
+    ("Violet", "#7c3aed"),
+    ("Slate", "#4b5563"),
+)
+
+
+def single_highlight_palette(color_value: str) -> tuple[str, str, str, str, str]:
+    qcolor = QColor(color_value)
+    if not qcolor.isValid():
+        qcolor = QColor(AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR)
+    white_low = qcolor.lighter(190).name()
+    white_high = qcolor.name()
+    black_low = qcolor.darker(115).name()
+    black_high = qcolor.lighter(150).name()
+    black_idle = qcolor.darker(260).name()
+    return (white_low, white_high, black_low, black_high, black_idle)
+
 
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
@@ -289,9 +310,14 @@ class PreferencesDialog(QDialog):
         pianola_form = QFormLayout(pianola_tab)
         self.pianola_color_mode = QComboBox(pianola_tab)
         self.pianola_color_mode.setObjectName("pianola_color_mode")
-        self.pianola_color_mode.addItem(self.tr("Blue"), "blue")
+        self.pianola_color_mode.addItem(self.tr("Single color"), "blue")
         self.pianola_color_mode.addItem(self.tr("By channel"), "channel")
         pianola_form.addRow(self.tr("Highlight colors:"), self.pianola_color_mode)
+        self.pianola_single_color = QComboBox(pianola_tab)
+        self.pianola_single_color.setObjectName("pianola_single_color")
+        for label, value in PIANOLA_COLOR_PRESETS:
+            self.pianola_single_color.addItem(self.tr(label), value)
+        pianola_form.addRow(self.tr("Single highlight color:"), self.pianola_single_color)
 
         self.pianola_note_label_mode = QComboBox(pianola_tab)
         self.pianola_note_label_mode.setObjectName("pianola_note_label_mode")
@@ -345,6 +371,9 @@ class PreferencesDialog(QDialog):
         )
         self.lyrics_past_color.setCurrentIndex(self.lyrics_past_color.findData(self._settings.lyrics_past_color()))
         self.pianola_color_mode.setCurrentIndex(self.pianola_color_mode.findData(self._settings.pianola_color_mode()))
+        self.pianola_single_color.setCurrentIndex(
+            self.pianola_single_color.findData(self._settings.pianola_single_color())
+        )
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(self._settings.pianola_note_label_mode())
         )
@@ -369,6 +398,9 @@ class PreferencesDialog(QDialog):
         self.pianola_color_mode.setCurrentIndex(
             self.pianola_color_mode.findData(AppSettings.DEFAULT_PIANOLA_COLOR_MODE)
         )
+        self.pianola_single_color.setCurrentIndex(
+            self.pianola_single_color.findData(AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR)
+        )
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(AppSettings.DEFAULT_PIANOLA_NOTE_LABEL_MODE)
         )
@@ -390,6 +422,7 @@ class PreferencesDialog(QDialog):
             str(self.lyrics_future_color.currentData()),
             str(self.lyrics_past_color.currentData()),
             str(self.pianola_color_mode.currentData()),
+            str(self.pianola_single_color.currentData()),
             str(self.pianola_note_label_mode.currentData()),
             self.pianola_note_font_family.currentFont().family(),
             self.pianola_note_font_size.value(),
@@ -579,6 +612,7 @@ class PianolaDialog(QDialog):
         self._range_mode = "exact"
         self._note_label_mode = "never"
         self._color_mode = "blue"
+        self._single_highlight_color = AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR
         self._octave_designation = "scientific"
         self._note_label_font = QFont("Sans Serif", 8)
         layout = QVBoxLayout(self)
@@ -609,7 +643,7 @@ class PianolaDialog(QDialog):
         button_row.addWidget(QLabel(self.tr("Colors:"), self))
         self.color_mode_combo = QComboBox(self)
         self.color_mode_combo.setObjectName("pianola_color_mode_combo")
-        self.color_mode_combo.addItem(self.tr("Blue"), "blue")
+        self.color_mode_combo.addItem(self.tr("Single color"), "blue")
         self.color_mode_combo.addItem(self.tr("By channel"), "channel")
         self.color_mode_combo.currentIndexChanged.connect(self._color_mode_changed)
         button_row.addWidget(self.color_mode_combo)
@@ -636,6 +670,7 @@ class PianolaDialog(QDialog):
     def set_display_preferences(
         self,
         color_mode: str,
+        single_highlight_color: str,
         note_label_mode: str,
         note_font_family: str,
         note_font_size: int,
@@ -645,6 +680,7 @@ class PianolaDialog(QDialog):
             index = self.color_mode_combo.findData(color_mode)
             self.color_mode_combo.setCurrentIndex(max(0, index))
         self._color_mode = color_mode if color_mode in {"blue", "channel"} else "blue"
+        self._single_highlight_color = single_highlight_color or AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR
         with QSignalBlocker(self.note_labels_combo):
             index = self.note_labels_combo.findData(note_label_mode)
             self.note_labels_combo.setCurrentIndex(max(0, index))
@@ -819,12 +855,15 @@ class PianolaDialog(QDialog):
                     black_high=black_high,
                 )
             else:
+                white_low, white_high, black_low, black_high, black_idle = single_highlight_palette(
+                    self._single_highlight_color
+                )
                 keyboard.set_active_colors(
-                    white_low="#bfdbfe",
-                    white_high="#1d4ed8",
-                    black_low="#1d4ed8",
-                    black_high="#93c5fd",
-                    black_idle="#111827",
+                    white_low=white_low,
+                    white_high=white_high,
+                    black_low=black_low,
+                    black_high=black_high,
+                    black_idle=black_idle,
                 )
 
     def set_fullscreen_enabled(self, enabled: bool) -> None:
@@ -1147,6 +1186,7 @@ class MainWindow(QMainWindow):
         self.lyrics_future_color = self.settings.lyrics_future_color()
         self.lyrics_past_color = self.settings.lyrics_past_color()
         self.pianola_color_mode = self.settings.pianola_color_mode()
+        self.pianola_single_color = self.settings.pianola_single_color()
         self.pianola_note_label_mode = self.settings.pianola_note_label_mode()
         self.pianola_note_font_family = self.settings.pianola_note_font_family()
         self.pianola_note_font_size = self.settings.pianola_note_font_size()
@@ -1852,6 +1892,7 @@ class MainWindow(QMainWindow):
             self.pianola_dialog = self._create_pianola_dialog()
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
+                self.pianola_single_color,
                 self.pianola_note_label_mode,
                 self.pianola_note_font_family,
                 self.pianola_note_font_size,
@@ -2083,6 +2124,7 @@ class MainWindow(QMainWindow):
         lyrics_future_color: str,
         lyrics_past_color: str,
         pianola_color_mode: str,
+        pianola_single_color: str,
         pianola_note_label_mode: str,
         pianola_note_font_family: str,
         pianola_note_font_size: int,
@@ -2112,11 +2154,13 @@ class MainWindow(QMainWindow):
                 self.lyrics_past_color,
             )
         self.pianola_color_mode = pianola_color_mode
+        self.pianola_single_color = pianola_single_color
         self.pianola_note_label_mode = pianola_note_label_mode
         self.pianola_note_font_family = pianola_note_font_family
         self.pianola_note_font_size = pianola_note_font_size
         self.pianola_octave_designation = pianola_octave_designation
         self.settings.set_pianola_color_mode(pianola_color_mode)
+        self.settings.set_pianola_single_color(pianola_single_color)
         self.settings.set_pianola_note_label_mode(pianola_note_label_mode)
         self.settings.set_pianola_note_font_family(pianola_note_font_family)
         self.settings.set_pianola_note_font_size(pianola_note_font_size)
@@ -2124,6 +2168,7 @@ class MainWindow(QMainWindow):
         if self.pianola_dialog is not None:
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
+                self.pianola_single_color,
                 self.pianola_note_label_mode,
                 self.pianola_note_font_family,
                 self.pianola_note_font_size,
