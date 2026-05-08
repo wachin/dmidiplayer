@@ -322,6 +322,8 @@ The current `Player Piano` tab includes:
 
 - `Highlight colors`: `Blue` or `By channel`
 - `Note names`: `Never`, `Minimal`, `When active`, or `Always`
+- `Note-name font`
+- `Note-name size`
 - `Octave designation`: `Scientific` or `Yamaha`
 
 - `Restore Defaults`: return the visible options to their default values.

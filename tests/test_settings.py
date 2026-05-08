@@ -204,24 +204,32 @@ class AppSettingsTest(unittest.TestCase):
             self.assertEqual(settings.pianola_color_mode(), "blue")
             self.assertEqual(settings.pianola_note_label_mode(), "never")
             self.assertEqual(settings.pianola_octave_designation(), "scientific")
+            self.assertEqual(settings.pianola_note_font_family(), "Sans Serif")
+            self.assertEqual(settings.pianola_note_font_size(), 8)
 
             settings.set_pianola_color_mode("channel")
             settings.set_pianola_note_label_mode("always")
             settings.set_pianola_octave_designation("yamaha")
+            settings.set_pianola_note_font_family("Monospace")
+            settings.set_pianola_note_font_size(11)
             restored = AppSettings(base_dir)
 
             self.assertEqual(restored.pianola_color_mode(), "channel")
             self.assertEqual(restored.pianola_note_label_mode(), "always")
             self.assertEqual(restored.pianola_octave_designation(), "yamaha")
+            self.assertEqual(restored.pianola_note_font_family(), "Monospace")
+            self.assertEqual(restored.pianola_note_font_size(), 11)
 
             settings.set_pianola_color_mode("bogus")
             settings.set_pianola_note_label_mode("bogus")
             settings.set_pianola_octave_designation("bogus")
+            settings.set_pianola_note_font_size(40)
 
             restored = AppSettings(base_dir)
             self.assertEqual(restored.pianola_color_mode(), "blue")
             self.assertEqual(restored.pianola_note_label_mode(), "never")
             self.assertEqual(restored.pianola_octave_designation(), "scientific")
+            self.assertEqual(restored.pianola_note_font_size(), 24)
 
     def test_lyrics_preferences_are_saved_and_clamped(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

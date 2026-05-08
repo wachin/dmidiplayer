@@ -301,6 +301,14 @@ class PreferencesDialog(QDialog):
         self.pianola_note_label_mode.addItem(self.tr("Always"), "always")
         pianola_form.addRow(self.tr("Note names:"), self.pianola_note_label_mode)
 
+        self.pianola_note_font_family = QFontComboBox(pianola_tab)
+        self.pianola_note_font_family.setObjectName("pianola_note_font_family")
+        pianola_form.addRow(self.tr("Note-name font:"), self.pianola_note_font_family)
+        self.pianola_note_font_size = QSpinBox(pianola_tab)
+        self.pianola_note_font_size.setObjectName("pianola_note_font_size")
+        self.pianola_note_font_size.setRange(6, 24)
+        pianola_form.addRow(self.tr("Note-name size:"), self.pianola_note_font_size)
+
         self.pianola_octave_designation = QComboBox(pianola_tab)
         self.pianola_octave_designation.setObjectName("pianola_octave_designation")
         self.pianola_octave_designation.addItem(self.tr("Scientific"), "scientific")
@@ -340,6 +348,8 @@ class PreferencesDialog(QDialog):
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(self._settings.pianola_note_label_mode())
         )
+        self.pianola_note_font_family.setCurrentFont(QFont(self._settings.pianola_note_font_family()))
+        self.pianola_note_font_size.setValue(self._settings.pianola_note_font_size())
         self.pianola_octave_designation.setCurrentIndex(
             self.pianola_octave_designation.findData(self._settings.pianola_octave_designation())
         )
@@ -362,11 +372,13 @@ class PreferencesDialog(QDialog):
         self.pianola_note_label_mode.setCurrentIndex(
             self.pianola_note_label_mode.findData(AppSettings.DEFAULT_PIANOLA_NOTE_LABEL_MODE)
         )
+        self.pianola_note_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_PIANOLA_NOTE_FONT_FAMILY))
+        self.pianola_note_font_size.setValue(AppSettings.DEFAULT_PIANOLA_NOTE_FONT_SIZE)
         self.pianola_octave_designation.setCurrentIndex(
             self.pianola_octave_designation.findData(AppSettings.DEFAULT_PIANOLA_OCTAVE_DESIGNATION)
         )
 
-    def preferences(self) -> tuple[int, int, bool, bool, bool, str, int, str, str, str, str, str]:
+    def preferences(self) -> tuple[int, int, bool, bool, bool, str, int, str, str, str, str, str, str, int]:
         return (
             self.general_percussion_channel.value(),
             self.general_solo_volume_reduction.value(),
@@ -379,6 +391,8 @@ class PreferencesDialog(QDialog):
             str(self.lyrics_past_color.currentData()),
             str(self.pianola_color_mode.currentData()),
             str(self.pianola_note_label_mode.currentData()),
+            self.pianola_note_font_family.currentFont().family(),
+            self.pianola_note_font_size.value(),
             str(self.pianola_octave_designation.currentData()),
         )
 
@@ -566,6 +580,7 @@ class PianolaDialog(QDialog):
         self._note_label_mode = "never"
         self._color_mode = "blue"
         self._octave_designation = "scientific"
+        self._note_label_font = QFont("Sans Serif", 8)
         layout = QVBoxLayout(self)
         button_row = QHBoxLayout()
         button_row.addWidget(QLabel(self.tr("Range:"), self))
@@ -618,7 +633,14 @@ class PianolaDialog(QDialog):
         layout.addWidget(self.tabs)
         self.resize(780, 520)
 
-    def set_display_preferences(self, color_mode: str, note_label_mode: str, octave_designation: str) -> None:
+    def set_display_preferences(
+        self,
+        color_mode: str,
+        note_label_mode: str,
+        note_font_family: str,
+        note_font_size: int,
+        octave_designation: str,
+    ) -> None:
         with QSignalBlocker(self.color_mode_combo):
             index = self.color_mode_combo.findData(color_mode)
             self.color_mode_combo.setCurrentIndex(max(0, index))
@@ -627,12 +649,14 @@ class PianolaDialog(QDialog):
             index = self.note_labels_combo.findData(note_label_mode)
             self.note_labels_combo.setCurrentIndex(max(0, index))
         self._note_label_mode = note_label_mode if note_label_mode in {"never", "minimal", "active", "always"} else "never"
+        self._note_label_font = QFont(note_font_family, max(6, min(24, note_font_size)))
         with QSignalBlocker(self.octave_designation_combo):
             index = self.octave_designation_combo.findData(octave_designation)
             self.octave_designation_combo.setCurrentIndex(max(0, index))
         self._octave_designation = octave_designation if octave_designation in {"scientific", "yamaha"} else "scientific"
         for keyboard in self._track_keyboards.values():
             keyboard.set_note_label_mode(self._note_label_mode)
+            keyboard.set_note_label_font(self._note_label_font)
             keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
         self._apply_track_colors()
 
@@ -705,6 +729,7 @@ class PianolaDialog(QDialog):
                 keyboard.setObjectName(f"pianola_track_keyboard_{track_number + 1}")
                 keyboard.set_note_range(display_min_note, display_max_note)
                 keyboard.set_note_label_mode(self._note_label_mode)
+                keyboard.set_note_label_font(self._note_label_font)
                 keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
                 keyboard_layout.addWidget(keyboard)
                 row_layout.addWidget(keyboard_container)
@@ -1123,6 +1148,8 @@ class MainWindow(QMainWindow):
         self.lyrics_past_color = self.settings.lyrics_past_color()
         self.pianola_color_mode = self.settings.pianola_color_mode()
         self.pianola_note_label_mode = self.settings.pianola_note_label_mode()
+        self.pianola_note_font_family = self.settings.pianola_note_font_family()
+        self.pianola_note_font_size = self.settings.pianola_note_font_size()
         self.pianola_octave_designation = self.settings.pianola_octave_designation()
         self._pause_requested = False
         self._current_file: str | None = None
@@ -1826,6 +1853,8 @@ class MainWindow(QMainWindow):
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_note_label_mode,
+                self.pianola_note_font_family,
+                self.pianola_note_font_size,
                 self.pianola_octave_designation,
             )
             self.pianola_dialog.trackVisibilityChanged.connect(self._pianola_track_visibility_changed)
@@ -2055,6 +2084,8 @@ class MainWindow(QMainWindow):
         lyrics_past_color: str,
         pianola_color_mode: str,
         pianola_note_label_mode: str,
+        pianola_note_font_family: str,
+        pianola_note_font_size: int,
         pianola_octave_designation: str,
     ) -> None:
         self.percussion_channel_control.setValue(percussion_channel)
@@ -2082,14 +2113,20 @@ class MainWindow(QMainWindow):
             )
         self.pianola_color_mode = pianola_color_mode
         self.pianola_note_label_mode = pianola_note_label_mode
+        self.pianola_note_font_family = pianola_note_font_family
+        self.pianola_note_font_size = pianola_note_font_size
         self.pianola_octave_designation = pianola_octave_designation
         self.settings.set_pianola_color_mode(pianola_color_mode)
         self.settings.set_pianola_note_label_mode(pianola_note_label_mode)
+        self.settings.set_pianola_note_font_family(pianola_note_font_family)
+        self.settings.set_pianola_note_font_size(pianola_note_font_size)
         self.settings.set_pianola_octave_designation(pianola_octave_designation)
         if self.pianola_dialog is not None:
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_note_label_mode,
+                self.pianola_note_font_family,
+                self.pianola_note_font_size,
                 self.pianola_octave_designation,
             )
         self.statusBar().showMessage(self.tr("Preferences updated"), 5000)

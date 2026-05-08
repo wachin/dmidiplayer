@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QPointF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPaintEvent
+from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPainter, QPaintEvent
 from PyQt6.QtWidgets import QWidget
 
 
@@ -40,6 +40,7 @@ class PianoKeyboard(QWidget):
         self._max_note = 108
         self._note_label_mode = "never"
         self._octave_offset = -1
+        self._note_label_font = QFont("Sans Serif", 8)
         self._white_low_color = QColor("#bfdbfe")
         self._white_high_color = QColor("#1d4ed8")
         self._black_low_color = QColor("#1d4ed8")
@@ -78,6 +79,10 @@ class PianoKeyboard(QWidget):
 
     def set_octave_offset(self, offset: int) -> None:
         self._octave_offset = offset
+        self.update()
+
+    def set_note_label_font(self, font: QFont) -> None:
+        self._note_label_font = QFont(font)
         self.update()
 
     def set_active_colors(
@@ -225,6 +230,7 @@ class PianoKeyboard(QWidget):
             )
             painter.drawRect(rect_x, 0, rect_w, self.height() - 1)
             if note in labels:
+                painter.setFont(self._note_label_font)
                 painter.setPen(Qt.GlobalColor.black)
                 painter.drawText(rect_x, self.height() - 18, rect_w, 16, int(Qt.AlignmentFlag.AlignCenter), labels[note])
         black_height = max(12, round(self.height() * 0.62))
@@ -246,6 +252,7 @@ class PianoKeyboard(QWidget):
             )
             painter.drawRect(rect_x, 0, black_width, black_height)
             if note in labels:
+                painter.setFont(self._note_label_font)
                 painter.setPen(Qt.GlobalColor.white)
                 painter.drawText(rect_x, black_height - 16, black_width, 14, int(Qt.AlignmentFlag.AlignCenter), labels[note])
 

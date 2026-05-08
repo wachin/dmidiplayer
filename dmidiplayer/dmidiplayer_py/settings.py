@@ -20,6 +20,8 @@ class AppSettings:
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
     DEFAULT_PIANOLA_NOTE_LABEL_MODE = "never"
     DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
+    DEFAULT_PIANOLA_NOTE_FONT_FAMILY = "Sans Serif"
+    DEFAULT_PIANOLA_NOTE_FONT_SIZE = 8
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
     DEFAULT_LYRICS_FONT_SIZE = 10
     DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
@@ -159,6 +161,22 @@ class AppSettings:
     def set_pianola_octave_designation(self, mode: str) -> None:
         value = mode if mode in {"scientific", "yamaha"} else self.DEFAULT_PIANOLA_OCTAVE_DESIGNATION
         self._settings.setValue("pianola/octave_designation", value)
+        self._settings.sync()
+
+    def pianola_note_font_family(self) -> str:
+        value = self._settings.value("pianola/note_font_family", self.DEFAULT_PIANOLA_NOTE_FONT_FAMILY, str)
+        return value or self.DEFAULT_PIANOLA_NOTE_FONT_FAMILY
+
+    def set_pianola_note_font_family(self, family: str) -> None:
+        self._settings.setValue("pianola/note_font_family", family or self.DEFAULT_PIANOLA_NOTE_FONT_FAMILY)
+        self._settings.sync()
+
+    def pianola_note_font_size(self) -> int:
+        value = self._settings.value("pianola/note_font_size", self.DEFAULT_PIANOLA_NOTE_FONT_SIZE, int)
+        return max(6, min(24, value))
+
+    def set_pianola_note_font_size(self, size: int) -> None:
+        self._settings.setValue("pianola/note_font_size", max(6, min(24, size)))
         self._settings.sync()
 
     def lyrics_font_family(self) -> str:

@@ -331,6 +331,8 @@ La pestaña `Player Piano` actual incluye:
 
 - `Highlight colors`: `Blue` o `By channel`
 - `Note names`: `Never`, `Minimal`, `When active` o `Always`
+- `Note-name font`
+- `Note-name size`
 - `Octave designation`: `Scientific` o `Yamaha`
 
 - `Restore Defaults`: devuelve las opciones visibles a sus valores por defecto.

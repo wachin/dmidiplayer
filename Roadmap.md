@@ -304,7 +304,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] highlight palettes;
   - [ ] single highlight color;
   - [ ] velocity tinting;
-  - [ ] note-name font;
+  - [x] note-name font;
   - [x] note-name display mode;
   - [x] octave designation.
 - [x] Persist basic application preferences with `QSettings`.
