@@ -310,6 +310,7 @@ The current `General` tab includes:
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
 - `Automatically load and save song settings`
+- `Qt Widgets style`
 - `Send GM reset before playback`
 
 From the `File` menu, the current port also includes `Song Settings -> Load`

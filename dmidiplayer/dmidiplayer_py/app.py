@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QStyleFactory,
 )
 
 from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard
@@ -247,6 +248,10 @@ def single_highlight_palette(color_value: str) -> tuple[str, str, str, str, str]
     return (white_low, white_high, black_low, black_high, black_idle)
 
 
+def available_qt_styles() -> list[str]:
+    return sorted(QStyleFactory.keys(), key=str.casefold)
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
         super().__init__(parent)
@@ -283,6 +288,13 @@ class PreferencesDialog(QDialog):
         self.general_auto_song_settings = QCheckBox(self.tr("Automatically load and save song settings"), general_tab)
         self.general_auto_song_settings.setObjectName("general_auto_song_settings")
         general_form.addRow("", self.general_auto_song_settings)
+
+        self.general_qt_style = QComboBox(general_tab)
+        self.general_qt_style.setObjectName("general_qt_style")
+        self.general_qt_style.addItem(self.tr("System"), "system")
+        for style_name in available_qt_styles():
+            self.general_qt_style.addItem(style_name, style_name)
+        general_form.addRow(self.tr("Qt Widgets style:"), self.general_qt_style)
 
         self.general_midi_reset_before_playback = QCheckBox(self.tr("Send GM reset before playback"), general_tab)
         self.general_midi_reset_before_playback.setObjectName("general_midi_reset_before_playback")
@@ -372,6 +384,7 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
         self.general_auto_song_settings.setChecked(self._settings.auto_song_settings())
+        self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(self._settings.qt_style())))
         self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
         self.lyrics_font_family.setCurrentFont(QFont(self._settings.lyrics_font_family()))
         self.lyrics_font_size.setValue(self._settings.lyrics_font_size())
@@ -399,6 +412,7 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
         self.general_auto_song_settings.setChecked(AppSettings.DEFAULT_AUTO_SONG_SETTINGS)
+        self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(AppSettings.DEFAULT_QT_STYLE)))
         self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
         self.lyrics_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_LYRICS_FONT_FAMILY))
         self.lyrics_font_size.setValue(AppSettings.DEFAULT_LYRICS_FONT_SIZE)
@@ -429,6 +443,7 @@ class PreferencesDialog(QDialog):
             self.general_auto_play_on_load.isChecked(),
             self.general_playlist_auto_advance.isChecked(),
             self.general_auto_song_settings.isChecked(),
+            str(self.general_qt_style.currentData()),
             self.general_midi_reset_before_playback.isChecked(),
             self.lyrics_font_family.currentFont().family(),
             self.lyrics_font_size.value(),
@@ -1210,6 +1225,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self.settings = AppSettings()
         self._restore_window_geometry()
+        self._system_qt_style = QApplication.style().objectName() or "Fusion"
         self.manager = BackendManager(self)
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
@@ -1225,6 +1241,7 @@ class MainWindow(QMainWindow):
         self.auto_play_on_load = self.settings.auto_play_on_load()
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
         self.auto_song_settings = self.settings.auto_song_settings()
+        self.qt_style = self.settings.qt_style()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
         self.lyrics_font_size = self.settings.lyrics_font_size()
@@ -1285,6 +1302,7 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self._build_menu_bar()
         self._build_layout()
+        self._apply_qt_style(self.qt_style)
         self._refresh_midi_connections(autoconnect=True)
         if start_files:
             self.open_paths([Path(file_name) for file_name in start_files], remember_folder=False)
@@ -2278,6 +2296,14 @@ class MainWindow(QMainWindow):
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
 
+    def _apply_qt_style(self, style_name: str) -> None:
+        target = self._system_qt_style if style_name == "system" else style_name
+        if not target:
+            return
+        applied = QApplication.setStyle(target)
+        if applied is not None:
+            self.qt_style = style_name if style_name in {"system", *available_qt_styles()} else "system"
+
     def _apply_preferences(
         self,
         percussion_channel: int,
@@ -2285,6 +2311,7 @@ class MainWindow(QMainWindow):
         auto_play_on_load: bool,
         playlist_auto_advance: bool,
         auto_song_settings: bool,
+        qt_style: str,
         midi_reset_before_playback: bool,
         lyrics_font_family: str,
         lyrics_font_size: int,
@@ -2306,6 +2333,8 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
         self.auto_song_settings = auto_song_settings
         self.settings.set_auto_song_settings(auto_song_settings)
+        self.settings.set_qt_style(qt_style)
+        self._apply_qt_style(qt_style)
         self.player.set_send_reset_before_playback(midi_reset_before_playback)
         self.settings.set_midi_reset_before_playback(midi_reset_before_playback)
         self.lyrics_font_family = lyrics_font_family

@@ -294,7 +294,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] sticky window borders, if kept for Windows;
   - [ ] force dark mode where applicable;
   - [ ] use internal icon theme;
-  - [ ] Qt Widgets style;
+  - [x] Qt Widgets style;
   - [x] MIDI reset SysEx before playback.
 - [ ] Lyrics tab:
   - [x] font;

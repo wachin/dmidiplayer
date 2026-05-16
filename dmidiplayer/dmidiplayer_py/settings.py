@@ -16,6 +16,7 @@ class AppSettings:
     DEFAULT_AUTO_PLAY_ON_LOAD = False
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_AUTO_SONG_SETTINGS = False
+    DEFAULT_QT_STYLE = "system"
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -121,6 +122,14 @@ class AppSettings:
 
     def set_auto_song_settings(self, enabled: bool) -> None:
         self._settings.setValue("general/auto_song_settings", bool(enabled))
+        self._settings.sync()
+
+    def qt_style(self) -> str:
+        value = self._settings.value("general/qt_style", self.DEFAULT_QT_STYLE, str)
+        return value or self.DEFAULT_QT_STYLE
+
+    def set_qt_style(self, style_name: str) -> None:
+        self._settings.setValue("general/qt_style", style_name or self.DEFAULT_QT_STYLE)
         self._settings.sync()
 
     def solo_volume_reduction(self) -> int:
