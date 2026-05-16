@@ -20,6 +20,7 @@ abras un archivo MIDI o una lista `.lst`.
 
 - `Open`: abre uno o más archivos MIDI o una lista de reproducción `.lst`.
 - `Open Playlist`: abre directamente un archivo de lista de reproducción.
+- `Play List...`: abre la ventana dedicada para administrar la lista.
 - `Open Recent`: vuelve a abrir un archivo MIDI usado recientemente.
 - `Save Playlist`: guarda la lista actual en el archivo `.lst` actual.
 - `Save Playlist As`: guarda la lista actual en un nuevo archivo `.lst`.
@@ -96,6 +97,12 @@ La `List` de la izquierda es la lista de reproducción actual.
 - Abrir una lista `.lst` carga esa lista guardada.
 - Por omisión no se duplican filas. Si abres un archivo que ya estaba en la
   lista, se reutiliza la fila existente.
+
+`File -> Play List...` abre una ventana separada que refleja las mismas
+canciones y la misma selección de la ventana principal. Desde allí puedes
+añadir archivos, cargar la canción seleccionada, mover entradas hacia arriba o
+abajo, ordenar el conjunto, eliminar entradas, vaciar la lista y abrir o
+guardar archivos `.lst`.
 
 Si el título de la ventana muestra un `*` antes del nombre de la lista, eso
 indica que hay cambios sin guardar.

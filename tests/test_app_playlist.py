@@ -780,6 +780,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(menus, ["File", "Playback", "View", "Tools", "Help"])
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.open_playlist_action), "open_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.playlist_dialog_action), "playlist_dialog_action"))
             self.assertIsNotNone(window.findChild(type(window.save_playlist_action), "save_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.save_playlist_as_action), "save_playlist_as_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
@@ -1915,6 +1916,80 @@ class AppPlaylistTest(unittest.TestCase):
                 window.next_file()
                 self.assertTrue(window.move_up_action.isEnabled())
                 self.assertFalse(window.move_down_action.isEnabled())
+
+    def test_playlist_dialog_action_opens_non_modal_window(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertIsNone(window.playlist_dialog)
+
+            window.playlist_dialog_action.trigger()
+
+            self.assertIsNotNone(window.playlist_dialog)
+            assert window.playlist_dialog is not None
+            self.assertEqual(window.playlist_dialog.windowTitle(), "Play List")
+            self.assertTrue(window.playlist_dialog.isVisible())
+
+    def test_playlist_dialog_stays_in_sync_with_main_playlist_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.playlist_dialog_action.trigger()
+
+                assert window.playlist_dialog is not None
+                dialog = window.playlist_dialog
+                self.assertEqual(dialog.list_widget.count(), 2)
+                self.assertEqual(dialog.list_widget.currentRow(), 0)
+
+                dialog.list_widget.setCurrentRow(1)
+
+                self.assertEqual(window.playlist.currentRow(), 1)
+                self.assertEqual(dialog.list_widget.currentRow(), 1)
+
+                window.previous_file()
+
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(dialog.list_widget.currentRow(), 0)
+
+    def test_playlist_dialog_buttons_reuse_main_playlist_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first), str(second)])
+                window.playlist_dialog_action.trigger()
+
+                assert window.playlist_dialog is not None
+                dialog = window.playlist_dialog
+                dialog.list_widget.setCurrentRow(0)
+                dialog.move_down_button.click()
+
+                self.assertEqual(window.playlist.item(0).text(), str(second))
+                self.assertEqual(dialog.list_widget.item(0).text(), str(second))
+                self.assertEqual(window.playlist.currentRow(), 1)
+
+                dialog.remove_button.click()
+
+                self.assertEqual(window.playlist.count(), 1)
+                self.assertEqual(dialog.list_widget.count(), 1)
+                self.assertEqual(window.playlist.item(0).text(), str(second))
 
     def test_move_selected_playlist_item_updates_order_and_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

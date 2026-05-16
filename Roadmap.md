@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-07.
+Last updated: 2026-05-15.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -255,8 +255,8 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Playlists And Repertoire
 
-- [ ] Manage playlists from `File -> Play List...`.
-- [ ] Create, modify, sort, open, and save playlists.
+- [x] Manage playlists from `File -> Play List...`.
+- [x] Create, modify, sort, open, and save playlists.
   - [x] Open and save `.lst` playlists.
   - [x] Add and remove playlist entries.
   - [x] Reorder playlist entries up and down.

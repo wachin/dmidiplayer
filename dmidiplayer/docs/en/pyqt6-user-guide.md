@@ -19,6 +19,7 @@ to open a MIDI file or playlist.
 
 - `Open`: open one or more MIDI files or a `.lst` playlist file.
 - `Open Playlist`: open a plain-text playlist file directly.
+- `Play List...`: open the dedicated playlist manager window.
 - `Open Recent`: reopen a recently loaded MIDI file.
 - `Save Playlist`: save the current playlist to the current `.lst` file.
 - `Save Playlist As`: save the current playlist to a new `.lst` file.
@@ -96,6 +97,11 @@ The `List` on the left is the current playlist.
 - Opening a `.lst` playlist loads that saved playlist.
 - Duplicate rows are avoided by default. If you open a file that is already in
   the playlist, the existing row is reused.
+
+`File -> Play List...` opens a separate playlist manager window that mirrors the
+same songs and current selection as the main window. From there you can add
+files, load the selected song, move entries up or down, sort the set, remove
+entries, clear the list, and open or save `.lst` playlist files.
 
 If the window title shows a `*` before the playlist file name, the playlist has
 unsaved changes.
