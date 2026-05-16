@@ -358,12 +358,22 @@ The current port lets you:
 
 - show or hide the toolbar from `View`
 - move the toolbar using standard Qt toolbar handling
+- open `Customize Toolbar` from `View` to manage which actions appear
 - choose button styles from `View -> Toolbar Buttons`:
   - `Icon Only`
   - `Text Only`
   - `Text Beside Icon`
   - `Text Under Icon`
   - `Follow Qt Style`
+
+The `Customize Toolbar` dialog currently provides:
+
+- `Available Actions`
+- `Selected Actions`
+- `Add`
+- `Remove`
+- `Move Up`
+- `Move Down`
 
 ## Current Limits
 

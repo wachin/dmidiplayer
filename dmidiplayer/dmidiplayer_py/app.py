@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -327,6 +328,8 @@ TOOLBAR_BUTTON_STYLES = {
     "follow_style": Qt.ToolButtonStyle.ToolButtonFollowStyle,
 }
 
+DEFAULT_TOOLBAR_ACTION_ORDER = list(AppSettings.DEFAULT_TOOLBAR_ACTIONS)
+
 
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
@@ -547,6 +550,120 @@ class PreferencesDialog(QDialog):
             self.pianola_note_font_size.value(),
             str(self.pianola_octave_designation.currentData()),
         )
+
+
+class ToolbarCustomizationDialog(QDialog):
+    def __init__(
+        self,
+        parent: QWidget | None,
+        available_actions: list[tuple[str, str]],
+        selected_action_ids: list[str],
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Customize Toolbar"))
+        self._available_actions = {action_id: label for action_id, label in available_actions}
+
+        layout = QVBoxLayout(self)
+        row = QHBoxLayout()
+        layout.addLayout(row)
+
+        left_column = QVBoxLayout()
+        left_column.addWidget(QLabel(self.tr("Available Actions"), self))
+        self.available_list = QListWidget(self)
+        self.available_list.setObjectName("toolbar_available_actions")
+        left_column.addWidget(self.available_list)
+        row.addLayout(left_column)
+
+        buttons_column = QVBoxLayout()
+        buttons_column.addStretch(1)
+        self.add_button = QPushButton(self.tr("Add"), self)
+        self.add_button.setObjectName("toolbar_add_action")
+        self.add_button.clicked.connect(self.add_selected_action)
+        buttons_column.addWidget(self.add_button)
+        self.remove_button = QPushButton(self.tr("Remove"), self)
+        self.remove_button.setObjectName("toolbar_remove_action")
+        self.remove_button.clicked.connect(self.remove_selected_action)
+        buttons_column.addWidget(self.remove_button)
+        buttons_column.addStretch(1)
+        row.addLayout(buttons_column)
+
+        right_column = QVBoxLayout()
+        right_column.addWidget(QLabel(self.tr("Selected Actions"), self))
+        self.selected_list = QListWidget(self)
+        self.selected_list.setObjectName("toolbar_selected_actions")
+        right_column.addWidget(self.selected_list)
+        move_row = QHBoxLayout()
+        self.move_up_button = QPushButton(self.tr("Move Up"), self)
+        self.move_up_button.setObjectName("toolbar_move_up_action")
+        self.move_up_button.clicked.connect(lambda: self.move_selected_action(-1))
+        move_row.addWidget(self.move_up_button)
+        self.move_down_button = QPushButton(self.tr("Move Down"), self)
+        self.move_down_button.setObjectName("toolbar_move_down_action")
+        self.move_down_button.clicked.connect(lambda: self.move_selected_action(1))
+        move_row.addWidget(self.move_down_button)
+        right_column.addLayout(move_row)
+        row.addLayout(right_column)
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=self,
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+        self._populate_lists(selected_action_ids)
+        self.resize(560, 360)
+
+    def _populate_lists(self, selected_action_ids: list[str]) -> None:
+        selected = [action_id for action_id in selected_action_ids if action_id in self._available_actions]
+        remaining = [action_id for action_id in self._available_actions if action_id not in selected]
+        self.available_list.clear()
+        self.selected_list.clear()
+        for action_id in remaining:
+            item = QListWidgetItem(self._available_actions[action_id])
+            item.setData(Qt.ItemDataRole.UserRole, action_id)
+            self.available_list.addItem(item)
+        for action_id in selected:
+            item = QListWidgetItem(self._available_actions[action_id])
+            item.setData(Qt.ItemDataRole.UserRole, action_id)
+            self.selected_list.addItem(item)
+
+    def add_selected_action(self) -> None:
+        row = self.available_list.currentRow()
+        if row < 0:
+            return
+        item = self.available_list.takeItem(row)
+        self.selected_list.addItem(item)
+        self.selected_list.setCurrentItem(item)
+
+    def remove_selected_action(self) -> None:
+        row = self.selected_list.currentRow()
+        if row < 0:
+            return
+        item = self.selected_list.takeItem(row)
+        self.available_list.addItem(item)
+        self.available_list.setCurrentItem(item)
+
+    def move_selected_action(self, delta: int) -> None:
+        row = self.selected_list.currentRow()
+        if row < 0:
+            return
+        target = row + delta
+        if target < 0 or target >= self.selected_list.count():
+            return
+        item = self.selected_list.takeItem(row)
+        self.selected_list.insertItem(target, item)
+        self.selected_list.setCurrentItem(item)
+
+    def selected_action_ids(self) -> list[str]:
+        result: list[str] = []
+        for index in range(self.selected_list.count()):
+            item = self.selected_list.item(index)
+            action_id = item.data(Qt.ItemDataRole.UserRole)
+            if action_id:
+                result.append(str(action_id))
+        return result
 
 
 class RhythmView(QWidget):
@@ -1335,6 +1452,7 @@ class MainWindow(QMainWindow):
         self.force_dark_mode = self.settings.force_dark_mode()
         self.use_internal_icon_theme = self.settings.use_internal_icon_theme()
         self.toolbar_button_style = self.settings.toolbar_button_style()
+        self.toolbar_action_ids = self.settings.toolbar_actions()
         self.qt_style = self.settings.qt_style()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
@@ -1532,6 +1650,9 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setCheckable(True)
         self.auto_advance_playlist_action.setChecked(self.auto_advance_playlist)
         self.auto_advance_playlist_action.toggled.connect(self._toggle_auto_advance_playlist)
+        self.customize_toolbar_action = QAction(self.tr("Customize Toolbar"), self)
+        self.customize_toolbar_action.setObjectName("customize_toolbar_action")
+        self.customize_toolbar_action.triggered.connect(self.show_customize_toolbar_dialog)
         self.toolbar_button_style_group = QActionGroup(self)
         self.toolbar_button_style_group.setExclusive(True)
         self.toolbar_icon_only_action = QAction(self.tr("Icon Only"), self)
@@ -1593,6 +1714,55 @@ class MainWindow(QMainWindow):
         self.settings.set_toolbar_button_style(style_name)
         self._apply_toolbar_button_style(style_name)
 
+    def _toolbar_action_map(self) -> dict[str, QAction]:
+        return {
+            "open_action": self.open_action,
+            "previous_action": self.previous_action,
+            "play_action": self.play_action,
+            "pause_action": self.pause_action,
+            "stop_action": self.stop_action,
+            "next_action": self.next_action,
+            "previous_bar_action": self.previous_bar_action,
+            "next_bar_action": self.next_bar_action,
+            "jump_bar_action": self.jump_bar_action,
+            "repeat_playlist_action": self.repeat_playlist_action,
+            "shuffle_playlist_action": self.shuffle_playlist_action,
+            "preferences_action": self.preferences_action,
+            "refresh_midi_action": self.refresh_midi_action,
+        }
+
+    def _toolbar_action_choices(self) -> list[tuple[str, str]]:
+        action_map = self._toolbar_action_map()
+        return [(action_id, action.text()) for action_id, action in action_map.items()]
+
+    def _normalized_toolbar_action_ids(self, action_ids: list[str]) -> list[str]:
+        valid_ids = set(self._toolbar_action_map())
+        normalized = [action_id for action_id in action_ids if action_id in valid_ids]
+        return normalized or list(DEFAULT_TOOLBAR_ACTION_ORDER)
+
+    def _rebuild_toolbar(self) -> None:
+        action_map = self._toolbar_action_map()
+        self.toolbar_action_ids = self._normalized_toolbar_action_ids(self.toolbar_action_ids)
+        self.playback_toolbar.clear()
+        for action_id in self.toolbar_action_ids:
+            action = action_map.get(action_id)
+            if action is not None:
+                self.playback_toolbar.addAction(action)
+
+    def _apply_toolbar_actions(self, action_ids: list[str]) -> None:
+        self.toolbar_action_ids = self._normalized_toolbar_action_ids(action_ids)
+        self.settings.set_toolbar_actions(self.toolbar_action_ids)
+        self._rebuild_toolbar()
+
+    def _create_toolbar_customization_dialog(self) -> ToolbarCustomizationDialog:
+        return ToolbarCustomizationDialog(self, self._toolbar_action_choices(), self.toolbar_action_ids)
+
+    def show_customize_toolbar_dialog(self) -> None:
+        dialog = self._create_toolbar_customization_dialog()
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        self._apply_toolbar_actions(dialog.selected_action_ids())
+
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
         current_row = self.playlist.currentRow()
@@ -1647,16 +1817,7 @@ class MainWindow(QMainWindow):
         self.playback_toolbar = QToolBar(self.tr("Playback"), self)
         self.playback_toolbar.setObjectName("playback_toolbar")
         self.addToolBar(self.playback_toolbar)
-        self.playback_toolbar.addAction(self.open_action)
-        self.playback_toolbar.addSeparator()
-        for action in (
-            self.previous_action,
-            self.play_action,
-            self.pause_action,
-            self.stop_action,
-            self.next_action,
-        ):
-            self.playback_toolbar.addAction(action)
+        self._rebuild_toolbar()
 
     def _build_menu_bar(self) -> None:
         file_menu = self.menuBar().addMenu(self.tr("File"))
@@ -1711,6 +1872,7 @@ class MainWindow(QMainWindow):
         toolbar_action.setText(self.tr("Toolbar"))
         toolbar_action.setObjectName("toggle_toolbar_action")
         view_menu.addAction(toolbar_action)
+        view_menu.addAction(self.customize_toolbar_action)
         self.statusbar_action = QAction(self.tr("Status bar"), self)
         self.statusbar_action.setObjectName("toggle_statusbar_action")
         self.statusbar_action.setCheckable(True)

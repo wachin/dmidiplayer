@@ -20,6 +20,14 @@ class AppSettings:
     DEFAULT_FORCE_DARK_MODE = False
     DEFAULT_USE_INTERNAL_ICON_THEME = False
     DEFAULT_TOOLBAR_BUTTON_STYLE = "follow_style"
+    DEFAULT_TOOLBAR_ACTIONS = (
+        "open_action",
+        "previous_action",
+        "play_action",
+        "pause_action",
+        "stop_action",
+        "next_action",
+    )
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -162,6 +170,16 @@ class AppSettings:
         valid = {"icon_only", "text_only", "text_beside", "text_under", "follow_style"}
         value = style_name if style_name in valid else self.DEFAULT_TOOLBAR_BUTTON_STYLE
         self._settings.setValue("toolbar/button_style", value)
+        self._settings.sync()
+
+    def toolbar_actions(self) -> list[str]:
+        value = self._settings.value("toolbar/actions", list(self.DEFAULT_TOOLBAR_ACTIONS), list)
+        if isinstance(value, str):
+            return [value]
+        return [str(item) for item in value if item]
+
+    def set_toolbar_actions(self, action_ids: list[str]) -> None:
+        self._settings.setValue("toolbar/actions", [str(item) for item in action_ids if item])
         self._settings.sync()
 
     def solo_volume_reduction(self) -> int:

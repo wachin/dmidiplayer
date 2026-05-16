@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import QSlider
 from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection, MidiEvent
-from dmidiplayer_py.app import MainWindow, PreferencesDialog, available_qt_styles
+from dmidiplayer_py.app import MainWindow, PreferencesDialog, ToolbarCustomizationDialog, available_qt_styles
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
 
@@ -43,6 +43,14 @@ class FakeSettings:
     DEFAULT_FORCE_DARK_MODE = False
     DEFAULT_USE_INTERNAL_ICON_THEME = False
     DEFAULT_TOOLBAR_BUTTON_STYLE = "follow_style"
+    DEFAULT_TOOLBAR_ACTIONS = (
+        "open_action",
+        "previous_action",
+        "play_action",
+        "pause_action",
+        "stop_action",
+        "next_action",
+    )
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
@@ -65,6 +73,7 @@ class FakeSettings:
     force_dark_mode_value = False
     use_internal_icon_theme_value = False
     toolbar_button_style_value = "follow_style"
+    toolbar_actions_value = list(DEFAULT_TOOLBAR_ACTIONS)
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
     lyrics_font_family_value = "Sans Serif"
@@ -165,6 +174,12 @@ class FakeSettings:
 
     def set_toolbar_button_style(self, style_name: str) -> None:
         type(self).toolbar_button_style_value = style_name
+
+    def toolbar_actions(self) -> list[str]:
+        return list(type(self).toolbar_actions_value)
+
+    def set_toolbar_actions(self, action_ids: list[str]) -> None:
+        type(self).toolbar_actions_value = list(action_ids)
 
     def solo_volume_reduction(self) -> int:
         return type(self).solo_volume_reduction_value
@@ -484,6 +499,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.force_dark_mode_value = False
         FakeSettings.use_internal_icon_theme_value = False
         FakeSettings.toolbar_button_style_value = "follow_style"
+        FakeSettings.toolbar_actions_value = list(FakeSettings.DEFAULT_TOOLBAR_ACTIONS)
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.lyrics_font_family_value = "Sans Serif"
@@ -2523,6 +2539,61 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.toolbar_button_style, "text_beside")
             self.assertEqual(window.playback_toolbar.toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             self.assertTrue(window.toolbar_text_beside_action.isChecked())
+
+    def test_toolbar_customization_dialog_can_add_remove_and_reorder_actions(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            dialog = window._create_toolbar_customization_dialog()
+
+            self.assertIsInstance(dialog, ToolbarCustomizationDialog)
+            self.assertGreater(dialog.available_list.count(), 0)
+            self.assertGreater(dialog.selected_list.count(), 0)
+
+            dialog.available_list.setCurrentRow(0)
+            added_label = dialog.available_list.currentItem().text()
+            dialog.add_selected_action()
+            self.assertIn(added_label, [dialog.selected_list.item(i).text() for i in range(dialog.selected_list.count())])
+
+            dialog.selected_list.setCurrentRow(dialog.selected_list.count() - 1)
+            dialog.move_selected_action(-1)
+            self.assertEqual(dialog.selected_list.currentRow(), dialog.selected_list.count() - 2)
+
+            first_selected = dialog.selected_list.item(0).text()
+            dialog.selected_list.setCurrentRow(0)
+            dialog.remove_selected_action()
+            self.assertIn(first_selected, [dialog.available_list.item(i).text() for i in range(dialog.available_list.count())])
+
+    def test_toolbar_customization_applies_and_persists_action_order(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window._apply_toolbar_actions(["play_action", "stop_action", "open_action"])
+
+            self.assertEqual(window.toolbar_action_ids, ["play_action", "stop_action", "open_action"])
+            self.assertEqual(FakeSettings.toolbar_actions_value, ["play_action", "stop_action", "open_action"])
+            self.assertEqual(
+                [action.objectName() for action in window.playback_toolbar.actions()],
+                ["play_action", "stop_action", "open_action"],
+            )
+
+    def test_saved_toolbar_actions_are_applied_on_startup(self) -> None:
+        FakeSettings.toolbar_actions_value = ["play_action", "pause_action", "stop_action"]
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            self.assertEqual(window.toolbar_action_ids, ["play_action", "pause_action", "stop_action"])
+            self.assertEqual(
+                [action.objectName() for action in window.playback_toolbar.actions()],
+                ["play_action", "pause_action", "stop_action"],
+            )
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

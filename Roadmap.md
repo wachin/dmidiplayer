@@ -314,10 +314,10 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Allow moving the toolbar through the default Qt toolbar.
 - [x] Allow toolbar at top, bottom, or floating when Qt supports it.
 - [ ] Customization dialog with:
-  - [ ] available actions;
-  - [ ] selected actions;
-  - [ ] add/remove;
-  - [ ] move up/down.
+  - [x] available actions;
+  - [x] selected actions;
+  - [x] add/remove;
+  - [x] move up/down.
 - [ ] Button styles:
   - [x] icon only;
   - [x] text only;
