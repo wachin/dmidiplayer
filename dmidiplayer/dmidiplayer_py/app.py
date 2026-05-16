@@ -51,6 +51,7 @@ MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
 PLAYLIST_FILE_SUFFIXES = {".lst"}
 APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
+ICONS_DIR = Path(__file__).resolve().parents[1] / "icons"
 GENERAL_MIDI_PROGRAMS = (
     "Acoustic Grand Piano",
     "Bright Acoustic Piano",
@@ -274,6 +275,51 @@ def dark_palette() -> QPalette:
     return palette
 
 
+def bundled_icon(icon_name: str) -> QIcon:
+    for suffix in (".png", ".svg", ".ico"):
+        path = ICONS_DIR / f"{icon_name}{suffix}"
+        if path.exists():
+            return QIcon(str(path))
+    return QIcon()
+
+
+ACTION_ICONS = {
+    "open_action": ("document-open", "document-open"),
+    "open_playlist_action": ("document-open", "view-media-playlist"),
+    "save_playlist_action": ("document-save", "document-save"),
+    "save_playlist_as_action": ("document-save", "document-save"),
+    "load_song_settings_action": ("document-open", "document-open"),
+    "save_song_settings_action": ("document-save", "document-save"),
+    "exit_action": ("system-shutdown", "system-shutdown"),
+    "clear_recent_action": ("edit-delete", "edit-delete"),
+    "refresh_midi_action": ("view-refresh", "midi"),
+    "connect_midi_action": ("audio-midi", "audio-midi"),
+    "disconnect_midi_action": ("window-close", "window-close"),
+    "preferences_action": ("settings", "settings"),
+    "remove_selected_action": ("edit-delete", "list-remove"),
+    "move_up_action": ("go-up", "go-up"),
+    "move_down_action": ("go-down", "go-down"),
+    "sort_playlist_action": ("view-sort-ascending", "view-media-playlist"),
+    "clear_playlist_action": ("edit-clear", "edit-clear"),
+    "help_contents_action": ("help-contents", "help-contents"),
+    "user_guide_action": ("viewhtml", "viewhtml"),
+    "about_action": ("help-about", "help-about"),
+    "previous_action": ("media-skip-backward", "media-skip-backward"),
+    "play_action": ("media-playback-start", "media-playback-start"),
+    "pause_action": ("media-playback-pause", "media-playback-pause"),
+    "stop_action": ("media-playback-stop", "media-playback-stop"),
+    "next_action": ("media-skip-forward", "media-skip-forward"),
+    "previous_bar_action": ("media-seek-backward", "media-seek-backward"),
+    "next_bar_action": ("media-seek-forward", "media-seek-forward"),
+    "jump_bar_action": ("go-jump", "go-jump"),
+    "repeat_playlist_action": ("media-playlist-repeat", "media-playlist-repeat"),
+    "shuffle_playlist_action": ("media-playlist-shuffle", "media-playlist-shuffle"),
+    "channels_action": ("audio-midi", "audio-midi"),
+    "pianola_action": ("application-menu", "application-menu"),
+    "lyrics_action": ("view-media-lyrics", "view-media-lyrics"),
+}
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
         super().__init__(parent)
@@ -314,6 +360,10 @@ class PreferencesDialog(QDialog):
         self.general_force_dark_mode = QCheckBox(self.tr("Force dark mode"), general_tab)
         self.general_force_dark_mode.setObjectName("general_force_dark_mode")
         general_form.addRow("", self.general_force_dark_mode)
+
+        self.general_use_internal_icon_theme = QCheckBox(self.tr("Use internal icon theme"), general_tab)
+        self.general_use_internal_icon_theme.setObjectName("general_use_internal_icon_theme")
+        general_form.addRow("", self.general_use_internal_icon_theme)
 
         self.general_qt_style = QComboBox(general_tab)
         self.general_qt_style.setObjectName("general_qt_style")
@@ -411,6 +461,7 @@ class PreferencesDialog(QDialog):
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
         self.general_auto_song_settings.setChecked(self._settings.auto_song_settings())
         self.general_force_dark_mode.setChecked(self._settings.force_dark_mode())
+        self.general_use_internal_icon_theme.setChecked(self._settings.use_internal_icon_theme())
         self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(self._settings.qt_style())))
         self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
         self.lyrics_font_family.setCurrentFont(QFont(self._settings.lyrics_font_family()))
@@ -440,6 +491,7 @@ class PreferencesDialog(QDialog):
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
         self.general_auto_song_settings.setChecked(AppSettings.DEFAULT_AUTO_SONG_SETTINGS)
         self.general_force_dark_mode.setChecked(AppSettings.DEFAULT_FORCE_DARK_MODE)
+        self.general_use_internal_icon_theme.setChecked(AppSettings.DEFAULT_USE_INTERNAL_ICON_THEME)
         self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(AppSettings.DEFAULT_QT_STYLE)))
         self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
         self.lyrics_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_LYRICS_FONT_FAMILY))
@@ -472,6 +524,7 @@ class PreferencesDialog(QDialog):
             self.general_playlist_auto_advance.isChecked(),
             self.general_auto_song_settings.isChecked(),
             self.general_force_dark_mode.isChecked(),
+            self.general_use_internal_icon_theme.isChecked(),
             str(self.general_qt_style.currentData()),
             self.general_midi_reset_before_playback.isChecked(),
             self.lyrics_font_family.currentFont().family(),
@@ -1272,6 +1325,7 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
         self.auto_song_settings = self.settings.auto_song_settings()
         self.force_dark_mode = self.settings.force_dark_mode()
+        self.use_internal_icon_theme = self.settings.use_internal_icon_theme()
         self.qt_style = self.settings.qt_style()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
@@ -1335,12 +1389,13 @@ class MainWindow(QMainWindow):
         self._build_layout()
         self._apply_qt_style(self.qt_style)
         self._apply_color_mode()
+        self._apply_icon_theme()
         self._refresh_midi_connections(autoconnect=True)
         if start_files:
             self.open_paths([Path(file_name) for file_name in start_files], remember_folder=False)
 
     def _build_actions(self) -> None:
-        self.open_action = QAction(QIcon.fromTheme("document-open"), self.tr("Open"), self)
+        self.open_action = QAction(self.tr("Open"), self)
         self.open_action.setObjectName("open_action")
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.triggered.connect(self.open_files)
@@ -1467,6 +1522,18 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setCheckable(True)
         self.auto_advance_playlist_action.setChecked(self.auto_advance_playlist)
         self.auto_advance_playlist_action.toggled.connect(self._toggle_auto_advance_playlist)
+
+    def _icon_for(self, theme_name: str, internal_name: str) -> QIcon:
+        internal = bundled_icon(internal_name)
+        if self.use_internal_icon_theme and not internal.isNull():
+            return internal
+        return QIcon.fromTheme(theme_name, internal)
+
+    def _apply_icon_theme(self) -> None:
+        for action_name, (theme_name, internal_name) in ACTION_ICONS.items():
+            action = getattr(self, action_name, None)
+            if isinstance(action, QAction):
+                action.setIcon(self._icon_for(theme_name, internal_name))
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
@@ -2348,6 +2415,7 @@ class MainWindow(QMainWindow):
         playlist_auto_advance: bool,
         auto_song_settings: bool,
         force_dark_mode: bool,
+        use_internal_icon_theme: bool,
         qt_style: str,
         midi_reset_before_playback: bool,
         lyrics_font_family: str,
@@ -2372,8 +2440,11 @@ class MainWindow(QMainWindow):
         self.settings.set_auto_song_settings(auto_song_settings)
         self.force_dark_mode = force_dark_mode
         self.settings.set_force_dark_mode(force_dark_mode)
+        self.use_internal_icon_theme = use_internal_icon_theme
+        self.settings.set_use_internal_icon_theme(use_internal_icon_theme)
         self.settings.set_qt_style(qt_style)
         self._apply_qt_style(qt_style)
+        self._apply_icon_theme()
         self.player.set_send_reset_before_playback(midi_reset_before_playback)
         self.settings.set_midi_reset_before_playback(midi_reset_before_playback)
         self.lyrics_font_family = lyrics_font_family

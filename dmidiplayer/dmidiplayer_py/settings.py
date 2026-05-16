@@ -18,6 +18,7 @@ class AppSettings:
     DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_QT_STYLE = "system"
     DEFAULT_FORCE_DARK_MODE = False
+    DEFAULT_USE_INTERNAL_ICON_THEME = False
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -138,6 +139,17 @@ class AppSettings:
 
     def set_force_dark_mode(self, enabled: bool) -> None:
         self._settings.setValue("general/force_dark_mode", bool(enabled))
+        self._settings.sync()
+
+    def use_internal_icon_theme(self) -> bool:
+        return self._settings.value(
+            "general/use_internal_icon_theme",
+            self.DEFAULT_USE_INTERNAL_ICON_THEME,
+            bool,
+        )
+
+    def set_use_internal_icon_theme(self, enabled: bool) -> None:
+        self._settings.setValue("general/use_internal_icon_theme", bool(enabled))
         self._settings.sync()
 
     def solo_volume_reduction(self) -> int:

@@ -293,7 +293,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] auto-load/save song settings;
   - [ ] sticky window borders, if kept for Windows;
   - [x] force dark mode where applicable;
-  - [ ] use internal icon theme;
+  - [x] use internal icon theme;
   - [x] Qt Widgets style;
   - [x] MIDI reset SysEx before playback.
 - [ ] Lyrics tab:

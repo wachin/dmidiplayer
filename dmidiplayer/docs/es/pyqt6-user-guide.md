@@ -320,6 +320,7 @@ La pestaña `General` actual incluye:
 - `Auto-advance to the next playlist item`
 - `Automatically load and save song settings`
 - `Force dark mode`
+- `Use internal icon theme`
 - `Qt Widgets style`
 - `Send GM reset before playback`
 
