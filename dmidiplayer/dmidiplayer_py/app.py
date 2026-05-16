@@ -670,71 +670,62 @@ class PlaylistDialog(QDialog):
     def __init__(self, window: "MainWindow") -> None:
         super().__init__(window)
         self.window = window
-        self.setWindowTitle(self.tr("Play List"))
-
         layout = QVBoxLayout(self)
+        row = QHBoxLayout()
+        layout.addLayout(row, 1)
+
         self.list_widget = QListWidget(self)
         self.list_widget.setObjectName("playlist_dialog_list")
         self.list_widget.currentRowChanged.connect(self._row_changed)
         self.list_widget.itemDoubleClicked.connect(self._load_selected_item)
-        layout.addWidget(self.list_widget)
+        row.addWidget(self.list_widget, 1)
 
-        top_row = QHBoxLayout()
-        self.add_button = QPushButton(self.tr("Add Files"), self)
+        button_column = QVBoxLayout()
+        row.addLayout(button_column)
+        self.add_button = QPushButton(self.tr("Add"), self)
         self.add_button.setObjectName("playlist_dialog_add_button")
         self.add_button.clicked.connect(self.window.open_files)
-        top_row.addWidget(self.add_button)
+        button_column.addWidget(self.add_button)
         self.remove_button = QPushButton(self.tr("Remove"), self)
         self.remove_button.setObjectName("playlist_dialog_remove_button")
         self.remove_button.clicked.connect(self.window.remove_selected_action.trigger)
-        top_row.addWidget(self.remove_button)
-        self.open_button = QPushButton(self.tr("Load"), self)
-        self.open_button.setObjectName("playlist_dialog_load_button")
-        self.open_button.clicked.connect(self._load_current_row)
-        top_row.addWidget(self.open_button)
-        top_row.addStretch(1)
-        layout.addLayout(top_row)
-
-        middle_row = QHBoxLayout()
+        button_column.addWidget(self.remove_button)
         self.move_up_button = QPushButton(self.tr("Move Up"), self)
         self.move_up_button.setObjectName("playlist_dialog_move_up_button")
         self.move_up_button.clicked.connect(self.window.move_up_action.trigger)
-        middle_row.addWidget(self.move_up_button)
+        button_column.addWidget(self.move_up_button)
         self.move_down_button = QPushButton(self.tr("Move Down"), self)
         self.move_down_button.setObjectName("playlist_dialog_move_down_button")
         self.move_down_button.clicked.connect(self.window.move_down_action.trigger)
-        middle_row.addWidget(self.move_down_button)
-        self.sort_button = QPushButton(self.tr("Sort"), self)
-        self.sort_button.setObjectName("playlist_dialog_sort_button")
-        self.sort_button.clicked.connect(self.window.sort_playlist_action.trigger)
-        middle_row.addWidget(self.sort_button)
+        button_column.addWidget(self.move_down_button)
+        self.randomize_button = QPushButton(self.tr("Randomize"), self)
+        self.randomize_button.setObjectName("playlist_dialog_randomize_button")
+        self.randomize_button.clicked.connect(self.window._randomize_playlist)
+        button_column.addWidget(self.randomize_button)
         self.clear_button = QPushButton(self.tr("Clear"), self)
         self.clear_button.setObjectName("playlist_dialog_clear_button")
         self.clear_button.clicked.connect(self.window.clear_playlist_action.trigger)
-        middle_row.addWidget(self.clear_button)
-        middle_row.addStretch(1)
-        layout.addLayout(middle_row)
+        button_column.addWidget(self.clear_button)
+        button_column.addStretch(1)
 
         bottom_row = QHBoxLayout()
-        self.open_playlist_button = QPushButton(self.tr("Open Playlist"), self)
+        self.accept_button = QPushButton(self.tr("Accept"), self)
+        self.accept_button.setObjectName("playlist_dialog_accept_button")
+        self.accept_button.clicked.connect(self.accept)
+        bottom_row.addWidget(self.accept_button)
+        self.open_playlist_button = QPushButton(self.tr("Open"), self)
         self.open_playlist_button.setObjectName("playlist_dialog_open_playlist_button")
         self.open_playlist_button.clicked.connect(self.window.open_playlist_action.trigger)
         bottom_row.addWidget(self.open_playlist_button)
-        self.save_button = QPushButton(self.tr("Save"), self)
-        self.save_button.setObjectName("playlist_dialog_save_button")
-        self.save_button.clicked.connect(self.window.save_playlist_action.trigger)
-        bottom_row.addWidget(self.save_button)
         self.save_as_button = QPushButton(self.tr("Save As"), self)
         self.save_as_button.setObjectName("playlist_dialog_save_as_button")
         self.save_as_button.clicked.connect(self.window.save_playlist_as_action.trigger)
         bottom_row.addWidget(self.save_as_button)
-        bottom_row.addStretch(1)
+        self.cancel_button = QPushButton(self.tr("Cancel"), self)
+        self.cancel_button.setObjectName("playlist_dialog_cancel_button")
+        self.cancel_button.clicked.connect(self.reject)
+        bottom_row.addWidget(self.cancel_button)
         layout.addLayout(bottom_row)
-
-        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=self)
-        self.buttons.rejected.connect(self.close)
-        self.buttons.accepted.connect(self.close)
-        layout.addWidget(self.buttons)
 
         self.refresh_from_window()
         self.resize(560, 420)
@@ -747,6 +738,7 @@ class PlaylistDialog(QDialog):
             for path in paths:
                 self.list_widget.addItem(path)
             self.list_widget.setCurrentRow(current_row)
+        self.setWindowTitle(self.window._playlist_dialog_title())
         self._update_button_state()
 
     def _row_changed(self, row: int) -> None:
@@ -766,12 +758,11 @@ class PlaylistDialog(QDialog):
 
     def _update_button_state(self) -> None:
         self.remove_button.setEnabled(self.window.remove_selected_action.isEnabled())
-        self.open_button.setEnabled(self.list_widget.currentRow() >= 0)
+        self.accept_button.setEnabled(True)
         self.move_up_button.setEnabled(self.window.move_up_action.isEnabled())
         self.move_down_button.setEnabled(self.window.move_down_action.isEnabled())
-        self.sort_button.setEnabled(self.window.sort_playlist_action.isEnabled())
+        self.randomize_button.setEnabled(self.window.playlist.count() > 1)
         self.clear_button.setEnabled(self.window.clear_playlist_action.isEnabled())
-        self.save_button.setEnabled(self.window.save_playlist_action.isEnabled())
         self.save_as_button.setEnabled(self.window.save_playlist_as_action.isEnabled())
 
 
@@ -1953,6 +1944,15 @@ class MainWindow(QMainWindow):
             )
         )
 
+    def _playlist_dialog_title(self) -> str:
+        if self._current_playlist_path is None:
+            return self.tr("Manage Playlists")
+        marker = " (*)" if self._playlist_modified else ""
+        return self.tr("Manage Playlists: {name}{marker}").format(
+            name=self._current_playlist_path.name,
+            marker=marker,
+        )
+
     def _build_toolbar(self) -> None:
         self.playback_toolbar = QToolBar(self.tr("Playback"), self)
         self.playback_toolbar.setObjectName("playback_toolbar")
@@ -2284,6 +2284,24 @@ class MainWindow(QMainWindow):
         self._mark_playlist_modified()
         self._sync_playlist_ui()
         self.statusBar().showMessage(self.tr("Playlist sorted"), 5000)
+
+    def _randomize_playlist(self) -> None:
+        if self.playlist.count() < 2:
+            return
+        selected_path = None
+        current_item = self.playlist.currentItem()
+        if current_item is not None:
+            selected_path = current_item.text()
+        paths = [self.playlist.item(row).text() for row in range(self.playlist.count())]
+        random.shuffle(paths)
+        self.playlist.clear()
+        for path in paths:
+            self.playlist.addItem(path)
+        if selected_path is not None:
+            self._select_playlist_file(selected_path)
+        self._mark_playlist_modified()
+        self._sync_playlist_ui()
+        self.statusBar().showMessage(self.tr("Playlist randomized"), 5000)
 
     def _clear_playlist(self) -> None:
         if self.playlist.count() == 0:

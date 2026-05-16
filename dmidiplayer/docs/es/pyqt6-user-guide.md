@@ -108,9 +108,8 @@ La `List` de la izquierda es la lista de reproducción actual.
 
 `File -> Play List...` abre una ventana separada que refleja las mismas
 canciones y la misma selección de la ventana principal. Desde allí puedes
-añadir archivos, cargar la canción seleccionada, mover entradas hacia arriba o
-abajo, ordenar el conjunto, eliminar entradas, vaciar la lista y abrir o
-guardar archivos `.lst`.
+añadir archivos, mover entradas hacia arriba o abajo, aleatorizar el orden,
+eliminar entradas, vaciar la lista y abrir o guardar archivos `.lst`.
 
 Si el título de la ventana muestra un `*` antes del nombre de la lista, eso
 indica que hay cambios sin guardar.

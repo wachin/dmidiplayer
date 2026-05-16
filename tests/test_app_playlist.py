@@ -1935,7 +1935,7 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertIsNotNone(window.playlist_dialog)
             assert window.playlist_dialog is not None
-            self.assertEqual(window.playlist_dialog.windowTitle(), "Play List")
+            self.assertEqual(window.playlist_dialog.windowTitle(), "Manage Playlists")
             self.assertTrue(window.playlist_dialog.isVisible())
 
     def test_window_menu_actions_toggle_independent_windows(self) -> None:
@@ -2042,6 +2042,64 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.count(), 1)
                 self.assertEqual(dialog.list_widget.count(), 1)
                 self.assertEqual(window.playlist.item(0).text(), str(second))
+
+    def test_playlist_dialog_title_tracks_playlist_file_and_unsaved_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path = Path(tmpdir, "examples.lst")
+            playlist_path.write_text(f"{first}\n{second}\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_playlist_file(playlist_path)
+                window.playlist_dialog_action.trigger()
+
+                assert window.playlist_dialog is not None
+                self.assertEqual(window.playlist_dialog.windowTitle(), "Manage Playlists: examples.lst")
+
+                window.add_file(str(first.parent / "third.mid"), mark_modified=False)
+
+                third = first.parent / "third.mid"
+                write_simple_midi(third)
+                window.add_file(str(third))
+                self.assertEqual(window.playlist_dialog.windowTitle(), "Manage Playlists: examples.lst (*)")
+
+    def test_playlist_dialog_randomize_button_reorders_playlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            third = Path(tmpdir, "third.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            write_simple_midi(third)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.random.shuffle", side_effect=lambda items: items.reverse()),
+            ):
+                window = MainWindow([str(first), str(second), str(third)])
+                window.playlist_dialog_action.trigger()
+
+                assert window.playlist_dialog is not None
+                dialog = window.playlist_dialog
+                dialog.randomize_button.click()
+
+                self.assertEqual(
+                    [window.playlist.item(row).text() for row in range(window.playlist.count())],
+                    [str(third), str(second), str(first)],
+                )
+                self.assertEqual(
+                    [dialog.list_widget.item(row).text() for row in range(dialog.list_widget.count())],
+                    [str(third), str(second), str(first)],
+                )
+                self.assertEqual(window.statusBar().currentMessage(), "Playlist randomized")
 
     def test_move_selected_playlist_item_updates_order_and_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

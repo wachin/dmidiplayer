@@ -260,6 +260,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] Open and save `.lst` playlists.
   - [x] Add and remove playlist entries.
   - [x] Reorder playlist entries up and down.
+  - [x] Randomize playlist entry order from the playlist manager.
   - [x] Sort playlist entries alphabetically.
   - [x] Open `.lst` playlists from shared file-opening paths, including startup arguments.
 - [x] Show the playlist file name in the window title.

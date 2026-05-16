@@ -108,8 +108,8 @@ The `List` on the left is the current playlist.
 
 `File -> Play List...` opens a separate playlist manager window that mirrors the
 same songs and current selection as the main window. From there you can add
-files, load the selected song, move entries up or down, sort the set, remove
-entries, clear the list, and open or save `.lst` playlist files.
+files, move entries up or down, randomize the order, remove entries, clear the
+list, and open or save `.lst` playlist files.
 
 If the window title shows a `*` before the playlist file name, the playlist has
 unsaved changes.
