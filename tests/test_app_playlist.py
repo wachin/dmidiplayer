@@ -777,10 +777,15 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             menus = [action.text() for action in window.menuBar().actions()]
 
-            self.assertEqual(menus, ["File", "Playback", "View", "Tools", "Help"])
+            self.assertEqual(menus, ["File", "Playback", "View", "Window", "Tools", "Help"])
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.open_playlist_action), "open_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.playlist_dialog_action), "playlist_dialog_action"))
+            self.assertIsNotNone(window.findChild(type(window.window_main_action), "window_main_action"))
+            self.assertIsNotNone(window.findChild(type(window.window_playlist_action), "window_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.window_channels_action), "window_channels_action"))
+            self.assertIsNotNone(window.findChild(type(window.window_pianola_action), "window_pianola_action"))
+            self.assertIsNotNone(window.findChild(type(window.window_lyrics_action), "window_lyrics_action"))
             self.assertIsNotNone(window.findChild(type(window.save_playlist_action), "save_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.save_playlist_as_action), "save_playlist_as_action"))
             self.assertIsNotNone(window.findChild(type(window.play_action), "play_action"))
@@ -1932,6 +1937,53 @@ class AppPlaylistTest(unittest.TestCase):
             assert window.playlist_dialog is not None
             self.assertEqual(window.playlist_dialog.windowTitle(), "Play List")
             self.assertTrue(window.playlist_dialog.isVisible())
+
+    def test_window_menu_actions_toggle_independent_windows(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.window_playlist_action.setChecked(True)
+            window.window_channels_action.setChecked(True)
+            window.window_pianola_action.setChecked(True)
+            window.window_lyrics_action.setChecked(True)
+
+            self.assertIsNotNone(window.playlist_dialog)
+            self.assertTrue(window.playlist_dialog.isVisible())
+            self.assertIsNotNone(window.channels_dialog)
+            self.assertTrue(window.channels_dialog.isVisible())
+            self.assertIsNotNone(window.pianola_dialog)
+            self.assertTrue(window.pianola_dialog.isVisible())
+            self.assertIsNotNone(window.lyrics_dialog)
+            self.assertTrue(window.lyrics_dialog.isVisible())
+
+            window.window_playlist_action.setChecked(False)
+            window.window_channels_action.setChecked(False)
+            window.window_pianola_action.setChecked(False)
+            window.window_lyrics_action.setChecked(False)
+
+            self.assertFalse(window.playlist_dialog.isVisible())
+            self.assertFalse(window.channels_dialog.isVisible())
+            self.assertFalse(window.pianola_dialog.isVisible())
+            self.assertFalse(window.lyrics_dialog.isVisible())
+
+    def test_window_menu_state_reflects_current_visible_windows(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            window.playlist_dialog_action.trigger()
+            window.channels_action.trigger()
+
+            window._refresh_window_menu_state()
+
+            self.assertTrue(window.window_playlist_action.isChecked())
+            self.assertTrue(window.window_channels_action.isChecked())
+            self.assertFalse(window.window_pianola_action.isChecked())
+            self.assertFalse(window.window_lyrics_action.isChecked())
 
     def test_playlist_dialog_stays_in_sync_with_main_playlist_selection(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

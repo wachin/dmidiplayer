@@ -1643,6 +1643,33 @@ class MainWindow(QMainWindow):
         self.playlist_dialog_action = QAction(self.tr("Play List..."), self)
         self.playlist_dialog_action.setObjectName("playlist_dialog_action")
         self.playlist_dialog_action.triggered.connect(self._show_playlist_dialog)
+        self.window_main_action = QAction(self.tr("Main Window"), self)
+        self.window_main_action.setObjectName("window_main_action")
+        self.window_main_action.triggered.connect(self._show_main_window)
+        self.window_playlist_action = QAction(self.tr("Play List"), self)
+        self.window_playlist_action.setObjectName("window_playlist_action")
+        self.window_playlist_action.setCheckable(True)
+        self.window_playlist_action.toggled.connect(
+            lambda visible: self._set_dialog_visibility("playlist_dialog", self._create_playlist_dialog, visible)
+        )
+        self.window_channels_action = QAction(self.tr("Channels"), self)
+        self.window_channels_action.setObjectName("window_channels_action")
+        self.window_channels_action.setCheckable(True)
+        self.window_channels_action.toggled.connect(
+            lambda visible: self._set_dialog_visibility("channels_dialog", self._create_channels_dialog, visible)
+        )
+        self.window_pianola_action = QAction(self.tr("Piano Player"), self)
+        self.window_pianola_action.setObjectName("window_pianola_action")
+        self.window_pianola_action.setCheckable(True)
+        self.window_pianola_action.toggled.connect(
+            lambda visible: self._set_dialog_visibility("pianola_dialog", self._create_pianola_dialog, visible)
+        )
+        self.window_lyrics_action = QAction(self.tr("Lyrics"), self)
+        self.window_lyrics_action.setObjectName("window_lyrics_action")
+        self.window_lyrics_action.setCheckable(True)
+        self.window_lyrics_action.toggled.connect(
+            lambda visible: self._set_dialog_visibility("lyrics_dialog", self._create_lyrics_dialog, visible)
+        )
         self.save_playlist_action = QAction(self.tr("Save Playlist"), self)
         self.save_playlist_action.setObjectName("save_playlist_action")
         self.save_playlist_action.setShortcut(QKeySequence.StandardKey.Save)
@@ -2025,6 +2052,16 @@ class MainWindow(QMainWindow):
         self.rhythm_action.toggled.connect(self.rhythm_view.setVisible)
         view_menu.addAction(self.rhythm_action)
 
+        self.window_menu = self.menuBar().addMenu(self.tr("Window"))
+        self.window_menu.setObjectName("window_menu")
+        self.window_menu.aboutToShow.connect(self._refresh_window_menu_state)
+        self.window_menu.addAction(self.window_main_action)
+        self.window_menu.addSeparator()
+        self.window_menu.addAction(self.window_playlist_action)
+        self.window_menu.addAction(self.window_channels_action)
+        self.window_menu.addAction(self.window_pianola_action)
+        self.window_menu.addAction(self.window_lyrics_action)
+
         tools_menu = self.menuBar().addMenu(self.tr("Tools"))
         tools_menu.setObjectName("tools_menu")
         tools_menu.addAction(self.preferences_action)
@@ -2056,6 +2093,76 @@ class MainWindow(QMainWindow):
     def _clear_recent_files(self) -> None:
         self.settings.clear_recent_files()
         self._refresh_recent_files_menu()
+
+    def _show_main_window(self) -> None:
+        if self.isMinimized():
+            self.showNormal()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _dialog_is_visible(self, dialog: QDialog | None) -> bool:
+        return dialog is not None and dialog.isVisible()
+
+    def _refresh_window_menu_state(self) -> None:
+        action_map = (
+            (self.window_playlist_action, self.playlist_dialog),
+            (self.window_channels_action, self.channels_dialog),
+            (self.window_pianola_action, self.pianola_dialog),
+            (self.window_lyrics_action, self.lyrics_dialog),
+        )
+        for action, dialog in action_map:
+            with QSignalBlocker(action):
+                action.setChecked(self._dialog_is_visible(dialog))
+
+    def _set_dialog_visibility(self, attribute_name: str, factory: object, visible: bool) -> None:
+        dialog = getattr(self, attribute_name)
+        if visible:
+            if dialog is None:
+                dialog = factory()
+                setattr(self, attribute_name, dialog)
+                if attribute_name == "channels_dialog":
+                    self._refresh_channels_dialog()
+                elif attribute_name == "pianola_dialog":
+                    dialog.set_display_preferences(
+                        self.pianola_color_mode,
+                        self.pianola_single_color,
+                        self.pianola_velocity_tinting,
+                        self.pianola_note_label_mode,
+                        self.pianola_note_font_family,
+                        self.pianola_note_font_size,
+                        self.pianola_octave_designation,
+                    )
+                    dialog.trackVisibilityChanged.connect(self._pianola_track_visibility_changed)
+                    dialog.allTracksVisibilityChanged.connect(self._pianola_all_tracks_visibility_changed)
+                    dialog.rangeModeChanged.connect(self._pianola_range_mode_changed)
+                    dialog.noteLabelModeChanged.connect(self._pianola_note_label_mode_changed)
+                    dialog.colorModeChanged.connect(self._pianola_color_mode_changed)
+                    dialog.octaveDesignationChanged.connect(self._pianola_octave_designation_changed)
+                    dialog.manualNoteOn.connect(
+                        lambda channel, note, velocity: self._manual_note_on(channel, note, velocity, "Piano Player")
+                    )
+                    dialog.manualNoteOff.connect(
+                        lambda channel, note: self._manual_note_off(channel, note, "Piano Player")
+                    )
+                    self._refresh_pianola_dialog()
+                elif attribute_name == "lyrics_dialog":
+                    dialog.set_display_preferences(
+                        self.lyrics_font_family,
+                        self.lyrics_font_size,
+                        self.lyrics_future_color,
+                        self.lyrics_past_color,
+                    )
+                    dialog.set_selected_encoding(self.lyrics_encoding)
+                    dialog.textSaved.connect(self._lyrics_text_saved)
+                    dialog.textPrinted.connect(self._lyrics_text_printed)
+                    self._refresh_lyrics_dialog()
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+        elif dialog is not None:
+            dialog.hide()
+        self._refresh_window_menu_state()
 
     def _refresh_playlist_dialog(self) -> None:
         if self.playlist_dialog is not None:
@@ -2111,12 +2218,7 @@ class MainWindow(QMainWindow):
         return PlaylistDialog(self)
 
     def _show_playlist_dialog(self) -> None:
-        if self.playlist_dialog is None:
-            self.playlist_dialog = self._create_playlist_dialog()
-        self.playlist_dialog.refresh_from_window()
-        self.playlist_dialog.show()
-        self.playlist_dialog.raise_()
-        self.playlist_dialog.activateWindow()
+        self._set_dialog_visibility("playlist_dialog", self._create_playlist_dialog, True)
 
     def _playlist_dialog_folder(self) -> Path:
         saved_playlist = self.settings.playlist_path()
@@ -2388,10 +2490,7 @@ class MainWindow(QMainWindow):
         return self.channels_dialog
 
     def _show_channels_dialog(self) -> None:
-        dialog = self._ensure_channels_dialog()
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        self._set_dialog_visibility("channels_dialog", self._create_channels_dialog, True)
 
     def _refresh_channels_dialog(self) -> None:
         if self.channels_dialog is None:
@@ -2455,10 +2554,7 @@ class MainWindow(QMainWindow):
         return self.pianola_dialog
 
     def _show_pianola_dialog(self) -> None:
-        dialog = self._ensure_pianola_dialog()
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        self._set_dialog_visibility("pianola_dialog", self._create_pianola_dialog, True)
 
     def _refresh_pianola_dialog(self) -> None:
         if self.pianola_dialog is None:
@@ -2583,10 +2679,7 @@ class MainWindow(QMainWindow):
         return self.lyrics_dialog
 
     def _show_lyrics_dialog(self) -> None:
-        dialog = self._ensure_lyrics_dialog()
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        self._set_dialog_visibility("lyrics_dialog", self._create_lyrics_dialog, True)
 
     def _refresh_lyrics_dialog(self) -> None:
         if self.lyrics_dialog is None:

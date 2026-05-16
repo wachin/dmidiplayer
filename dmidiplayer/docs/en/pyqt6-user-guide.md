@@ -49,6 +49,14 @@ to open a MIDI file or playlist.
 - `Playlist Auto-Advance`: automatically continue to the next playlist item
   when a song finishes.
 
+## Window Menu
+
+- `Main Window`: bring the main player window to the front.
+- `Play List`: show or hide the playlist manager window.
+- `Channels`: show or hide the channels window.
+- `Piano Player`: show or hide the Piano Player window.
+- `Lyrics`: show or hide the Lyrics window.
+
 ## View Menu
 
 - `Channels`: open the channel activity window.

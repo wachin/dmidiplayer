@@ -49,6 +49,14 @@ abras un archivo MIDI o una lista `.lst`.
 - `Playlist Auto-Advance`: continúa automáticamente con la siguiente entrada
   cuando termina una canción.
 
+## Menú Window
+
+- `Main Window`: trae al frente la ventana principal del reproductor.
+- `Play List`: muestra u oculta la ventana del administrador de listas.
+- `Channels`: muestra u oculta la ventana de canales.
+- `Piano Player`: muestra u oculta la ventana de Piano Player.
+- `Lyrics`: muestra u oculta la ventana de letras.
+
 ## Menú View
 
 - `Channels`: abre la ventana de actividad de canales.
