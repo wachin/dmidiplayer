@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence
+from PyQt6.QtGui import QAction, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence, QPalette
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -252,6 +252,28 @@ def available_qt_styles() -> list[str]:
     return sorted(QStyleFactory.keys(), key=str.casefold)
 
 
+def dark_palette() -> QPalette:
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#1f2937"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#f9fafb"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#111827"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#1f2937"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#111827"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#f9fafb"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#f9fafb"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#374151"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#f9fafb"))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#2563eb"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Link, QColor("#60a5fa"))
+    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor("#9ca3af"))
+    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor("#9ca3af"))
+    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor("#9ca3af"))
+    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor("#9ca3af"))
+    return palette
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, parent: QWidget | None, settings: AppSettings) -> None:
         super().__init__(parent)
@@ -288,6 +310,10 @@ class PreferencesDialog(QDialog):
         self.general_auto_song_settings = QCheckBox(self.tr("Automatically load and save song settings"), general_tab)
         self.general_auto_song_settings.setObjectName("general_auto_song_settings")
         general_form.addRow("", self.general_auto_song_settings)
+
+        self.general_force_dark_mode = QCheckBox(self.tr("Force dark mode"), general_tab)
+        self.general_force_dark_mode.setObjectName("general_force_dark_mode")
+        general_form.addRow("", self.general_force_dark_mode)
 
         self.general_qt_style = QComboBox(general_tab)
         self.general_qt_style.setObjectName("general_qt_style")
@@ -384,6 +410,7 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(self._settings.auto_play_on_load())
         self.general_playlist_auto_advance.setChecked(self._settings.playlist_auto_advance())
         self.general_auto_song_settings.setChecked(self._settings.auto_song_settings())
+        self.general_force_dark_mode.setChecked(self._settings.force_dark_mode())
         self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(self._settings.qt_style())))
         self.general_midi_reset_before_playback.setChecked(self._settings.midi_reset_before_playback())
         self.lyrics_font_family.setCurrentFont(QFont(self._settings.lyrics_font_family()))
@@ -412,6 +439,7 @@ class PreferencesDialog(QDialog):
         self.general_auto_play_on_load.setChecked(AppSettings.DEFAULT_AUTO_PLAY_ON_LOAD)
         self.general_playlist_auto_advance.setChecked(AppSettings.DEFAULT_PLAYLIST_AUTO_ADVANCE)
         self.general_auto_song_settings.setChecked(AppSettings.DEFAULT_AUTO_SONG_SETTINGS)
+        self.general_force_dark_mode.setChecked(AppSettings.DEFAULT_FORCE_DARK_MODE)
         self.general_qt_style.setCurrentIndex(max(0, self.general_qt_style.findData(AppSettings.DEFAULT_QT_STYLE)))
         self.general_midi_reset_before_playback.setChecked(AppSettings.DEFAULT_MIDI_RESET_BEFORE_PLAYBACK)
         self.lyrics_font_family.setCurrentFont(QFont(AppSettings.DEFAULT_LYRICS_FONT_FAMILY))
@@ -443,6 +471,7 @@ class PreferencesDialog(QDialog):
             self.general_auto_play_on_load.isChecked(),
             self.general_playlist_auto_advance.isChecked(),
             self.general_auto_song_settings.isChecked(),
+            self.general_force_dark_mode.isChecked(),
             str(self.general_qt_style.currentData()),
             self.general_midi_reset_before_playback.isChecked(),
             self.lyrics_font_family.currentFont().family(),
@@ -1226,6 +1255,7 @@ class MainWindow(QMainWindow):
         self.settings = AppSettings()
         self._restore_window_geometry()
         self._system_qt_style = QApplication.style().objectName() or "Fusion"
+        self._system_palette = QPalette(QApplication.palette())
         self.manager = BackendManager(self)
         self.output = self._create_midi_output()
         self.player = SequencePlayer(self.output, self)
@@ -1241,6 +1271,7 @@ class MainWindow(QMainWindow):
         self.auto_play_on_load = self.settings.auto_play_on_load()
         self.auto_advance_playlist = self.settings.playlist_auto_advance()
         self.auto_song_settings = self.settings.auto_song_settings()
+        self.force_dark_mode = self.settings.force_dark_mode()
         self.qt_style = self.settings.qt_style()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
@@ -1303,6 +1334,7 @@ class MainWindow(QMainWindow):
         self._build_menu_bar()
         self._build_layout()
         self._apply_qt_style(self.qt_style)
+        self._apply_color_mode()
         self._refresh_midi_connections(autoconnect=True)
         if start_files:
             self.open_paths([Path(file_name) for file_name in start_files], remember_folder=False)
@@ -2296,6 +2328,9 @@ class MainWindow(QMainWindow):
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
 
+    def _apply_color_mode(self) -> None:
+        QApplication.setPalette(dark_palette() if self.force_dark_mode else QApplication.style().standardPalette())
+
     def _apply_qt_style(self, style_name: str) -> None:
         target = self._system_qt_style if style_name == "system" else style_name
         if not target:
@@ -2303,6 +2338,7 @@ class MainWindow(QMainWindow):
         applied = QApplication.setStyle(target)
         if applied is not None:
             self.qt_style = style_name if style_name in {"system", *available_qt_styles()} else "system"
+            self._apply_color_mode()
 
     def _apply_preferences(
         self,
@@ -2311,6 +2347,7 @@ class MainWindow(QMainWindow):
         auto_play_on_load: bool,
         playlist_auto_advance: bool,
         auto_song_settings: bool,
+        force_dark_mode: bool,
         qt_style: str,
         midi_reset_before_playback: bool,
         lyrics_font_family: str,
@@ -2333,6 +2370,8 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setChecked(playlist_auto_advance)
         self.auto_song_settings = auto_song_settings
         self.settings.set_auto_song_settings(auto_song_settings)
+        self.force_dark_mode = force_dark_mode
+        self.settings.set_force_dark_mode(force_dark_mode)
         self.settings.set_qt_style(qt_style)
         self._apply_qt_style(qt_style)
         self.player.set_send_reset_before_playback(midi_reset_before_playback)

@@ -169,16 +169,19 @@ class AppSettingsTest(unittest.TestCase):
             self.assertTrue(settings.playlist_auto_advance())
             self.assertFalse(settings.auto_song_settings())
             self.assertEqual(settings.qt_style(), "system")
+            self.assertFalse(settings.force_dark_mode())
 
             settings.set_auto_play_on_load(True)
             settings.set_playlist_auto_advance(False)
             settings.set_auto_song_settings(True)
+            settings.set_force_dark_mode(True)
             settings.set_qt_style("Fusion")
             restored = AppSettings(base_dir)
 
             self.assertTrue(restored.auto_play_on_load())
             self.assertFalse(restored.playlist_auto_advance())
             self.assertTrue(restored.auto_song_settings())
+            self.assertTrue(restored.force_dark_mode())
             self.assertEqual(restored.qt_style(), "Fusion")
 
     def test_general_preferences_are_saved_and_clamped(self) -> None:

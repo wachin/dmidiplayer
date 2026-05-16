@@ -319,6 +319,7 @@ La pestaña `General` actual incluye:
 - `Auto-play after loading a file`
 - `Auto-advance to the next playlist item`
 - `Automatically load and save song settings`
+- `Force dark mode`
 - `Qt Widgets style`
 - `Send GM reset before playback`
 

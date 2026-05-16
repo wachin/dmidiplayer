@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPalette
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
@@ -40,6 +40,7 @@ class FakeSettings:
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_QT_STYLE = "system"
+    DEFAULT_FORCE_DARK_MODE = False
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
@@ -59,6 +60,7 @@ class FakeSettings:
     playlist_auto_advance_value = True
     auto_song_settings_value = False
     qt_style_value = "system"
+    force_dark_mode_value = False
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
     lyrics_font_family_value = "Sans Serif"
@@ -141,6 +143,12 @@ class FakeSettings:
 
     def set_qt_style(self, style_name: str) -> None:
         type(self).qt_style_value = style_name
+
+    def force_dark_mode(self) -> bool:
+        return type(self).force_dark_mode_value
+
+    def set_force_dark_mode(self, enabled: bool) -> None:
+        type(self).force_dark_mode_value = enabled
 
     def solo_volume_reduction(self) -> int:
         return type(self).solo_volume_reduction_value
@@ -457,6 +465,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.playlist_auto_advance_value = True
         FakeSettings.auto_song_settings_value = False
         FakeSettings.qt_style_value = "system"
+        FakeSettings.force_dark_mode_value = False
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.lyrics_font_family_value = "Sans Serif"
@@ -2123,6 +2132,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.auto_play_on_load_value = True
         FakeSettings.playlist_auto_advance_value = False
         FakeSettings.auto_song_settings_value = True
+        FakeSettings.force_dark_mode_value = True
         FakeSettings.qt_style_value = "Fusion"
         FakeSettings.midi_reset_before_playback_value = True
         FakeSettings.lyrics_font_family_value = "Monospace"
@@ -2152,6 +2162,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertFalse(dialog.general_playlist_auto_advance.isChecked())
             self.assertTrue(dialog.general_auto_song_settings.isChecked())
+            self.assertTrue(dialog.general_force_dark_mode.isChecked())
             self.assertEqual(dialog.general_qt_style.currentData(), "Fusion")
             self.assertTrue(dialog.general_midi_reset_before_playback.isChecked())
             self.assertIn("Mono", dialog.lyrics_font_family.currentFont().family())
@@ -2173,6 +2184,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertFalse(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
             self.assertFalse(dialog.general_auto_song_settings.isChecked())
+            self.assertFalse(dialog.general_force_dark_mode.isChecked())
             self.assertEqual(dialog.general_qt_style.currentData(), "system")
             self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
             self.assertIn("Sans", dialog.lyrics_font_family.currentFont().family())
@@ -2200,6 +2212,7 @@ class AppPlaylistTest(unittest.TestCase):
                 True,
                 False,
                 True,
+                True,
                 "Fusion",
                 True,
                 "Monospace",
@@ -2221,6 +2234,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(window.auto_play_on_load)
             self.assertFalse(window.auto_advance_playlist)
             self.assertTrue(window.auto_song_settings)
+            self.assertTrue(window.force_dark_mode)
             self.assertEqual(window.qt_style, "Fusion")
             self.assertTrue(window.player.send_reset_before_playback)
             self.assertEqual(window.lyrics_font_family, "Monospace")
@@ -2239,6 +2253,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertTrue(FakeSettings.auto_play_on_load_value)
             self.assertFalse(FakeSettings.playlist_auto_advance_value)
             self.assertTrue(FakeSettings.auto_song_settings_value)
+            self.assertTrue(FakeSettings.force_dark_mode_value)
             self.assertEqual(FakeSettings.qt_style_value, "Fusion")
             self.assertTrue(FakeSettings.midi_reset_before_playback_value)
             self.assertEqual(FakeSettings.lyrics_font_family_value, "Monospace")
@@ -2429,6 +2444,22 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(QApplication.style().objectName().casefold(), "fusion")
         finally:
             QApplication.setStyle(original_style)
+
+    def test_saved_force_dark_mode_is_applied_on_startup(self) -> None:
+        original_palette = QPalette(QApplication.palette())
+        FakeSettings.force_dark_mode_value = True
+        try:
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                MainWindow([])
+                self.assertEqual(
+                    QApplication.palette().color(QPalette.ColorRole.Window).name(),
+                    "#1f2937",
+                )
+        finally:
+            QApplication.setPalette(original_palette)
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
