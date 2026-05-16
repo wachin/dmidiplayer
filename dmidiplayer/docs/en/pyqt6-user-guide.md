@@ -182,16 +182,15 @@ MIDI channel used by the loaded song.
 Each row currently includes:
 
 - `Channel`: the MIDI channel number
-- `Label`: an editable text label for that channel
+- `Label`: an inline editable text label for that channel
 - `Mute`: silences that channel during playback
 - `Solo`: keeps that channel at full level while reducing the others according
   to the current solo reduction preference
+- `Level`: a compact combined area with live note activity and a volume slider
 - `Program`: sends a program change for that channel and overrides later
   program-change events from the file. The selector now shows General MIDI
   instrument names instead of only raw program numbers
 - `Lock`: ignores later program changes from the file for that channel
-- `Volume`: adjusts the playback level for that channel from `0%` to `200%`
-- `Level`: a live activity meter that follows note velocity while playback runs
 
 This is still an early Python port slice of the channels view, so there are
 still richer channel behaviors pending.

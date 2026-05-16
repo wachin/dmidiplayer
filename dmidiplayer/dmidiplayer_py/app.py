@@ -21,8 +21,10 @@ from PyQt6.QtWidgets import (
     QFontComboBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -827,11 +829,11 @@ class RhythmView(QWidget):
 class ChannelsDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(self.tr("Channels"))
+        self.setWindowTitle(self.tr("MIDI Channels"))
         self.channel_rows: dict[int, int] = {}
         self._label_changed_callback: object | None = None
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 8, self)
+        self.table = QTableWidget(0, 7, self)
         self.table.setObjectName("channels_table")
         self.table.setHorizontalHeaderLabels(
             [
@@ -839,16 +841,19 @@ class ChannelsDialog(QDialog):
                 self.tr("Label"),
                 self.tr("Mute"),
                 self.tr("Solo"),
-                self.tr("Program"),
-                self.tr("Lock"),
-                self.tr("Volume"),
                 self.tr("Level"),
+                self.tr("Lock"),
+                self.tr("Program"),
             ]
         )
+        self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.itemChanged.connect(self._item_changed)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.table.setShowGrid(False)
         layout.addWidget(self.table)
-        self.resize(420, 320)
+        self.resize(640, 320)
 
     def set_channels(
         self,
@@ -881,59 +886,79 @@ class ChannelsDialog(QDialog):
                 channel_item = QTableWidgetItem(str(channel + 1))
                 channel_item.setFlags(channel_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, 0, channel_item)
-                self.table.setItem(
-                    row,
-                    1,
-                    QTableWidgetItem(
-                        channel_labels.get(channel, self.tr("Channel {number}").format(number=channel + 1))
-                    ),
+                label_edit = QLineEdit(
+                    channel_labels.get(channel, self.tr("Channel {number}").format(number=channel + 1)),
+                    self.table,
                 )
+                label_edit.setObjectName(f"channel_label_{channel + 1}")
+                if label_changed is not None:
+                    label_edit.editingFinished.connect(
+                        lambda ch=channel, editor=label_edit: label_changed(ch, editor.text())
+                    )
+                self.table.setCellWidget(row, 1, label_edit)
                 mute_checkbox = QCheckBox(self.table)
+                mute_checkbox.setObjectName(f"channel_mute_{channel + 1}")
                 mute_checkbox.setChecked(channel in muted_channels)
+                mute_checkbox.setStyleSheet("QCheckBox::indicator:checked { background-color: #7f1d1d; border: 1px solid #7f1d1d; }")
                 if mute_changed is not None:
                     mute_checkbox.toggled.connect(lambda checked, ch=channel: mute_changed(ch, checked))
                 self.table.setCellWidget(row, 2, mute_checkbox)
                 solo_checkbox = QCheckBox(self.table)
+                solo_checkbox.setObjectName(f"channel_solo_{channel + 1}")
                 solo_checkbox.setChecked(channel in solo_channels)
+                solo_checkbox.setStyleSheet("QCheckBox::indicator:checked { background-color: #166534; border: 1px solid #166534; }")
                 if solo_changed is not None:
                     solo_checkbox.toggled.connect(lambda checked, ch=channel: solo_changed(ch, checked))
                 self.table.setCellWidget(row, 3, solo_checkbox)
+                level_widget = QWidget(self.table)
+                level_widget.setObjectName(f"channel_level_widget_{channel + 1}")
+                level_layout = QGridLayout(level_widget)
+                level_layout.setContentsMargins(0, 0, 0, 0)
+                level_layout.setHorizontalSpacing(0)
+                level_layout.setVerticalSpacing(0)
+                level = QProgressBar(level_widget)
+                level.setObjectName(f"channel_level_bar_{channel + 1}")
+                level.setRange(0, 127)
+                level.setValue(0)
+                level.setTextVisible(False)
+                level.setStyleSheet(
+                    "QProgressBar { border: 1px solid #4b5563; background: #111827; } "
+                    "QProgressBar::chunk { background-color: #22c55e; }"
+                )
+                level_slider = QSlider(Qt.Orientation.Horizontal, level_widget)
+                level_slider.setObjectName(f"channel_volume_slider_{channel + 1}")
+                level_slider.setRange(0, 200)
+                level_slider.setValue(channel_volumes.get(channel, 100))
+                level_slider.setStyleSheet("QSlider { background: transparent; }")
+                if volume_changed is not None:
+                    level_slider.valueChanged.connect(lambda value, ch=channel: volume_changed(ch, value))
+                level_layout.addWidget(level, 0, 0)
+                level_layout.addWidget(level_slider, 0, 0)
+                self.table.setCellWidget(row, 4, level_widget)
+                lock_checkbox = QCheckBox(self.table)
+                lock_checkbox.setObjectName(f"channel_lock_{channel + 1}")
+                lock_checkbox.setChecked(channel in locked_channels)
+                if lock_changed is not None:
+                    lock_checkbox.toggled.connect(lambda checked, ch=channel: lock_changed(ch, checked))
+                self.table.setCellWidget(row, 5, lock_checkbox)
                 program_combo = QComboBox(self.table)
+                program_combo.setObjectName(f"channel_program_{channel + 1}")
                 for program in range(128):
                     program_combo.addItem(gm_program_label(program), program)
                 program_combo.setCurrentIndex(channel_programs.get(channel, 0))
                 if program_changed is not None:
                     program_combo.currentIndexChanged.connect(lambda value, ch=channel: program_changed(ch, value))
-                self.table.setCellWidget(row, 4, program_combo)
-                lock_checkbox = QCheckBox(self.table)
-                lock_checkbox.setChecked(channel in locked_channels)
-                if lock_changed is not None:
-                    lock_checkbox.toggled.connect(lambda checked, ch=channel: lock_changed(ch, checked))
-                self.table.setCellWidget(row, 5, lock_checkbox)
-                volume_slider = QSlider(Qt.Orientation.Horizontal, self.table)
-                volume_slider.setRange(0, 200)
-                volume_slider.setValue(channel_volumes.get(channel, 100))
-                if volume_changed is not None:
-                    volume_slider.valueChanged.connect(lambda value, ch=channel: volume_changed(ch, value))
-                self.table.setCellWidget(row, 6, volume_slider)
-                level = QProgressBar(self.table)
-                level.setRange(0, 127)
-                level.setValue(0)
-                level.setFormat("%v")
-                self.table.setCellWidget(row, 7, level)
+                self.table.setCellWidget(row, 6, program_combo)
                 self.channel_rows[channel] = row
-
-    def _item_changed(self, item: QTableWidgetItem) -> None:
-        if item.column() != 1 or self._label_changed_callback is None:
-            return
-        for channel, row in self.channel_rows.items():
-            if row == item.row():
-                self._label_changed_callback(channel, item.text())
-                return
+        self.table.resizeColumnsToContents()
+        self.table.setColumnWidth(1, 140)
+        self.table.setColumnWidth(4, 120)
+        self.table.setColumnWidth(6, 220)
 
     def clear_levels(self) -> None:
         for row in self.channel_rows.values():
-            level = self.table.cellWidget(row, 7)
+            level_widget = self.table.cellWidget(row, 4)
+            level = level_widget.findChild(QProgressBar) if isinstance(level_widget, QWidget) else None
             if isinstance(level, QProgressBar):
                 level.setValue(0)
 
@@ -941,7 +966,8 @@ class ChannelsDialog(QDialog):
         row = self.channel_rows.get(channel)
         if row is None:
             return
-        level = self.table.cellWidget(row, 7)
+        level_widget = self.table.cellWidget(row, 4)
+        level = level_widget.findChild(QProgressBar) if isinstance(level_widget, QWidget) else None
         if isinstance(level, QProgressBar):
             level.setValue(max(0, min(127, value)))
 

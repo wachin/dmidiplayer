@@ -16,8 +16,11 @@ from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QDialog
 from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QLineEdit
+from PyQt6.QtWidgets import QProgressBar
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QSlider
+from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection, MidiEvent
@@ -908,7 +911,7 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             window.channels_action.trigger()
 
-            self.assertEqual(shown, ["Channels"])
+            self.assertEqual(shown, ["MIDI Channels"])
 
     def test_lyrics_action_opens_dialog(self) -> None:
         shown: list[str] = []
@@ -973,16 +976,20 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.table.rowCount(), 2)
                 self.assertEqual(dialog.table.item(0, 0).text(), "1")
                 self.assertEqual(dialog.table.item(1, 0).text(), "2")
-                self.assertEqual(dialog.table.item(0, 1).text(), "Channel 1")
-                self.assertTrue(bool(dialog.table.item(0, 1).flags() & Qt.ItemFlag.ItemIsEditable))
+                self.assertEqual(dialog.windowTitle(), "MIDI Channels")
+                self.assertIsInstance(dialog.table.cellWidget(0, 1), QLineEdit)
+                self.assertEqual(dialog.table.cellWidget(0, 1).text(), "Channel 1")
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
-                self.assertIsInstance(dialog.table.cellWidget(0, 4), QComboBox)
+                self.assertIsInstance(dialog.table.cellWidget(0, 4), QWidget)
                 self.assertIsInstance(dialog.table.cellWidget(0, 5), QCheckBox)
-                self.assertIsInstance(dialog.table.cellWidget(0, 6), QSlider)
-                self.assertEqual(dialog.table.cellWidget(0, 4).currentIndex(), 10)
-                self.assertEqual(dialog.table.cellWidget(1, 4).currentIndex(), 20)
-                self.assertIn("Music Box", dialog.table.cellWidget(0, 4).currentText())
+                self.assertIsInstance(dialog.table.cellWidget(0, 6), QComboBox)
+                level_widget = dialog.table.cellWidget(0, 4)
+                self.assertIsInstance(level_widget.findChild(QSlider), QSlider)
+                self.assertIsInstance(level_widget.findChild(QProgressBar), QProgressBar)
+                self.assertEqual(dialog.table.cellWidget(0, 6).currentIndex(), 10)
+                self.assertEqual(dialog.table.cellWidget(1, 6).currentIndex(), 20)
+                self.assertIn("Music Box", dialog.table.cellWidget(0, 6).currentText())
 
     def test_pianola_dialog_shows_only_tracks_with_midi(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1341,7 +1348,7 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_channels_dialog()
 
                 window._event_played(type("Evt", (), {"kind": "note_on", "channel": 1, "data": bytes([64, 80])})())
-                level = dialog.table.cellWidget(1, 7)
+                level = dialog.table.cellWidget(1, 4).findChild(QProgressBar)
                 self.assertEqual(level.value(), 80)
 
                 window._event_played(type("Evt", (), {"kind": "note_off", "channel": 1, "data": bytes([64, 0])})())
@@ -1394,7 +1401,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_channels_dialog()
-                program_combo = dialog.table.cellWidget(0, 4)
+                program_combo = dialog.table.cellWidget(0, 6)
 
                 program_combo.setCurrentIndex(33)
 
@@ -1430,7 +1437,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_channels_dialog()
-                volume_slider = dialog.table.cellWidget(0, 6)
+                volume_slider = dialog.table.cellWidget(0, 4).findChild(QSlider)
 
                 volume_slider.setValue(60)
 
