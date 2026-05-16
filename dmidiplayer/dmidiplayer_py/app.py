@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QProgressBar,
@@ -1297,7 +1298,7 @@ class LyricsDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(self.tr("Lyrics"))
+        self.setWindowTitle(self.tr("Lyrics and Texts"))
         self._text_events: list[object] = []
         self._track_counts: dict[int, int] = {}
         self._current_tick = 0
@@ -1318,13 +1319,6 @@ class LyricsDialog(QDialog):
             self.filter_combo.addItem(self.tr(label), key)
         self.filter_combo.currentIndexChanged.connect(self._apply_filter)
         filter_row.addWidget(self.filter_combo)
-        filter_row.addStretch(1)
-        layout.addLayout(filter_row)
-        self.browser = QTextBrowser(self)
-        self.browser.setObjectName("lyrics_browser")
-        layout.addWidget(self.browser)
-        button_row = QHBoxLayout()
-        button_row.addWidget(QLabel(self.tr("Encoding:")))
         self.encoding_combo = QComboBox(self)
         self.encoding_combo.setObjectName("lyrics_encoding_combo")
         self.encoding_combo.addItem(self.tr("Auto"), None)
@@ -1332,30 +1326,66 @@ class LyricsDialog(QDialog):
         self.encoding_combo.addItem("Latin-1", "latin-1")
         self.encoding_combo.addItem("CP1252", "cp1252")
         self.encoding_combo.currentIndexChanged.connect(self._apply_filter)
-        button_row.addWidget(self.encoding_combo)
-        button_row.addStretch(1)
+        filter_row.addWidget(QLabel(self.tr("Encoding:")))
+        filter_row.addWidget(self.encoding_combo)
+        filter_row.addStretch(1)
         self.save_button = QPushButton(self.tr("Save"), self)
         self.save_button.setObjectName("lyrics_save_button")
         self.save_button.clicked.connect(self.save_to_file)
-        button_row.addWidget(self.save_button)
         self.print_button = QPushButton(self.tr("Print"), self)
         self.print_button.setObjectName("lyrics_print_button")
         self.print_button.clicked.connect(self.print_text)
-        button_row.addWidget(self.print_button)
         self.copy_button = QPushButton(self.tr("Copy"), self)
         self.copy_button.setObjectName("lyrics_copy_button")
         self.copy_button.clicked.connect(self.copy_to_clipboard)
-        button_row.addWidget(self.copy_button)
         self.font_button = QPushButton(self.tr("Font"), self)
         self.font_button.setObjectName("lyrics_font_button")
         self.font_button.clicked.connect(self.choose_font)
-        button_row.addWidget(self.font_button)
         self.fullscreen_button = QPushButton(self.tr("Fullscreen"), self)
         self.fullscreen_button.setObjectName("lyrics_fullscreen_button")
         self.fullscreen_button.setCheckable(True)
         self.fullscreen_button.toggled.connect(self.set_fullscreen_enabled)
+        self.copy_action = QAction(self.tr("Copy to Clipboard"), self)
+        self.copy_action.triggered.connect(self.copy_to_clipboard)
+        self.save_action = QAction(self.tr("Save to File..."), self)
+        self.save_action.triggered.connect(self.save_to_file)
+        self.print_action = QAction(self.tr("Print..."), self)
+        self.print_action.triggered.connect(self.print_text)
+        self.fullscreen_action = QAction(self.tr("Fullscreen"), self)
+        self.fullscreen_action.setCheckable(True)
+        self.fullscreen_action.toggled.connect(self.fullscreen_button.setChecked)
+        self.font_action = QAction(self.tr("Font..."), self)
+        self.font_action.triggered.connect(self.choose_font)
+        self.menu_button = QToolButton(self)
+        self.menu_button.setObjectName("lyrics_menu_button")
+        self.menu_button.setText("≡")
+        self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(self.menu_button)
+        menu.addAction(self.copy_action)
+        menu.addAction(self.save_action)
+        menu.addAction(self.print_action)
+        menu.addAction(self.fullscreen_action)
+        menu.addAction(self.font_action)
+        self.menu_button.setMenu(menu)
+        filter_row.addWidget(self.menu_button)
+        layout.addLayout(filter_row)
+        self.browser = QTextBrowser(self)
+        self.browser.setObjectName("lyrics_browser")
+        layout.addWidget(self.browser)
+        button_row = QHBoxLayout()
+        button_row.addWidget(self.save_button)
+        button_row.addWidget(self.print_button)
+        button_row.addWidget(self.copy_button)
+        button_row.addWidget(self.font_button)
         button_row.addWidget(self.fullscreen_button)
-        layout.addLayout(button_row)
+        button_row.addStretch(1)
+        button_row.setContentsMargins(0, 0, 0, 0)
+        button_row.setSpacing(0)
+        button_row_widget = QWidget(self)
+        button_row_widget.setObjectName("lyrics_hidden_button_row")
+        button_row_widget.setVisible(False)
+        button_row_widget.setLayout(button_row)
+        layout.addWidget(button_row_widget)
         self.resize(560, 420)
 
     def set_display_preferences(self, font_family: str, font_size: int, future_color: str, past_color: str) -> None:
@@ -1514,6 +1544,8 @@ class LyricsDialog(QDialog):
         else:
             self.showNormal()
             self.fullscreen_button.setText(self.tr("Fullscreen"))
+        with QSignalBlocker(self.fullscreen_action):
+            self.fullscreen_action.setChecked(enabled)
 
     def save_to_file(self) -> None:
         file_name, _ = QFileDialog.getSaveFileName(

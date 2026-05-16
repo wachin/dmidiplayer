@@ -247,7 +247,7 @@ You can also play notes directly from the keyboards:
 
 ## Lyrics Window
 
-The `Lyrics` window is opened from the `View` menu. It shows text-related MIDI
+The `Lyrics and Texts` window is opened from the `View` menu. It shows text-related MIDI
 meta events from the loaded song.
 
 The filter at the top lets you switch between:
@@ -267,20 +267,24 @@ no dedicated lyric track, it falls back to the track with the most text events.
 Switching back to `All tracks` shows the track number before each line so mixed
 sources stay readable.
 
-The `Encoding` selector controls how embedded MIDI text is decoded in the
-window. `Auto` uses the built-in guesser, while `UTF-8`, `Latin-1`, and
-`CP1252` let you override the display manually.
+The top row also includes:
 
-Use `Save` to write the currently filtered text to a file. When `Auto` is
-selected, files are saved as `UTF-8`; otherwise the selected encoding is used.
+- `Encoding`: controls how embedded MIDI text is decoded in the window.
+  `Auto` uses the built-in guesser, while `UTF-8`, `Latin-1`, and `CP1252`
+  let you override the display manually.
+- menu button: opens actions for `Copy to Clipboard`, `Save to File...`,
+  `Print...`, `Fullscreen`, and `Font...`
 
-Use `Print` to send the currently filtered text to a printer through the
-standard Qt print dialog.
+`Save` writes the currently filtered text to a file. When `Auto` is selected,
+files are saved as `UTF-8`; otherwise the selected encoding is used.
 
-Use `Copy` to place the currently filtered text into the clipboard. Use `Font`
-to choose a more comfortable display font for the lyrics pane. Use
-`Fullscreen` to expand the lyrics window for rehearsal or singing along, and
-press `Esc` to return to the normal window.
+`Print` sends the currently filtered text to a printer through the standard Qt
+print dialog.
+
+`Copy` places the currently filtered text into the clipboard. `Font` chooses a
+more comfortable display font for the lyrics pane. `Fullscreen` expands the
+lyrics window for rehearsal or singing along, and `Esc` returns to the normal
+window.
 
 During playback, the visible lines are highlighted by state: earlier lines fade,
 the current line is emphasized, and upcoming lines remain easy to spot.

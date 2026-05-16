@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import QLineEdit
 from PyQt6.QtWidgets import QProgressBar
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QSlider
+from PyQt6.QtWidgets import QToolButton
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
 
@@ -929,7 +930,27 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             window.lyrics_action.trigger()
 
-            self.assertEqual(shown, ["Lyrics"])
+            self.assertEqual(shown, ["Lyrics and Texts"])
+
+    def test_lyrics_dialog_exposes_menu_button_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "text.mid")
+            write_text_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+
+                self.assertEqual(dialog.windowTitle(), "Lyrics and Texts")
+                self.assertIsNotNone(dialog.findChild(QToolButton, "lyrics_menu_button"))
+                action_texts = [action.text() for action in dialog.menu_button.menu().actions()]
+                self.assertEqual(
+                    action_texts,
+                    ["Copy to Clipboard", "Save to File...", "Print...", "Fullscreen", "Font..."],
+                )
 
     def test_pianola_action_opens_dialog(self) -> None:
         shown: list[str] = []

@@ -335,6 +335,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] Lyrics;
   - [x] Piano Player.
   - [x] Channels window now uses a more compact row layout closer to the original reference.
+  - [x] Lyrics window now uses a compact top control row with a popup actions menu closer to the original reference.
 - [ ] Embedded views that can be shown/hidden:
   - [x] toolbar;
   - [x] status bar;

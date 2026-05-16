@@ -253,7 +253,7 @@ Tambien puedes tocar notas directamente desde los teclados:
 
 ## Ventana de letras
 
-La ventana `Lyrics` se abre desde el menú `View`. Muestra eventos de texto MIDI
+La ventana `Lyrics and Texts` se abre desde el menú `View`. Muestra eventos de texto MIDI
 relacionados con la canción cargada.
 
 El filtro superior permite cambiar entre:
@@ -273,21 +273,24 @@ el archivo tiene texto pero no una pista de letras dedicada, entonces usa como
 respaldo la pista con mas eventos de texto. Si vuelves a `All tracks`, veras el
 numero de pista delante de cada linea para distinguir el origen.
 
-El selector `Encoding` controla como se decodifica en la ventana el texto MIDI
-incrustado. `Auto` usa la deteccion integrada, mientras que `UTF-8`,
-`Latin-1` y `CP1252` te permiten forzar manualmente la visualizacion.
+La fila superior también incluye:
 
-Usa `Save` para guardar en un archivo el texto filtrado actual. Cuando esta
-seleccionado `Auto`, el archivo se guarda como `UTF-8`; en los demas casos se
-usa la codificacion elegida.
+- `Encoding`: controla como se decodifica en la ventana el texto MIDI
+  incrustado. `Auto` usa la deteccion integrada, mientras que `UTF-8`,
+  `Latin-1` y `CP1252` te permiten forzar manualmente la visualizacion.
+- boton de menu: abre acciones para `Copy to Clipboard`, `Save to File...`,
+  `Print...`, `Fullscreen` y `Font...`
 
-Usa `Print` para enviar el texto filtrado actual a una impresora mediante el
-cuadro de impresion estandar de Qt.
+`Save` guarda en un archivo el texto filtrado actual. Cuando esta seleccionado
+`Auto`, el archivo se guarda como `UTF-8`; en los demas casos se usa la
+codificacion elegida.
 
-Usa `Copy` para llevar al portapapeles el texto filtrado actual. Usa `Font`
-para elegir una fuente mas comoda para el panel de letras. Usa `Fullscreen`
-para ampliar la ventana de letras durante el ensayo o el canto, y pulsa `Esc`
-para volver a la ventana normal.
+`Print` envia el texto filtrado actual a una impresora mediante el cuadro de
+impresion estandar de Qt.
+
+`Copy` lleva al portapapeles el texto filtrado actual. `Font` elige una fuente
+mas comoda para el panel de letras. `Fullscreen` amplia la ventana de letras
+durante el ensayo o el canto, y `Esc` vuelve a la ventana normal.
 
 Durante la reproduccion, las lineas visibles se resaltan por estado: las lineas
 anteriores se atenúan, la linea actual se enfatiza y las siguientes quedan
