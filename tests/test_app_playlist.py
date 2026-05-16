@@ -557,6 +557,26 @@ class AppPlaylistTest(unittest.TestCase):
                 window._update_position(480, 480)
                 self.assertEqual(window.time_label.text(), "00:00 / 00:00 - 120 BPM - Bar 1/1")
 
+    def test_transport_summary_panel_updates_with_controls(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            self.assertEqual(window.transport_time_label.text(), "00:00")
+            self.assertEqual(window.transport_summary_label.text(), "120 BPM")
+            self.assertEqual(window.transport_volume_label.text(), "100%")
+            self.assertEqual(window.transport_pitch_label.text(), "0")
+
+            window.tempo_control.setValue(150)
+            window.volume_control.setValue(80)
+            window.pitch_control.setValue(-3)
+
+            self.assertEqual(window.transport_summary_label.text(), "180 BPM")
+            self.assertEqual(window.transport_volume_label.text(), "80%")
+            self.assertEqual(window.transport_pitch_label.text(), "-3")
+
     def test_rhythm_view_updates_with_bar_and_beat(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "simple.mid")

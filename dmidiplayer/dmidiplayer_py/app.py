@@ -1652,7 +1652,7 @@ class MainWindow(QMainWindow):
         self.event_label = QLabel(self.tr("MIDI output: {name}").format(name=self.output.name))
         self.connection_combo = QComboBox()
         self.connection_combo.setMinimumWidth(260)
-        self.pitch_control = self._spinbox(-12, 12, 0, self.player.set_pitch_shift)
+        self.pitch_control = self._spinbox(-12, 12, 0, self._set_pitch_shift)
         self.percussion_channel_control = self._spinbox(
             1,
             16,
@@ -1660,13 +1660,21 @@ class MainWindow(QMainWindow):
             self._set_percussion_channel,
         )
         self.tempo_control = self._spinbox(50, 200, 100, self._set_tempo_percent, "%")
-        self.volume_control = self._spinbox(0, 200, 100, self.player.set_volume_percent, "%")
+        self.volume_control = self._spinbox(0, 200, 100, self._set_volume_percent, "%")
         self.loop_check = QCheckBox(self.tr("Loop"))
         self.loop_check.toggled.connect(self._toggle_loop)
         self.loop_start = self._spinbox(1, 1, 1, self._update_loop_range)
         self.loop_end = self._spinbox(1, 1, 1, self._update_loop_range)
         self.jump_bar = self._spinbox(1, 1, 1, self._jump_bar_value_changed)
         self._updating_position = False
+        self.transport_time_label = QLabel("00:00", self)
+        self.transport_time_label.setObjectName("transport_time_label")
+        self.transport_summary_label = QLabel("120 BPM", self)
+        self.transport_summary_label.setObjectName("transport_summary_label")
+        self.transport_volume_label = QLabel("100%", self)
+        self.transport_volume_label.setObjectName("transport_volume_label")
+        self.transport_pitch_label = QLabel("0", self)
+        self.transport_pitch_label.setObjectName("transport_pitch_label")
 
         self._build_actions()
         self._update_action_state()
@@ -3062,10 +3070,15 @@ class MainWindow(QMainWindow):
     def _build_layout(self) -> None:
         central = QWidget()
         root = QHBoxLayout(central)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(10)
         left = QVBoxLayout()
+        left.setSpacing(6)
         left.addWidget(QLabel(self.tr("List")))
         left.addWidget(self.playlist)
         right = QVBoxLayout()
+        right.setSpacing(8)
+        right.addWidget(self._build_transport_summary())
         right.addWidget(self.title_label)
         right.addWidget(self.position)
         right.addWidget(self.time_label)
@@ -3077,6 +3090,30 @@ class MainWindow(QMainWindow):
         root.addLayout(left, 1)
         root.addLayout(right, 3)
         self.setCentralWidget(central)
+
+    def _build_transport_summary(self) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("transport_summary_panel")
+        panel.setFrameShape(QFrame.Shape.StyledPanel)
+        panel.setStyleSheet(
+            "#transport_summary_panel { background: #111111; color: white; border: 1px solid #2b2b2b; }"
+            "#transport_time_label { font-size: 34px; color: white; }"
+            "#transport_summary_panel QLabel { color: white; }"
+        )
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(18)
+        self.transport_time_label.setMinimumWidth(160)
+        layout.addWidget(self.transport_time_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        details = QFormLayout()
+        details.setContentsMargins(0, 0, 0, 0)
+        details.setHorizontalSpacing(16)
+        details.setVerticalSpacing(6)
+        details.addRow(self.tr("Tempo:"), self.transport_summary_label)
+        details.addRow(self.tr("Volume:"), self.transport_volume_label)
+        details.addRow(self.tr("Pitch:"), self.transport_pitch_label)
+        layout.addLayout(details, 1)
+        return panel
 
     def _build_playback_settings(self) -> QWidget:
         panel = QWidget()
@@ -3518,7 +3555,16 @@ class MainWindow(QMainWindow):
 
     def _set_tempo_percent(self, value: int) -> None:
         self.player.set_tempo_percent(value)
+        self.transport_summary_label.setText(self.tr("{bpm:.0f} BPM").format(bpm=120 * value / 100))
         self._update_time_label(self.position.value(), self.position.maximum())
+
+    def _set_pitch_shift(self, value: int) -> None:
+        self.player.set_pitch_shift(value)
+        self.transport_pitch_label.setText(str(value))
+
+    def _set_volume_percent(self, value: int) -> None:
+        self.player.set_volume_percent(value)
+        self.transport_volume_label.setText(f"{value}%")
 
     def _set_percussion_channel(self, value: int) -> None:
         self.player.set_percussion_channel(value)
@@ -3528,6 +3574,10 @@ class MainWindow(QMainWindow):
         midi = self.player.sequence.midi
         if midi is None:
             self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
+            self.transport_time_label.setText("00:00")
+            self.transport_summary_label.setText("120 BPM")
+            self.transport_volume_label.setText(f"{self.player.volume_percent}%")
+            self.transport_pitch_label.setText(str(self.player.pitch_shift))
             return
         current_us = self.player.sequence.tick_to_microseconds(tick)
         total_us = self.player.sequence.tick_to_microseconds(maximum)
@@ -3548,6 +3598,10 @@ class MainWindow(QMainWindow):
                 bar_count=bar_count,
             )
         )
+        self.transport_time_label.setText(self._format_time(current_us))
+        self.transport_summary_label.setText(self.tr("{bpm:.2f} BPM").format(bpm=bpm))
+        self.transport_volume_label.setText(f"{self.player.volume_percent}%")
+        self.transport_pitch_label.setText(str(self.player.pitch_shift))
 
     def _format_time(self, microseconds: int) -> str:
         seconds = max(0, microseconds // 1_000_000)
