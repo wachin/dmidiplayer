@@ -352,6 +352,19 @@ The current `Player Piano` tab includes:
 - `Alt+Down`: Move selected playlist row down
 - `Ctrl+J`: Jump to the selected bar
 
+## Toolbar
+
+The current port lets you:
+
+- show or hide the toolbar from `View`
+- move the toolbar using standard Qt toolbar handling
+- choose button styles from `View -> Toolbar Buttons`:
+  - `Icon Only`
+  - `Text Only`
+  - `Text Beside Icon`
+  - `Text Under Icon`
+  - `Follow Qt Style`
+
 ## Current Limits
 
 This PyQt6 port is already useful, but some parts of the original application

@@ -361,6 +361,19 @@ La pestaña `Player Piano` actual incluye:
 - `Alt+Down`: mover la fila seleccionada hacia abajo
 - `Ctrl+J`: saltar al compás elegido
 
+## Barra de herramientas
+
+El port actual permite:
+
+- mostrar u ocultar la barra desde `View`
+- mover la barra usando el comportamiento estándar de Qt
+- elegir estilos de botones desde `View -> Toolbar Buttons`:
+  - `Icon Only`
+  - `Text Only`
+  - `Text Beside Icon`
+  - `Text Under Icon`
+  - `Follow Qt Style`
+
 ## Límites actuales
 
 Este port a PyQt6 ya es útil, pero todavía faltan partes de la aplicación

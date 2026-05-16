@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence, QPalette
+from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence, QPalette
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -317,6 +317,14 @@ ACTION_ICONS = {
     "channels_action": ("audio-midi", "audio-midi"),
     "pianola_action": ("application-menu", "application-menu"),
     "lyrics_action": ("view-media-lyrics", "view-media-lyrics"),
+}
+
+TOOLBAR_BUTTON_STYLES = {
+    "icon_only": Qt.ToolButtonStyle.ToolButtonIconOnly,
+    "text_only": Qt.ToolButtonStyle.ToolButtonTextOnly,
+    "text_beside": Qt.ToolButtonStyle.ToolButtonTextBesideIcon,
+    "text_under": Qt.ToolButtonStyle.ToolButtonTextUnderIcon,
+    "follow_style": Qt.ToolButtonStyle.ToolButtonFollowStyle,
 }
 
 
@@ -1326,6 +1334,7 @@ class MainWindow(QMainWindow):
         self.auto_song_settings = self.settings.auto_song_settings()
         self.force_dark_mode = self.settings.force_dark_mode()
         self.use_internal_icon_theme = self.settings.use_internal_icon_theme()
+        self.toolbar_button_style = self.settings.toolbar_button_style()
         self.qt_style = self.settings.qt_style()
         self.solo_volume_reduction = self.settings.solo_volume_reduction()
         self.lyrics_font_family = self.settings.lyrics_font_family()
@@ -1390,6 +1399,7 @@ class MainWindow(QMainWindow):
         self._apply_qt_style(self.qt_style)
         self._apply_color_mode()
         self._apply_icon_theme()
+        self._apply_toolbar_button_style(self.toolbar_button_style)
         self._refresh_midi_connections(autoconnect=True)
         if start_files:
             self.open_paths([Path(file_name) for file_name in start_files], remember_folder=False)
@@ -1522,6 +1532,33 @@ class MainWindow(QMainWindow):
         self.auto_advance_playlist_action.setCheckable(True)
         self.auto_advance_playlist_action.setChecked(self.auto_advance_playlist)
         self.auto_advance_playlist_action.toggled.connect(self._toggle_auto_advance_playlist)
+        self.toolbar_button_style_group = QActionGroup(self)
+        self.toolbar_button_style_group.setExclusive(True)
+        self.toolbar_icon_only_action = QAction(self.tr("Icon Only"), self)
+        self.toolbar_icon_only_action.setObjectName("toolbar_icon_only_action")
+        self.toolbar_icon_only_action.setCheckable(True)
+        self.toolbar_icon_only_action.triggered.connect(lambda: self._set_toolbar_button_style("icon_only"))
+        self.toolbar_button_style_group.addAction(self.toolbar_icon_only_action)
+        self.toolbar_text_only_action = QAction(self.tr("Text Only"), self)
+        self.toolbar_text_only_action.setObjectName("toolbar_text_only_action")
+        self.toolbar_text_only_action.setCheckable(True)
+        self.toolbar_text_only_action.triggered.connect(lambda: self._set_toolbar_button_style("text_only"))
+        self.toolbar_button_style_group.addAction(self.toolbar_text_only_action)
+        self.toolbar_text_beside_action = QAction(self.tr("Text Beside Icon"), self)
+        self.toolbar_text_beside_action.setObjectName("toolbar_text_beside_action")
+        self.toolbar_text_beside_action.setCheckable(True)
+        self.toolbar_text_beside_action.triggered.connect(lambda: self._set_toolbar_button_style("text_beside"))
+        self.toolbar_button_style_group.addAction(self.toolbar_text_beside_action)
+        self.toolbar_text_under_action = QAction(self.tr("Text Under Icon"), self)
+        self.toolbar_text_under_action.setObjectName("toolbar_text_under_action")
+        self.toolbar_text_under_action.setCheckable(True)
+        self.toolbar_text_under_action.triggered.connect(lambda: self._set_toolbar_button_style("text_under"))
+        self.toolbar_button_style_group.addAction(self.toolbar_text_under_action)
+        self.toolbar_follow_style_action = QAction(self.tr("Follow Qt Style"), self)
+        self.toolbar_follow_style_action.setObjectName("toolbar_follow_style_action")
+        self.toolbar_follow_style_action.setCheckable(True)
+        self.toolbar_follow_style_action.triggered.connect(lambda: self._set_toolbar_button_style("follow_style"))
+        self.toolbar_button_style_group.addAction(self.toolbar_follow_style_action)
 
     def _icon_for(self, theme_name: str, internal_name: str) -> QIcon:
         internal = bundled_icon(internal_name)
@@ -1534,6 +1571,27 @@ class MainWindow(QMainWindow):
             action = getattr(self, action_name, None)
             if isinstance(action, QAction):
                 action.setIcon(self._icon_for(theme_name, internal_name))
+
+    def _apply_toolbar_button_style(self, style_name: str) -> None:
+        style = TOOLBAR_BUTTON_STYLES.get(style_name, Qt.ToolButtonStyle.ToolButtonFollowStyle)
+        self.toolbar_button_style = style_name if style_name in TOOLBAR_BUTTON_STYLES else "follow_style"
+        if hasattr(self, "playback_toolbar"):
+            self.playback_toolbar.setToolButtonStyle(style)
+        action_map = {
+            "icon_only": self.toolbar_icon_only_action,
+            "text_only": self.toolbar_text_only_action,
+            "text_beside": self.toolbar_text_beside_action,
+            "text_under": self.toolbar_text_under_action,
+            "follow_style": self.toolbar_follow_style_action,
+        }
+        target = action_map.get(self.toolbar_button_style, self.toolbar_follow_style_action)
+        for action in action_map.values():
+            with QSignalBlocker(action):
+                action.setChecked(action is target)
+
+    def _set_toolbar_button_style(self, style_name: str) -> None:
+        self.settings.set_toolbar_button_style(style_name)
+        self._apply_toolbar_button_style(style_name)
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
@@ -1664,6 +1722,13 @@ class MainWindow(QMainWindow):
         self.keyboard_action.setCheckable(True)
         self.keyboard_action.setChecked(True)
         self.keyboard_action.toggled.connect(self.keyboard.setVisible)
+        toolbar_buttons_menu = view_menu.addMenu(self.tr("Toolbar Buttons"))
+        toolbar_buttons_menu.setObjectName("toolbar_buttons_menu")
+        toolbar_buttons_menu.addAction(self.toolbar_icon_only_action)
+        toolbar_buttons_menu.addAction(self.toolbar_text_only_action)
+        toolbar_buttons_menu.addAction(self.toolbar_text_beside_action)
+        toolbar_buttons_menu.addAction(self.toolbar_text_under_action)
+        toolbar_buttons_menu.addAction(self.toolbar_follow_style_action)
         self.channels_action = QAction(self.tr("Channels"), self)
         self.channels_action.setObjectName("channels_action")
         self.channels_action.triggered.connect(self._show_channels_dialog)

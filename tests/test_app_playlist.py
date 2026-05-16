@@ -42,6 +42,7 @@ class FakeSettings:
     DEFAULT_QT_STYLE = "system"
     DEFAULT_FORCE_DARK_MODE = False
     DEFAULT_USE_INTERNAL_ICON_THEME = False
+    DEFAULT_TOOLBAR_BUTTON_STYLE = "follow_style"
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
@@ -63,6 +64,7 @@ class FakeSettings:
     qt_style_value = "system"
     force_dark_mode_value = False
     use_internal_icon_theme_value = False
+    toolbar_button_style_value = "follow_style"
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
     lyrics_font_family_value = "Sans Serif"
@@ -157,6 +159,12 @@ class FakeSettings:
 
     def set_use_internal_icon_theme(self, enabled: bool) -> None:
         type(self).use_internal_icon_theme_value = enabled
+
+    def toolbar_button_style(self) -> str:
+        return type(self).toolbar_button_style_value
+
+    def set_toolbar_button_style(self, style_name: str) -> None:
+        type(self).toolbar_button_style_value = style_name
 
     def solo_volume_reduction(self) -> int:
         return type(self).solo_volume_reduction_value
@@ -475,6 +483,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.qt_style_value = "system"
         FakeSettings.force_dark_mode_value = False
         FakeSettings.use_internal_icon_theme_value = False
+        FakeSettings.toolbar_button_style_value = "follow_style"
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.lyrics_font_family_value = "Sans Serif"
@@ -2143,6 +2152,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.auto_song_settings_value = True
         FakeSettings.force_dark_mode_value = True
         FakeSettings.use_internal_icon_theme_value = True
+        FakeSettings.toolbar_button_style_value = "text_under"
         FakeSettings.qt_style_value = "Fusion"
         FakeSettings.midi_reset_before_playback_value = True
         FakeSettings.lyrics_font_family_value = "Monospace"
@@ -2485,6 +2495,34 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             self.assertTrue(window.use_internal_icon_theme)
             self.assertFalse(window.open_action.icon().isNull())
+
+    def test_toolbar_button_style_actions_apply_and_persist(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+
+            window.toolbar_text_under_action.trigger()
+            self.assertEqual(window.playback_toolbar.toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            self.assertEqual(FakeSettings.toolbar_button_style_value, "text_under")
+            self.assertTrue(window.toolbar_text_under_action.isChecked())
+
+            window.toolbar_icon_only_action.trigger()
+            self.assertEqual(window.playback_toolbar.toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonIconOnly)
+            self.assertEqual(FakeSettings.toolbar_button_style_value, "icon_only")
+            self.assertTrue(window.toolbar_icon_only_action.isChecked())
+
+    def test_saved_toolbar_button_style_is_applied_on_startup(self) -> None:
+        FakeSettings.toolbar_button_style_value = "text_beside"
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            self.assertEqual(window.toolbar_button_style, "text_beside")
+            self.assertEqual(window.playback_toolbar.toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            self.assertTrue(window.toolbar_text_beside_action.isChecked())
 
     def test_repeat_playlist_restarts_from_first_song_at_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

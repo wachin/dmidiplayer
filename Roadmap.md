@@ -319,11 +319,11 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] add/remove;
   - [ ] move up/down.
 - [ ] Button styles:
-  - [ ] icon only;
-  - [ ] text only;
-  - [ ] text beside icon;
-  - [ ] text under icon;
-  - [ ] follow Qt style.
+  - [x] icon only;
+  - [x] text only;
+  - [x] text beside icon;
+  - [x] text under icon;
+  - [x] follow Qt style.
 
 ### Main UI And Views
 

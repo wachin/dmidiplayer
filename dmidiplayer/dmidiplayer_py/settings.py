@@ -19,6 +19,7 @@ class AppSettings:
     DEFAULT_QT_STYLE = "system"
     DEFAULT_FORCE_DARK_MODE = False
     DEFAULT_USE_INTERNAL_ICON_THEME = False
+    DEFAULT_TOOLBAR_BUTTON_STYLE = "follow_style"
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -150,6 +151,17 @@ class AppSettings:
 
     def set_use_internal_icon_theme(self, enabled: bool) -> None:
         self._settings.setValue("general/use_internal_icon_theme", bool(enabled))
+        self._settings.sync()
+
+    def toolbar_button_style(self) -> str:
+        value = self._settings.value("toolbar/button_style", self.DEFAULT_TOOLBAR_BUTTON_STYLE, str)
+        valid = {"icon_only", "text_only", "text_beside", "text_under", "follow_style"}
+        return value if value in valid else self.DEFAULT_TOOLBAR_BUTTON_STYLE
+
+    def set_toolbar_button_style(self, style_name: str) -> None:
+        valid = {"icon_only", "text_only", "text_beside", "text_under", "follow_style"}
+        value = style_name if style_name in valid else self.DEFAULT_TOOLBAR_BUTTON_STYLE
+        self._settings.setValue("toolbar/button_style", value)
         self._settings.sync()
 
     def solo_volume_reduction(self) -> int:

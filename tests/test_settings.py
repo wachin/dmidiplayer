@@ -171,12 +171,14 @@ class AppSettingsTest(unittest.TestCase):
             self.assertEqual(settings.qt_style(), "system")
             self.assertFalse(settings.force_dark_mode())
             self.assertFalse(settings.use_internal_icon_theme())
+            self.assertEqual(settings.toolbar_button_style(), "follow_style")
 
             settings.set_auto_play_on_load(True)
             settings.set_playlist_auto_advance(False)
             settings.set_auto_song_settings(True)
             settings.set_force_dark_mode(True)
             settings.set_use_internal_icon_theme(True)
+            settings.set_toolbar_button_style("text_under")
             settings.set_qt_style("Fusion")
             restored = AppSettings(base_dir)
 
@@ -185,6 +187,7 @@ class AppSettingsTest(unittest.TestCase):
             self.assertTrue(restored.auto_song_settings())
             self.assertTrue(restored.force_dark_mode())
             self.assertTrue(restored.use_internal_icon_theme())
+            self.assertEqual(restored.toolbar_button_style(), "text_under")
             self.assertEqual(restored.qt_style(), "Fusion")
 
     def test_general_preferences_are_saved_and_clamped(self) -> None:
