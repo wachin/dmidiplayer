@@ -593,7 +593,7 @@ clearer bites instead of rediscovering the next small step.
   `examples/mozart_diesirae.mid`.
 - [ ] Add a karaoke `.kar` fixture with lyric meta events split across tracks.
 - [ ] Preserve original track numbers for meta text and channel events.
-- [ ] Preserve track names and instrument names as structured metadata.
+- [x] Preserve track names and instrument names as structured metadata.
 - [x] Parse RIFF MIDI container headers and delegate embedded SMF data to
   `read_smf()`.
 - [x] Add invalid RIFF MIDI tests for missing `RMID` and missing `data` chunks.

@@ -336,6 +336,30 @@ class SmfParserTest(unittest.TestCase):
             [(0, 0, 0x05, "Hello"), (0, 240, 0x06, "Verse1")],
         )
 
+    def test_preserves_track_and_instrument_names_as_track_metadata(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x03",
+                varlen(5),
+                b"Piano",
+                varlen(0),
+                b"\xff\x04",
+                varlen(11),
+                b"Grand Piano",
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(120),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(0, 480, [track]), "track-names.mid")
+
+        self.assertEqual(midi.tracks[0].name, "Piano")
+        self.assertEqual(midi.tracks[0].instrument_name, "Grand Piano")
+
     def test_auto_detects_cp1252_text_events(self) -> None:
         track = b"".join(
             [

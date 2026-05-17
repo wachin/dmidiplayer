@@ -488,6 +488,37 @@ def write_track_range_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
 
 
+def write_named_instrument_midi(path: Path) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 1, 2, 480))
+    track_one = b"".join(
+        [
+            varlen(0),
+            b"\xff\x03\x05Piano",
+            varlen(0),
+            b"\xff\x04\x0bGrand Piano",
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(120),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    track_two = b"".join(
+        [
+            varlen(0),
+            b"\xff\x04\x06Violin",
+            varlen(0),
+            bytes([0x91, 67, 100]),
+            varlen(120),
+            bytes([0x81, 67, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -3131,6 +3162,25 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
 
             self.assertTrue(window.player.send_reset_before_playback)
+
+    def test_midi_track_infos_preserve_track_and_instrument_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "named.mid")
+            write_named_instrument_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                tracks = window.player.sequence.midi_track_infos()
+
+                self.assertEqual(tracks[0]["track_name"], "Piano")
+                self.assertEqual(tracks[0]["instrument_name"], "Grand Piano")
+                self.assertEqual(tracks[0]["title"], "Piano")
+                self.assertEqual(tracks[1]["track_name"], "")
+                self.assertEqual(tracks[1]["instrument_name"], "Violin")
+                self.assertEqual(tracks[1]["title"], "Violin")
 
 
 if __name__ == "__main__":

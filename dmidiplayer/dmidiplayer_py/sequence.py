@@ -112,13 +112,8 @@ class Sequence(QObject):
             channels = {event.channel for event in track.events if event.channel is not None}
             if not channels:
                 continue
-            title = ""
             notes: list[int] = []
             for event in track.events:
-                if event.kind == "meta" and event.meta_type in (0x03, 0x04):
-                    text = event.text.strip()
-                    if text:
-                        title = text
                 if event.kind in ("note_on", "note_off", "key_pressure") and event.data:
                     notes.append(event.data[0])
             min_note = min(notes, default=21)
@@ -127,7 +122,9 @@ class Sequence(QObject):
                 {
                     "track": track_number,
                     "channels": channels,
-                    "title": title,
+                    "title": track.name or track.instrument_name,
+                    "track_name": track.name,
+                    "instrument_name": track.instrument_name,
                     "min_note": min_note,
                     "max_note": max_note,
                 }

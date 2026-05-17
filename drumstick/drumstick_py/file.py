@@ -92,6 +92,8 @@ class TextEvent:
 @dataclass(slots=True)
 class MidiTrack:
     events: list[MidiEvent] = field(default_factory=list)
+    name: str = ""
+    instrument_name: str = ""
 
 
 @dataclass(slots=True)
@@ -415,6 +417,8 @@ def _read_track(data: bytes) -> MidiTrack:
     tick = 0
     running_status: int | None = None
     events: list[MidiEvent] = []
+    track_name = ""
+    instrument_name = ""
 
     while reader.remaining:
         tick += reader.read_varlen()
@@ -431,6 +435,11 @@ def _read_track(data: bytes) -> MidiTrack:
             meta_type = reader.read(1)[0]
             payload = reader.read(reader.read_varlen())
             events.append(MidiEvent(tick=tick, kind="meta", data=payload, meta_type=meta_type))
+            text = decode_midi_text(payload).strip()
+            if meta_type == 0x03 and text and not track_name:
+                track_name = text
+            elif meta_type == 0x04 and text and not instrument_name:
+                instrument_name = text
             if meta_type == 0x2F:
                 break
             continue
@@ -445,7 +454,7 @@ def _read_track(data: bytes) -> MidiTrack:
         payload = reader.read(size)
         events.append(MidiEvent(tick=tick, kind=_channel_kind(event_type), channel=channel, data=payload))
 
-    return MidiTrack(events=events)
+    return MidiTrack(events=events, name=track_name, instrument_name=instrument_name)
 
 
 def _channel_kind(event_type: int) -> str:
