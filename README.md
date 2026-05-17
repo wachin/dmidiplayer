@@ -121,6 +121,8 @@ Use one of the `.mid` files under `dmidiplayer/examples`, for example:
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
+The current parser also accepts RIFF-wrapped MIDI files such as `.rmi`.
+
 Another useful example:
 
 ```bash

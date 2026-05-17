@@ -2,7 +2,8 @@
 
 The original Drumstick file library supports SMF, RIFF MIDI, and Cakewalk WRK.
 This module starts with SMF because it unlocks dmidiplayer's main workflow and
-keeps the first Python version dependency-free on Debian 12.
+keeps the first Python version dependency-free on Debian 12. It also supports
+the common RIFF/RMID wrapper used by some MIDI collections.
 """
 
 from __future__ import annotations
@@ -338,6 +339,9 @@ class _Reader:
     def read_u32(self) -> int:
         return struct.unpack(">I", self.read(4))[0]
 
+    def read_u32_le(self) -> int:
+        return struct.unpack("<I", self.read(4))[0]
+
     def read_varlen(self) -> int:
         value = 0
         for _ in range(4):
@@ -354,7 +358,13 @@ class _Reader:
 
 def read_smf(file_name: str | Path) -> MidiFile:
     path = Path(file_name)
-    reader = _Reader(path.read_bytes())
+    return _read_midi_file_bytes(path.read_bytes(), path)
+
+
+def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
+    if data.startswith(b"RIFF"):
+        data = _unwrap_rmid_data(data)
+    reader = _Reader(data)
     if reader.read(4) != b"MThd":
         raise MidiFileError("Not a Standard MIDI File")
     header_size = reader.read_u32()
@@ -373,6 +383,31 @@ def read_smf(file_name: str | Path) -> MidiFile:
         track_size = reader.read_u32()
         tracks.append(_read_track(reader.read(track_size)))
     return MidiFile(path=path, format=midi_format, division=division, tracks=tracks)
+
+
+def _unwrap_rmid_data(data: bytes) -> bytes:
+    reader = _Reader(data)
+    if reader.read(4) != b"RIFF":
+        raise MidiFileError("Not a Standard MIDI File")
+    riff_size = reader.read_u32_le()
+    if reader.remaining < 4:
+        raise MidiFileError("Unexpected end of file")
+    form_type = reader.read(4)
+    if form_type != b"RMID":
+        raise MidiFileError("Unsupported RIFF MIDI form")
+
+    container_limit = min(len(data), riff_size + 8)
+    while reader._pos + 8 <= container_limit:
+        chunk_id = reader.read(4)
+        chunk_size = reader.read_u32_le()
+        if reader._pos + chunk_size > container_limit:
+            raise MidiFileError("Unexpected end of file")
+        chunk_data = reader.read(chunk_size)
+        if chunk_size % 2 and reader._pos < container_limit:
+            reader.read(1)
+        if chunk_id == b"data":
+            return chunk_data
+    raise MidiFileError("RIFF MIDI data chunk not found")
 
 
 def _read_track(data: bytes) -> MidiTrack:

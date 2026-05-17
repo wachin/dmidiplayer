@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-15.
+Last updated: 2026-05-17.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -105,9 +105,9 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### File Formats And Parsing
 
-- [x] Open `.mid`, `.midi`, and `.kar` as Standard MIDI Files.
+- [x] Open `.mid`, `.midi`, `.kar`, and RIFF-wrapped `.rmi` files.
 - [ ] Open Cakewalk `.wrk` files.
-- [ ] Port RIFF MIDI.
+- [x] Port RIFF MIDI.
 - [x] Preserve channel MIDI events, meta events, lyrics, text, markers, cue points,
   tempo changes, time signatures, key signatures, and SysEx.
 - [ ] Detect or allow choosing text/lyrics encoding.
@@ -549,7 +549,7 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
   not yet ported.
 - [ ] Temporary playlist navigation and auto-advance exist, but full playlist dialog,
   `.lst` open/save, repeat, and shuffle are still missing.
-- [ ] RIFF MIDI and Cakewalk WRK are not ported yet.
+- [ ] Cakewalk WRK is not ported yet.
 - [ ] `uchardet` is not connected to the Python parser yet.
 - [ ] Automated tests exist but coverage still needs to grow.
 - [ ] The initial Spanish translation exists as `.ts`, but is not translated or
@@ -564,7 +564,7 @@ Recommended priority:
      quantities;
    - [x] SMPTE division timing;
    - [x] tempo and time-signature maps with mid-song changes;
-   - [ ] RIFF MIDI fixtures once `rmid.cpp` is ported;
+   - [x] RIFF MIDI fixtures and invalid-container cases;
    - [ ] Cakewalk WRK fixtures once `qwrk.cpp` is ported.
 2. [ ] Improve `drumstick_py.rt`:
    - [ ] query active ALSA subscriptions from the backend instead of only tracking
@@ -594,9 +594,9 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Add a karaoke `.kar` fixture with lyric meta events split across tracks.
 - [ ] Preserve original track numbers for meta text and channel events.
 - [ ] Preserve track names and instrument names as structured metadata.
-- [ ] Parse RIFF MIDI container headers and delegate embedded SMF data to
+- [x] Parse RIFF MIDI container headers and delegate embedded SMF data to
   `read_smf()`.
-- [ ] Add invalid RIFF MIDI tests for missing `RMID` and missing `data` chunks.
+- [x] Add invalid RIFF MIDI tests for missing `RMID` and missing `data` chunks.
 - [ ] Study `qwrk.cpp` and define the minimum WRK event model needed by
   dmidiplayer.
 - [ ] Add WRK parser skeleton with explicit unsupported-feature errors.
@@ -605,8 +605,8 @@ clearer bites instead of rediscovering the next small step.
 
 ### Playback Engine
 
-- [ ] Track active notes per channel in `SequencePlayer`.
-- [ ] Send note-off for active notes before seek instead of relying only on
+- [x] Track active notes per channel in `SequencePlayer`.
+- [x] Send note-off for active notes before seek instead of relying only on
   controller all-notes-off.
 - [ ] Reset pitch, tempo, and volume when loading a new file if song settings
   are not active.
@@ -784,7 +784,7 @@ Tasks:
   - [x] real duration in microseconds with tempo changes;
   - [x] bar count and bar/tick conversion.
 - [ ] Add SMF writer if any utility requires it.
-- [ ] Port RIFF MIDI from `rmid.cpp`.
+- [x] Port RIFF MIDI from `rmid.cpp`.
 - [ ] Port Cakewalk WRK from `qwrk.cpp`.
 - [ ] Integrate encoding detection:
   - [ ] use `uchardet` through external command or `ctypes` binding;

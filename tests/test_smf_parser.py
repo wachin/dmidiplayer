@@ -33,6 +33,19 @@ def smf_data(midi_format: int, division: int, tracks: list[bytes]) -> bytes:
     return header + b"".join(chunk(b"MTrk", track) for track in tracks)
 
 
+def riff_chunk(name: bytes, payload: bytes) -> bytes:
+    padding = b"\x00" if len(payload) % 2 else b""
+    return name + struct.pack("<I", len(payload)) + payload + padding
+
+
+def rmid_data(smf_payload: bytes, extra_chunks: list[bytes] | None = None, form: bytes = b"RMID") -> bytes:
+    chunks = [riff_chunk(b"data", smf_payload)]
+    if extra_chunks is not None:
+        chunks.extend(extra_chunks)
+    payload = form + b"".join(chunks)
+    return b"RIFF" + struct.pack("<I", len(payload)) + payload
+
+
 def read_temp_smf(data: bytes, name: str = "test.mid"):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir, name)
@@ -44,6 +57,41 @@ class SmfParserTest(unittest.TestCase):
     def test_rejects_invalid_header(self) -> None:
         with self.assertRaisesRegex(MidiFileError, "Not a Standard MIDI File"):
             read_temp_smf(b"not midi", "not-midi.mid")
+
+    def test_reads_rmid_wrapped_smf(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x03",
+                varlen(4),
+                b"RIFF",
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(480),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+
+        midi = read_temp_smf(rmid_data(smf_data(0, 480, [track])), "wrapped.rmi")
+
+        self.assertEqual(midi.title, "RIFF")
+        self.assertEqual(midi.length_ticks, 480)
+        self.assertEqual([event.kind for event in midi.events if event.kind in ("note_on", "note_off")], ["note_on", "note_off"])
+
+    def test_rejects_unsupported_riff_form(self) -> None:
+        midi_bytes = rmid_data(smf_data(0, 480, [b"\x00\xff\x2f\x00"]), form=b"WAVE")
+
+        with self.assertRaisesRegex(MidiFileError, "Unsupported RIFF MIDI form"):
+            read_temp_smf(midi_bytes, "bad-form.rmi")
+
+    def test_rejects_rmid_without_data_chunk(self) -> None:
+        info_chunk = riff_chunk(b"DISP", b"metadata")
+        midi_bytes = b"RIFF" + struct.pack("<I", len(b"RMID" + info_chunk)) + b"RMID" + info_chunk
+
+        with self.assertRaisesRegex(MidiFileError, "RIFF MIDI data chunk not found"):
+            read_temp_smf(midi_bytes, "missing-data.rmi")
 
     def test_rejects_truncated_track_chunk(self) -> None:
         header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
