@@ -88,10 +88,14 @@ class SequencePlayerTest(unittest.TestCase):
         output = OutputStub()
         player = SequencePlayer(output)
         player._playing = True
+        player._active_notes = {0: {60}}
 
         player.pause()
 
         self.assertFalse(player._playing)
+        self.assertEqual(output.events[0].kind, "note_off")
+        self.assertEqual(output.events[0].channel, 0)
+        self.assertEqual(output.events[0].data, bytes([60, 0]))
         self.assertEqual(output.all_notes_off_count, 1)
 
     def test_clear_resets_loaded_sequence(self) -> None:
@@ -109,6 +113,16 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player._events, [])
         self.assertEqual(player._position, 0)
 
+    def test_sent_note_events_are_tracked_as_active_notes(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        player._track_active_note_event(MidiEvent(tick=0, kind="note_on", channel=2, data=bytes([64, 90])))
+        self.assertEqual(player._active_notes, {2: {64}})
+
+        player._track_active_note_event(MidiEvent(tick=10, kind="note_off", channel=2, data=bytes([64, 0])))
+        self.assertEqual(player._active_notes, {})
+
     def test_pitch_shift_transposes_note_events(self) -> None:
         player = SequencePlayer(OutputStub())
         player.set_pitch_shift(2)
@@ -122,9 +136,11 @@ class SequencePlayerTest(unittest.TestCase):
     def test_pitch_shift_change_turns_off_current_notes(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
+        player._active_notes = {0: {60}}
 
         player.set_pitch_shift(-2)
 
+        self.assertEqual(output.events[0].kind, "note_off")
         self.assertEqual(output.all_notes_off_count, 1)
 
     def test_pitch_shift_same_value_does_not_repeat_all_notes_off(self) -> None:
@@ -149,6 +165,7 @@ class SequencePlayerTest(unittest.TestCase):
         output = OutputStub()
         player = SequencePlayer(output)
         player.set_pitch_shift(2)
+        player._active_notes = {0: {60}}
         player.set_percussion_channel(1)
 
         percussion_event = MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100]))
@@ -157,7 +174,36 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player.percussion_channel, 1)
         self.assertIs(player._playable_event(percussion_event), percussion_event)
         self.assertEqual(player._playable_event(melodic_event).data, bytes([62, 100]))
+        self.assertEqual(output.events[0].kind, "note_off")
         self.assertGreaterEqual(output.all_notes_off_count, 1)
+
+    def test_seek_sends_note_off_for_tracked_notes_before_all_notes_off(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player._events = [MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100]))]
+        player._event_times_us = [0]
+        player._active_notes = {0: {60}, 1: {65}}
+
+        player.seek(0)
+
+        self.assertEqual(
+            [(event.kind, event.channel, event.data) for event in output.events],
+            [("note_off", 0, bytes([60, 0])), ("note_off", 1, bytes([65, 0]))],
+        )
+        self.assertEqual(output.all_notes_off_count, 1)
+        self.assertEqual(player._active_notes, {})
+
+    def test_stop_sends_note_off_for_tracked_notes_before_all_notes_off(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player._active_notes = {0: {60}}
+
+        player.stop()
+
+        self.assertEqual(output.events[0].kind, "note_off")
+        self.assertEqual(output.events[0].data, bytes([60, 0]))
+        self.assertEqual(output.all_notes_off_count, 1)
+        self.assertEqual(player._active_notes, {})
 
     def test_percussion_channel_is_clamped(self) -> None:
         player = SequencePlayer(OutputStub())

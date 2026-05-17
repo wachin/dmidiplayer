@@ -43,6 +43,7 @@ class SequencePlayer(QObject):
         self._channel_volume_percents: dict[int, int] = {}
         self._channel_program_overrides: dict[int, int] = {}
         self._locked_channels: set[int] = set()
+        self._active_notes: dict[int, set[int]] = {}
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
@@ -62,6 +63,7 @@ class SequencePlayer(QObject):
         self._loop_end_tick = self.sequence.length_ticks
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
+        self._active_notes.clear()
         self.positionChanged.emit(self._position, self.sequence.length_ticks)
 
     def clear(self) -> None:
@@ -77,6 +79,7 @@ class SequencePlayer(QObject):
         self._loop_end_tick = 0
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
+        self._active_notes.clear()
         self.positionChanged.emit(0, 0)
 
     def play(self) -> None:
@@ -102,13 +105,13 @@ class SequencePlayer(QObject):
     def pause(self) -> None:
         self._position_us = self._elapsed_microseconds()
         self._timer.stop()
-        self.output.all_notes_off()
+        self._silence_active_notes()
         self._playing = False
         self.stopped.emit()
 
     def stop(self) -> None:
         self._timer.stop()
-        self.output.all_notes_off()
+        self._silence_active_notes()
         self._playing = False
         self._index = 0
         self._position = 0
@@ -122,7 +125,7 @@ class SequencePlayer(QObject):
             return
         was_playing = self._playing
         self._timer.stop()
-        self.output.all_notes_off()
+        self._silence_active_notes()
 
         self._position = max(0, min(tick, self.sequence.length_ticks))
         self._position_us = self.sequence.tick_to_microseconds(self._position)
@@ -159,7 +162,7 @@ class SequencePlayer(QObject):
         semitones = max(-12, min(12, semitones))
         if semitones == self._pitch_shift:
             return
-        self.output.all_notes_off()
+        self._silence_active_notes()
         self._pitch_shift = semitones
 
     @property
@@ -170,7 +173,7 @@ class SequencePlayer(QObject):
         channel_index = max(1, min(16, channel)) - 1
         if channel_index == self._percussion_channel:
             return
-        self.output.all_notes_off()
+        self._silence_active_notes()
         self._percussion_channel = channel_index
 
     @property
@@ -211,7 +214,7 @@ class SequencePlayer(QObject):
             if channel not in self._muted_channels:
                 return
             self._muted_channels.remove(channel)
-        self.output.all_notes_off()
+        self._silence_active_notes()
 
     def set_channel_solo(self, channel: int, solo: bool) -> None:
         channel = max(0, min(15, channel))
@@ -223,7 +226,7 @@ class SequencePlayer(QObject):
             if channel not in self._solo_channels:
                 return
             self._solo_channels.remove(channel)
-        self.output.all_notes_off()
+        self._silence_active_notes()
 
     def channel_volume_percent(self, channel: int) -> int:
         channel = max(0, min(15, channel))
@@ -267,7 +270,7 @@ class SequencePlayer(QObject):
             if channel not in self._locked_channels:
                 return
             self._locked_channels.remove(channel)
-        self.output.all_notes_off()
+        self._silence_active_notes()
 
     @property
     def loop_enabled(self) -> bool:
@@ -296,9 +299,10 @@ class SequencePlayer(QObject):
             try:
                 if output_event is not None:
                     self.output.send_event(output_event)
+                    self._track_active_note_event(output_event)
             except MidiOutputError as exc:
                 self._timer.stop()
-                self.output.all_notes_off()
+                self._silence_active_notes()
                 self._playing = False
                 self.outputError.emit(str(exc))
                 self.stopped.emit()
@@ -328,6 +332,39 @@ class SequencePlayer(QObject):
             return self._position_us
         elapsed = (self._clock.nsecsElapsed() // 1000) * self._tempo_percent // 100
         return self._base_position_us + elapsed
+
+    def _track_active_note_event(self, event: MidiEvent) -> None:
+        if event.channel is None or not event.data:
+            return
+        if event.kind == "note_on" and len(event.data) >= 2 and event.data[1] > 0:
+            self._active_notes.setdefault(event.channel, set()).add(event.data[0])
+            return
+        if event.kind not in ("note_off", "note_on"):
+            return
+        channel_notes = self._active_notes.get(event.channel)
+        if not channel_notes:
+            return
+        channel_notes.discard(event.data[0])
+        if not channel_notes:
+            del self._active_notes[event.channel]
+
+    def _silence_active_notes(self) -> None:
+        for channel, notes in sorted(self._active_notes.items()):
+            for note in sorted(notes):
+                try:
+                    self.output.send_event(
+                        MidiEvent(
+                            tick=self._position,
+                            kind="note_off",
+                            channel=channel,
+                            data=bytes([note, 0]),
+                        )
+                    )
+                except MidiOutputError as exc:
+                    self.outputError.emit(str(exc))
+                    break
+        self._active_notes.clear()
+        self.output.all_notes_off()
 
     def _playable_event(self, event: MidiEvent) -> MidiEvent | None:
         event = self._channel_mix_event(event)

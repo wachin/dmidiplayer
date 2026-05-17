@@ -12,6 +12,13 @@ The main window is split into two areas:
 - Playback area: song information, position slider, playback controls, rhythm
   panel, MIDI destination row, keyboard view, and status text.
 
+At the top of the playback area there is also a transport summary panel with:
+
+- a large current-time readout
+- live `Tempo`
+- live `Volume`
+- live `Pitch`
+
 If no file is loaded yet, the window starts in an empty state and waits for you
 to open a MIDI file or playlist.
 
@@ -19,6 +26,7 @@ to open a MIDI file or playlist.
 
 - `Open`: open one or more MIDI files or a `.lst` playlist file.
 - `Open Playlist`: open a plain-text playlist file directly.
+- `Open Example Playlist`: load the bundled sample playlist from the repository examples.
 - `Play List...`: open the dedicated playlist manager window.
 - `Open Recent`: reopen a recently loaded MIDI file.
 - `Save Playlist`: save the current playlist to the current `.lst` file.

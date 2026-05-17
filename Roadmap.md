@@ -272,7 +272,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Use plain text playlist files, one file per line.
 - [x] Support absolute paths and paths relative to the `.lst` file.
 - [x] Allow starting with an empty playlist.
-- [ ] Include an initial playlist with examples.
+- [x] Include an initial playlist with examples.
 
 ### File Opening And Recent Files
 
@@ -330,6 +330,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [ ] Port File menu, View menu, tools, status bar, and main dialogs.
 - [x] Add a `Window` menu for the main window plus independent auxiliary views.
+- [x] Main window now includes a transport summary panel with large time and compact tempo/volume/pitch readouts closer to the original reference.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;
@@ -532,6 +533,7 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
 - [ ] The initial SMF parser computes tempo, real duration, and bars for PPQ SMF,
   but still needs more edge-case tests and comparison with Drumstick C++.
 - [ ] The scheduler already supports real timing, basic seek, loop, and tempo scale.
+  - [x] Active notes are tracked and explicit note-offs are sent before seek, stop, pause, and similar panic-style transitions.
   The UI loop works by bars and converts to ticks before calling the scheduler.
   The scheduler still depends on `QTimer` and has no advanced latency
   compensation yet.

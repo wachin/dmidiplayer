@@ -732,6 +732,27 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.windowTitle(), "first.mid [1/2] - setlist.lst - dmidiplayer PyQt6")
                 self.assertEqual(window.settings.folder, playlist_path.parent)
 
+    def test_open_example_playlist_action_loads_bundled_playlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            playlist_path = Path(tmpdir, "examples.lst")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            playlist_path.write_text("first.mid\nsecond.mid\n", encoding="utf-8")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                with patch.object(window, "_example_playlist_path", return_value=playlist_path):
+                    window.open_examples_action.trigger()
+
+                self.assertEqual(window.playlist.count(), 2)
+                self.assertEqual(window.playlist.currentRow(), 0)
+                self.assertEqual(window.windowTitle(), "first.mid [1/2] - examples.lst - dmidiplayer PyQt6")
+
     def test_open_paths_loads_playlist_then_appends_explicit_midi_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")
@@ -804,6 +825,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(menus, ["File", "Playback", "View", "Window", "Tools", "Help"])
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.open_playlist_action), "open_playlist_action"))
+            self.assertIsNotNone(window.findChild(type(window.open_examples_action), "open_examples_action"))
             self.assertIsNotNone(window.findChild(type(window.playlist_dialog_action), "playlist_dialog_action"))
             self.assertIsNotNone(window.findChild(type(window.window_main_action), "window_main_action"))
             self.assertIsNotNone(window.findChild(type(window.window_playlist_action), "window_playlist_action"))

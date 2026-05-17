@@ -56,6 +56,7 @@ PLAYLIST_FILE_SUFFIXES = {".lst"}
 APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
 ICONS_DIR = Path(__file__).resolve().parents[1] / "icons"
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 GENERAL_MIDI_PROGRAMS = (
     "Acoustic Grand Piano",
     "Bright Acoustic Piano",
@@ -1697,6 +1698,9 @@ class MainWindow(QMainWindow):
         self.open_playlist_action = QAction(self.tr("Open Playlist"), self)
         self.open_playlist_action.setObjectName("open_playlist_action")
         self.open_playlist_action.triggered.connect(self.open_playlist)
+        self.open_examples_action = QAction(self.tr("Open Example Playlist"), self)
+        self.open_examples_action.setObjectName("open_examples_action")
+        self.open_examples_action.triggered.connect(self.open_example_playlist)
         self.playlist_dialog_action = QAction(self.tr("Play List..."), self)
         self.playlist_dialog_action.setObjectName("playlist_dialog_action")
         self.playlist_dialog_action.triggered.connect(self._show_playlist_dialog)
@@ -2030,6 +2034,7 @@ class MainWindow(QMainWindow):
         file_menu.setObjectName("file_menu")
         file_menu.addAction(self.open_action)
         file_menu.addAction(self.open_playlist_action)
+        file_menu.addAction(self.open_examples_action)
         file_menu.addAction(self.playlist_dialog_action)
         self.recent_files_menu = file_menu.addMenu(self.tr("Open Recent"))
         self.recent_files_menu.setObjectName("recent_files_menu")
@@ -2386,6 +2391,18 @@ class MainWindow(QMainWindow):
         )
         if file_name:
             self.load_playlist_file(file_name)
+
+    def _example_playlist_path(self) -> Path:
+        return EXAMPLES_DIR / "examples.lst"
+
+    def open_example_playlist(self) -> None:
+        playlist_path = self._example_playlist_path()
+        if not playlist_path.exists():
+            message = self.tr("Example playlist not found: {name}").format(name=playlist_path.name)
+            self.statusBar().showMessage(message, 10000)
+            QMessageBox.warning(self, self.tr("Open Example Playlist"), message)
+            return
+        self.load_playlist_file(playlist_path)
 
     def save_playlist(self) -> None:
         if self._current_playlist_path is not None:
@@ -3575,7 +3592,7 @@ class MainWindow(QMainWindow):
         if midi is None:
             self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
             self.transport_time_label.setText("00:00")
-            self.transport_summary_label.setText("120 BPM")
+            self.transport_summary_label.setText(self.tr("{bpm:.0f} BPM").format(bpm=120 * self.player.tempo_percent / 100))
             self.transport_volume_label.setText(f"{self.player.volume_percent}%")
             self.transport_pitch_label.setText(str(self.player.pitch_shift))
             return

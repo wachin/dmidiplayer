@@ -127,6 +127,14 @@ Another useful example:
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/mozart_diesirae.mid
 ```
 
+There is also a bundled example playlist with several songs:
+
+```bash
+./dmidiplayer/dmidiplayer-py dmidiplayer/examples/examples.lst
+```
+
+You can open the same curated set from the app with `File -> Open Example Playlist`.
+
 Several files can also be passed at once. They become a temporary playlist, and
 `Previous` / `Next` navigate through it:
 

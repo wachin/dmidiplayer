@@ -13,6 +13,14 @@ La ventana principal está dividida en dos áreas:
   controles de reproducción, panel de ritmo, fila de destino MIDI, teclado
   visual y texto de estado.
 
+En la parte superior del área de reproducción también hay un panel de resumen
+de transporte con:
+
+- un reloj grande de tiempo actual
+- `Tempo` en vivo
+- `Volume` en vivo
+- `Pitch` en vivo
+
 Si todavía no hay un archivo cargado, la ventana inicia vacía y espera a que
 abras un archivo MIDI o una lista `.lst`.
 
@@ -20,6 +28,7 @@ abras un archivo MIDI o una lista `.lst`.
 
 - `Open`: abre uno o más archivos MIDI o una lista de reproducción `.lst`.
 - `Open Playlist`: abre directamente un archivo de lista de reproducción.
+- `Open Example Playlist`: carga la lista de ejemplo incluida en el repositorio.
 - `Play List...`: abre la ventana dedicada para administrar la lista.
 - `Open Recent`: vuelve a abrir un archivo MIDI usado recientemente.
 - `Save Playlist`: guarda la lista actual en el archivo `.lst` actual.
