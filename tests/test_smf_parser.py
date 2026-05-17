@@ -58,6 +58,10 @@ class SmfParserTest(unittest.TestCase):
         with self.assertRaisesRegex(MidiFileError, "Not a Standard MIDI File"):
             read_temp_smf(b"not midi", "not-midi.mid")
 
+    def test_rejects_wrk_files_with_explicit_message(self) -> None:
+        with self.assertRaisesRegex(MidiFileError, "Cakewalk WRK files are not supported yet"):
+            read_temp_smf(b"CAKEWALK\x00\x01\x02\x03", "song.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [

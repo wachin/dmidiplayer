@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import struct
 
+WRK_HEADER = b"CAKEWALK"
+
 
 class MidiFileError(ValueError):
     """Raised when a MIDI file cannot be parsed."""
@@ -364,6 +366,8 @@ def read_smf(file_name: str | Path) -> MidiFile:
 
 
 def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
+    if _looks_like_wrk(data, path):
+        raise MidiFileError("Cakewalk WRK files are not supported yet")
     if data.startswith(b"RIFF"):
         data = _unwrap_rmid_data(data)
     reader = _Reader(data)
@@ -410,6 +414,10 @@ def _unwrap_rmid_data(data: bytes) -> bytes:
         if chunk_id == b"data":
             return chunk_data
     raise MidiFileError("RIFF MIDI data chunk not found")
+
+
+def _looks_like_wrk(data: bytes, path: Path) -> bool:
+    return data.startswith(WRK_HEADER) or path.suffix.casefold() == ".wrk"
 
 
 def _read_track(data: bytes) -> MidiTrack:
