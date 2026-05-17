@@ -130,3 +130,15 @@ class Sequence(QObject):
                 }
             )
         return tracks
+
+    def default_channel_labels(self) -> dict[int, str]:
+        if self.midi is None:
+            return {}
+        labels: dict[int, str] = {}
+        for info in self.midi_track_infos():
+            title = str(info.get("instrument_name") or info.get("track_name") or "").strip()
+            if not title:
+                continue
+            for channel in sorted(set(info["channels"])):
+                labels.setdefault(int(channel), title)
+        return labels

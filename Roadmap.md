@@ -187,6 +187,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Show up to 16 rows, one per used MIDI channel.
 - [x] Show only channels that are actually present in the loaded MIDI file.
 - [x] Show channel number and editable label.
+- [x] Use track/instrument metadata as the default channel label when available.
 - [x] Mute per channel.
 - [x] Solo per channel, reducing other channels according to preference.
 - [x] Activity/level indicator per channel.

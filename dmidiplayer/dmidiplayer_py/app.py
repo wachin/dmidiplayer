@@ -2847,7 +2847,7 @@ class MainWindow(QMainWindow):
         self.channels_dialog.clear_levels()
 
     def _set_channel_label(self, channel: int, label: str) -> None:
-        text = label.strip() or self.tr("Channel {number}").format(number=channel + 1)
+        text = label.strip() or self._default_channel_label(channel)
         self.channel_labels[channel] = text
         self.statusBar().showMessage(
             self.tr("Channel {number} label updated").format(number=channel + 1),
@@ -2855,6 +2855,9 @@ class MainWindow(QMainWindow):
         )
 
     def _default_channel_label(self, channel: int) -> str:
+        labels = self.player.sequence.default_channel_labels()
+        if channel in labels:
+            return labels[channel]
         return self.tr("Channel {number}").format(number=channel + 1)
 
     def _reset_channel_labels(self) -> None:

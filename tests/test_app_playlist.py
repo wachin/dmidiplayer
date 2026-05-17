@@ -3182,6 +3182,19 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(tracks[1]["instrument_name"], "Violin")
                 self.assertEqual(tracks[1]["title"], "Violin")
 
+    def test_channel_labels_default_to_track_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "named.mid")
+            write_named_instrument_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                self.assertEqual(window.channel_labels[0], "Grand Piano")
+                self.assertEqual(window.channel_labels[1], "Violin")
+
 
 if __name__ == "__main__":
     unittest.main()
