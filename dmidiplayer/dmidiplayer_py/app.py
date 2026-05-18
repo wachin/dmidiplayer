@@ -1635,6 +1635,7 @@ class MainWindow(QMainWindow):
         self._current_file: str | None = None
         self.channel_labels: dict[int, str] = {}
         self.lyrics_encoding: str | None = None
+        self.player.sequence.set_text_encoding(None)
         self._current_playlist_path: Path | None = None
         self._playlist_modified = False
         self.channels_dialog: ChannelsDialog | None = None
@@ -2264,7 +2265,7 @@ class MainWindow(QMainWindow):
     def _reset_loaded_file_state(self, status_message: str) -> None:
         self._current_file = None
         self.channel_labels = {}
-        self.lyrics_encoding = None
+        self._set_lyrics_encoding(None)
         self.position.setEnabled(False)
         self.title_label.setText(self.tr("No file loaded"))
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
@@ -2821,6 +2822,9 @@ class MainWindow(QMainWindow):
                 self.lyrics_past_color,
             )
             self.lyrics_dialog.set_selected_encoding(self.lyrics_encoding)
+            self.lyrics_dialog.encoding_combo.currentIndexChanged.connect(
+                self._lyrics_encoding_selection_changed
+            )
             self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
             self.lyrics_dialog.textPrinted.connect(self._lyrics_text_printed)
             self._refresh_lyrics_dialog()
@@ -2923,8 +2927,17 @@ class MainWindow(QMainWindow):
 
     def _current_lyrics_encoding(self) -> str | None:
         if self.lyrics_dialog is not None:
-            self.lyrics_encoding = self.lyrics_dialog.selected_encoding()
+            self._set_lyrics_encoding(self.lyrics_dialog.selected_encoding())
         return self.lyrics_encoding
+
+    def _set_lyrics_encoding(self, encoding: str | None) -> None:
+        self.lyrics_encoding = encoding
+        self.player.sequence.set_text_encoding(encoding)
+
+    def _lyrics_encoding_selection_changed(self) -> None:
+        if self.lyrics_dialog is None:
+            return
+        self._set_lyrics_encoding(self.lyrics_dialog.selected_encoding())
 
     def _current_song_settings(self) -> configparser.ConfigParser:
         config = configparser.ConfigParser()
@@ -2970,7 +2983,7 @@ class MainWindow(QMainWindow):
         config.read(path, encoding="utf-8")
         song = config["song"] if config.has_section("song") else {}
         encoding = song.get("encoding", "auto")
-        self.lyrics_encoding = None if encoding == "auto" else encoding
+        self._set_lyrics_encoding(None if encoding == "auto" else encoding)
         self.pitch_control.setValue(int(song.get("transpose", self.player.pitch_shift)))
         self.tempo_control.setValue(int(song.get("tempo", self.player.tempo_percent)))
         self.volume_control.setValue(int(song.get("volume", self.player.volume_percent)))
@@ -3473,7 +3486,7 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_file(file_name)
         self._refresh_recent_files_menu()
         self._current_file = file_name
-        self.lyrics_encoding = None
+        self._set_lyrics_encoding(None)
         self._reset_channel_labels()
         if self.auto_song_settings:
             self.load_song_settings()

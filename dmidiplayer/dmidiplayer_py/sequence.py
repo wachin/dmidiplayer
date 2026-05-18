@@ -2,10 +2,42 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from drumstick_py import MidiEvent, MidiFile, read_smf
+from drumstick_py import MidiEvent, MidiFile, TextEvent, read_smf
+
+
+@dataclass(frozen=True, slots=True)
+class SequenceTextEvent:
+    source: TextEvent
+    default_encoding_getter: object
+
+    @property
+    def track(self) -> int:
+        return self.source.track
+
+    @property
+    def tick(self) -> int:
+        return self.source.tick
+
+    @property
+    def meta_type(self) -> int:
+        return self.source.meta_type
+
+    @property
+    def data(self) -> bytes:
+        return self.source.data
+
+    @property
+    def text(self) -> str:
+        return self.decoded_text()
+
+    def decoded_text(self, preferred_encoding: str | None = None) -> str:
+        getter = self.default_encoding_getter
+        default_encoding = getter() if callable(getter) else None
+        return self.source.decoded_text(preferred_encoding or default_encoding)
 
 
 class Sequence(QObject):
@@ -14,6 +46,7 @@ class Sequence(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.midi: MidiFile | None = None
+        self._text_encoding: str | None = None
 
     def load_file(self, file_name: str | Path) -> None:
         self.midi = read_smf(file_name)
@@ -22,6 +55,12 @@ class Sequence(QObject):
     def clear(self) -> None:
         self.midi = None
         self.loaded.emit()
+
+    def set_text_encoding(self, encoding: str | None) -> None:
+        self._text_encoding = encoding
+
+    def text_encoding(self) -> str | None:
+        return self._text_encoding
 
     @property
     def events(self) -> list[MidiEvent]:
@@ -92,7 +131,10 @@ class Sequence(QObject):
     def text_events(self) -> list[object]:
         if self.midi is None:
             return []
-        return list(self.midi.text_events)
+        return [
+            SequenceTextEvent(event, self.text_encoding)
+            for event in self.midi.text_events
+        ]
 
     def midi_tracks(self) -> list[tuple[int, set[int]]]:
         if self.midi is None:
