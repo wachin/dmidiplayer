@@ -190,6 +190,23 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "ntrack.wrk")
 
+    def test_reports_wrk_markers_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<I", 1)
+            + bytes([24, 0])
+            + bytes([0x39, 0x30, 0x00])
+            + b"\x00\x00\x00\x00\x00"
+            + bytes([5])
+            + b"Intro"
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(21, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, markers 1 first at 12345 smpte 24 'Intro'\)",
+        ):
+            read_temp_smf(wrk, "markers.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [

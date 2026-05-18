@@ -49,6 +49,10 @@ class _WrkHeader:
     track_chunk_name: str | None = None
     track_chunk_channel: int | None = None
     track_chunk_patch: int | None = None
+    marker_count: int | None = None
+    first_marker_time: int | None = None
+    first_marker_smpte: int | None = None
+    first_marker_name: str | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -448,6 +452,14 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" channel {header.track_chunk_channel + 1}"
             if header.track_chunk_patch is not None:
                 details += f" patch {header.track_chunk_patch}"
+        if header.marker_count is not None:
+            details += f", markers {header.marker_count}"
+            if header.first_marker_time is not None:
+                details += f" first at {header.first_marker_time}"
+            if header.first_marker_smpte is not None:
+                details += f" smpte {header.first_marker_smpte}"
+            if header.first_marker_name:
+                details += f" '{header.first_marker_name}'"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -551,6 +563,10 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     track_chunk_name: str | None = None
     track_chunk_channel: int | None = None
     track_chunk_patch: int | None = None
+    marker_count: int | None = None
+    first_marker_time: int | None = None
+    first_marker_smpte: int | None = None
+    first_marker_name: str | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -628,6 +644,23 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         track_chunk_patch = reader.read(1)[0]
         reader.read(3)  # velocity, port, flags
         track_chunk_name = primary_name or alternate_name or None
+    elif first_chunk_id == 21:
+        if first_chunk_length < 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        marker_count = reader.read_u32_le()
+        if marker_count > 0:
+            if reader.remaining < 11:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_marker_smpte = reader.read(1)[0]
+            reader.read(1)
+            first_marker_time = int.from_bytes(reader.read(3), "little")
+            reader.read(5)
+            name_length = reader.read(1)[0]
+            if reader.remaining < name_length:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_marker_name = reader.read(name_length).decode(
+                "latin-1", errors="replace"
+            )
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -656,6 +689,10 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         track_chunk_name=track_chunk_name,
         track_chunk_channel=track_chunk_channel,
         track_chunk_patch=track_chunk_patch,
+        marker_count=marker_count,
+        first_marker_time=first_marker_time,
+        first_marker_smpte=first_marker_smpte,
+        first_marker_name=first_marker_name,
     )
 
 
