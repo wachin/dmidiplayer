@@ -207,6 +207,33 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "markers.wrk")
 
+    def test_reports_wrk_segment_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<HI", 0, 960)
+            + b"\x00" * 8
+            + bytes([5])
+            + b"Verse"
+            + b"\x00" * 20
+            + struct.pack("<I", 12)
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(49, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, segment track 1 offset 960 'Verse' events 12\)",
+        ):
+            read_temp_smf(wrk, "segment.wrk")
+
+    def test_reports_wrk_new_stream_from_first_chunk(self) -> None:
+        payload = struct.pack("<H", 0) + bytes([5]) + b"Intro" + struct.pack("<I", 7)
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(45, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, stream track 1 'Intro' events 7\)",
+        ):
+            read_temp_smf(wrk, "nstream.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [

@@ -53,6 +53,13 @@ class _WrkHeader:
     first_marker_time: int | None = None
     first_marker_smpte: int | None = None
     first_marker_name: str | None = None
+    segment_track: int | None = None
+    segment_offset: int | None = None
+    segment_name: str | None = None
+    segment_events: int | None = None
+    new_stream_track: int | None = None
+    new_stream_name: str | None = None
+    new_stream_events: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -460,6 +467,20 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" smpte {header.first_marker_smpte}"
             if header.first_marker_name:
                 details += f" '{header.first_marker_name}'"
+        if header.segment_track is not None:
+            details += f", segment track {header.segment_track + 1}"
+            if header.segment_offset is not None:
+                details += f" offset {header.segment_offset}"
+            if header.segment_name:
+                details += f" '{header.segment_name}'"
+            if header.segment_events is not None:
+                details += f" events {header.segment_events}"
+        if header.new_stream_track is not None:
+            details += f", stream track {header.new_stream_track + 1}"
+            if header.new_stream_name:
+                details += f" '{header.new_stream_name}'"
+            if header.new_stream_events is not None:
+                details += f" events {header.new_stream_events}"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -567,6 +588,13 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     first_marker_time: int | None = None
     first_marker_smpte: int | None = None
     first_marker_name: str | None = None
+    segment_track: int | None = None
+    segment_offset: int | None = None
+    segment_name: str | None = None
+    segment_events: int | None = None
+    new_stream_track: int | None = None
+    new_stream_name: str | None = None
+    new_stream_events: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -661,6 +689,27 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             first_marker_name = reader.read(name_length).decode(
                 "latin-1", errors="replace"
             )
+    elif first_chunk_id == 49:
+        if first_chunk_length < 35:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        segment_track = reader.read_u16_le()
+        segment_offset = reader.read_u32_le()
+        reader.read(8)
+        name_length = reader.read(1)[0]
+        if reader.remaining < name_length + 24:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        segment_name = reader.read(name_length).decode("latin-1", errors="replace")
+        reader.read(20)
+        segment_events = reader.read_u32_le()
+    elif first_chunk_id == 45:
+        if first_chunk_length < 7:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        new_stream_track = reader.read_u16_le()
+        name_length = reader.read(1)[0]
+        if reader.remaining < name_length + 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        new_stream_name = reader.read(name_length).decode("latin-1", errors="replace")
+        new_stream_events = reader.read_u32_le()
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -693,6 +742,13 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         first_marker_time=first_marker_time,
         first_marker_smpte=first_marker_smpte,
         first_marker_name=first_marker_name,
+        segment_track=segment_track,
+        segment_offset=segment_offset,
+        segment_name=segment_name,
+        segment_events=segment_events,
+        new_stream_track=new_stream_track,
+        new_stream_name=new_stream_name,
+        new_stream_events=new_stream_events,
     )
 
 
