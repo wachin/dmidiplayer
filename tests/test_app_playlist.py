@@ -741,6 +741,19 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(titled))
                 self.assertEqual(window.playlist.item(0).toolTip(), str(titled))
 
+    def test_title_label_shows_song_title_and_filename_when_they_differ(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            titled = Path(tmpdir, "anthem.mid")
+            write_titled_midi(titled, "Grand Finale")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(titled)])
+
+                self.assertIn("Grand Finale - anthem.mid", window.title_label.text())
+
     def test_open_paths_does_not_duplicate_existing_playlist_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")

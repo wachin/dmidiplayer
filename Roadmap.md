@@ -334,6 +334,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Port File menu, View menu, tools, status bar, and main dialogs.
 - [x] Add a `Window` menu for the main window plus independent auxiliary views.
 - [x] Main window now includes a transport summary panel with large time and compact tempo/volume/pitch readouts closer to the original reference.
+- [x] Main window file summary now shows both song title and filename when they differ.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;

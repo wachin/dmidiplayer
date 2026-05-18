@@ -2490,6 +2490,12 @@ class MainWindow(QMainWindow):
             return title
         return path.name
 
+    def _song_summary_title(self, path: Path, title: str) -> str:
+        title = title.strip()
+        if title and title != path.name:
+            return self.tr("{title} - {name}").format(title=title, name=path.name)
+        return title or path.name
+
     def _playlist_display_text(self, path: Path) -> str:
         return self._song_display_text(path)
 
@@ -3440,9 +3446,10 @@ class MainWindow(QMainWindow):
         if midi is None:
             return
         duration = midi.length_microseconds / 1_000_000
+        path = Path(file_name)
         self.title_label.setText(
             self.tr("{title} - format {format}, {tracks} track(s), {ticks} ticks, {seconds:.1f} s").format(
-                title=midi.title,
+                title=self._song_summary_title(path, midi.title),
                 format=midi.format,
                 tracks=len(midi.tracks),
                 ticks=midi.length_ticks,
