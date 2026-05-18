@@ -410,7 +410,7 @@ def write_cp1252_text_midi(path: Path) -> None:
 
 
 def write_wrk_stub(path: Path) -> None:
-    path.write_bytes(b"CAKEWALK\x00\x01\x02\xff")
+    path.write_bytes(b"CAKEWALK\x00\x01\x02" + bytes([10]) + struct.pack("<I", 2) + struct.pack("<H", 120) + b"\xff")
 
 
 def write_timed_lyrics_midi(path: Path) -> None:
@@ -811,7 +811,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(wrk))
                 self.assertEqual(
                     window.statusBar().currentMessage(),
-                    "Error loading file: Cakewalk WRK files are not supported yet (detected version 2.1)",
+                    "Error loading file: Cakewalk WRK files are not supported yet (detected version 2.1, timebase 120)",
                 )
                 critical.assert_called_once()
 

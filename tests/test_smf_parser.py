@@ -46,6 +46,10 @@ def rmid_data(smf_payload: bytes, extra_chunks: list[bytes] | None = None, form:
     return b"RIFF" + struct.pack("<I", len(payload)) + payload
 
 
+def wrk_chunk(chunk_id: int, payload: bytes) -> bytes:
+    return bytes([chunk_id]) + struct.pack("<I", len(payload)) + payload
+
+
 def read_temp_smf(data: bytes, name: str = "test.mid"):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir, name)
@@ -70,6 +74,14 @@ class SmfParserTest(unittest.TestCase):
         corrupted = b"CAKEWALK\x00\x01\x02" + bytes([10]) + struct.pack("<I", 20) + b"\x00\x00"
         with self.assertRaisesRegex(MidiFileError, "Corrupted Cakewalk WRK file"):
             read_temp_smf(corrupted, "broken.wrk")
+
+    def test_reports_wrk_timebase_from_first_chunk(self) -> None:
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(10, struct.pack("<H", 120)) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, timebase 120\)",
+        ):
+            read_temp_smf(wrk, "timebase.wrk")
 
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(

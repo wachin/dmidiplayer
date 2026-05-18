@@ -609,6 +609,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Add WRK parser skeleton with explicit unsupported-feature errors.
   - [x] Detect the WRK header and report the file format version in the unsupported message.
   - [x] Reject obviously corrupted WRK first-chunk headers before claiming generic unsupported status.
+  - [x] Parse `TIMEBASE_CHUNK` when it is the first WRK record and include the detected timebase in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 

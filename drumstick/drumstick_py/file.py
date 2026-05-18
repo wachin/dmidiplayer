@@ -26,6 +26,7 @@ class _WrkHeader:
     minor_version: int
     first_chunk_id: int | None = None
     first_chunk_length: int | None = None
+    timebase: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -348,6 +349,9 @@ class _Reader:
     def read_u16(self) -> int:
         return struct.unpack(">H", self.read(2))[0]
 
+    def read_u16_le(self) -> int:
+        return struct.unpack("<H", self.read(2))[0]
+
     def read_u32(self) -> int:
         return struct.unpack(">I", self.read(4))[0]
 
@@ -376,8 +380,11 @@ def read_smf(file_name: str | Path) -> MidiFile:
 def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
     if _looks_like_wrk(data, path):
         header = _read_wrk_header(data, path)
+        details = f"detected version {header.major_version}.{header.minor_version}"
+        if header.timebase is not None:
+            details += f", timebase {header.timebase}"
         raise MidiFileError(
-            f"Cakewalk WRK files are not supported yet (detected version {header.major_version}.{header.minor_version})"
+            f"Cakewalk WRK files are not supported yet ({details})"
         )
     if data.startswith(b"RIFF"):
         data = _unwrap_rmid_data(data)
@@ -456,11 +463,17 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     first_chunk_length = reader.read_u32_le()
     if reader.remaining < first_chunk_length:
         raise MidiFileError("Corrupted Cakewalk WRK file")
+    timebase: int | None = None
+    if first_chunk_id == 10:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        timebase = reader.read_u16_le()
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
         first_chunk_id=first_chunk_id,
         first_chunk_length=first_chunk_length,
+        timebase=timebase,
     )
 
 
