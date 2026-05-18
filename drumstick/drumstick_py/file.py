@@ -39,6 +39,8 @@ class _WrkHeader:
     track_patch: int | None = None
     track_offset_track: int | None = None
     track_offset: int | None = None
+    track_repetitions_track: int | None = None
+    track_repetitions: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -409,6 +411,14 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", track {header.track_patch_track + 1} patch {header.track_patch}"
         if header.track_offset_track is not None and header.track_offset is not None:
             details += f", track {header.track_offset_track + 1} offset {header.track_offset}"
+        if (
+            header.track_repetitions_track is not None
+            and header.track_repetitions is not None
+        ):
+            details += (
+                f", track {header.track_repetitions_track + 1} repetitions "
+                f"{header.track_repetitions}"
+            )
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -502,6 +512,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     track_patch: int | None = None
     track_offset_track: int | None = None
     track_offset: int | None = None
+    track_repetitions_track: int | None = None
+    track_repetitions: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -548,6 +560,11 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         track_offset_track = reader.read_u16_le()
         track_offset = struct.unpack("<h", reader.read(2))[0]
+    elif first_chunk_id == 12:
+        if first_chunk_length < 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        track_repetitions_track = reader.read_u16_le()
+        track_repetitions = reader.read_u16_le()
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -566,6 +583,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         track_patch=track_patch,
         track_offset_track=track_offset_track,
         track_offset=track_offset,
+        track_repetitions_track=track_repetitions_track,
+        track_repetitions=track_repetitions,
     )
 
 
