@@ -41,6 +41,8 @@ class _WrkHeader:
     track_offset: int | None = None
     track_repetitions_track: int | None = None
     track_repetitions: int | None = None
+    time_format: int | None = None
+    time_format_offset: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -419,6 +421,11 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 f", track {header.track_repetitions_track + 1} repetitions "
                 f"{header.track_repetitions}"
             )
+        if header.time_format is not None and header.time_format_offset is not None:
+            details += (
+                f", time format {header.time_format}"
+                f" offset {header.time_format_offset}"
+            )
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -514,6 +521,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     track_offset: int | None = None
     track_repetitions_track: int | None = None
     track_repetitions: int | None = None
+    time_format: int | None = None
+    time_format_offset: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -565,6 +574,11 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         track_repetitions_track = reader.read_u16_le()
         track_repetitions = reader.read_u16_le()
+    elif first_chunk_id == 11:
+        if first_chunk_length < 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        time_format = reader.read_u16_le()
+        time_format_offset = reader.read_u16_le()
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -585,6 +599,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         track_offset=track_offset,
         track_repetitions_track=track_repetitions_track,
         track_repetitions=track_repetitions,
+        time_format=time_format,
+        time_format_offset=time_format_offset,
     )
 
 
