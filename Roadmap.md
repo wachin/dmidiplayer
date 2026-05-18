@@ -714,7 +714,7 @@ clearer bites instead of rediscovering the next small step.
 
 ### Tests And Tooling
 
-- [ ] Add import/offscreen startup tests for the main window without ALSA.
+- [x] Add import/offscreen startup tests for the main window without ALSA.
 - [x] Add UI tests for toolbar play/pause/stop state transitions.
 - [ ] Add drag/drop event tests using real `QDropEvent` when practical.
 - [ ] Add tests for recent files and playlist persistence.

@@ -575,6 +575,22 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
 
+    def test_main_window_can_start_offscreen_without_alsa(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            window.show()
+            self.app.processEvents()
+
+            self.assertTrue(window.isVisible())
+            self.assertEqual(window.title_label.text(), "No file loaded")
+            self.assertFalse(window.play_action.isEnabled())
+            self.assertFalse(window.pause_action.isEnabled())
+            self.assertTrue(window.stop_action.isEnabled())
+            self.assertEqual(window.event_label.text(), "MIDI output: Dummy output")
+
     def test_next_and_previous_select_playlist_items(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")
