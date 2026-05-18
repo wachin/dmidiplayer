@@ -620,6 +620,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `TRKREPS_CHUNK` when it is the first WRK record and include the detected track repetitions in the unsupported message.
   - [x] Parse `TIMEFMT_CHUNK` when it is the first WRK record and include the detected time format and offset in the unsupported message.
   - [x] Parse `NTRKOFS_CHUNK` when it is the first WRK record and include the detected 32-bit track offset in the unsupported message.
+  - [x] Parse `NTRACK_CHUNK` when it is the first WRK record and include the detected track summary in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
