@@ -628,6 +628,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `VARS_CHUNK` when it is the first WRK record and include the detected global time markers in the unsupported message.
   - [x] Parse `THRU_CHUNK` when it is the first WRK record and include the detected thru settings in the unsupported message.
   - [x] Parse `METERKEY_CHUNK` when it is the first WRK record and include the detected meter/key summary in the unsupported message.
+  - [x] Parse `METER_CHUNK` when it is the first WRK record and include the detected meter summary in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 

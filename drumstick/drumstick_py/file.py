@@ -77,6 +77,10 @@ class _WrkHeader:
     first_meter_numerator: int | None = None
     first_meter_denominator: int | None = None
     first_key_alterations: int | None = None
+    meter_count: int | None = None
+    plain_meter_measure: int | None = None
+    plain_meter_numerator: int | None = None
+    plain_meter_denominator: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -527,6 +531,13 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                     f" {header.first_meter_numerator}/{header.first_meter_denominator}"
                     f" key {header.first_key_alterations}"
                 )
+        if header.meter_count is not None:
+            details += f", meter entries {header.meter_count}"
+            if header.plain_meter_measure is not None:
+                details += (
+                    f" first measure {header.plain_meter_measure}"
+                    f" {header.plain_meter_numerator}/{header.plain_meter_denominator}"
+                )
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -658,6 +669,10 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     first_meter_numerator: int | None = None
     first_meter_denominator: int | None = None
     first_key_alterations: int | None = None
+    meter_count: int | None = None
+    plain_meter_measure: int | None = None
+    plain_meter_numerator: int | None = None
+    plain_meter_denominator: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -832,6 +847,18 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             first_meter_numerator = reader.read(1)[0]
             first_meter_denominator = 2 ** reader.read(1)[0]
             first_key_alterations = struct.unpack("<b", reader.read(1))[0]
+    elif first_chunk_id == 5:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        meter_count = reader.read_u16_le()
+        if meter_count > 0:
+            if reader.remaining < 12:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            reader.read(4)
+            plain_meter_measure = reader.read_u16_le()
+            plain_meter_numerator = reader.read(1)[0]
+            plain_meter_denominator = 2 ** reader.read(1)[0]
+            reader.read(4)
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -888,6 +915,10 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         first_meter_numerator=first_meter_numerator,
         first_meter_denominator=first_meter_denominator,
         first_key_alterations=first_key_alterations,
+        meter_count=meter_count,
+        plain_meter_measure=plain_meter_measure,
+        plain_meter_numerator=plain_meter_numerator,
+        plain_meter_denominator=plain_meter_denominator,
     )
 
 
