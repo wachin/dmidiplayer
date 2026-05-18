@@ -62,6 +62,16 @@ class _WrkHeader:
     new_stream_events: int | None = None
     variable_name: str | None = None
     variable_data_length: int | None = None
+    vars_now: int | None = None
+    vars_from: int | None = None
+    vars_thru: int | None = None
+    vars_end_all_time: int | None = None
+    thru_mode: int | None = None
+    thru_port: int | None = None
+    thru_channel: int | None = None
+    thru_key_plus: int | None = None
+    thru_vel_plus: int | None = None
+    thru_local_port: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -487,6 +497,23 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", variable '{header.variable_name}'"
             if header.variable_data_length is not None:
                 details += f" bytes {header.variable_data_length}"
+        if header.vars_now is not None:
+            details += (
+                f", now {header.vars_now}"
+                f" from {header.vars_from}"
+                f" thru {header.vars_thru}"
+            )
+            if header.vars_end_all_time is not None:
+                details += f" end {header.vars_end_all_time}"
+        if header.thru_mode is not None:
+            details += (
+                f", thru mode {header.thru_mode}"
+                f" port {header.thru_port}"
+                f" channel {header.thru_channel}"
+                f" key+ {header.thru_key_plus}"
+                f" vel+ {header.thru_vel_plus}"
+                f" local {header.thru_local_port}"
+            )
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -603,6 +630,16 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     new_stream_events: int | None = None
     variable_name: str | None = None
     variable_data_length: int | None = None
+    vars_now: int | None = None
+    vars_from: int | None = None
+    vars_thru: int | None = None
+    vars_end_all_time: int | None = None
+    thru_mode: int | None = None
+    thru_port: int | None = None
+    thru_channel: int | None = None
+    thru_key_plus: int | None = None
+    thru_vel_plus: int | None = None
+    thru_local_port: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -733,6 +770,39 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         variable_name = bytes(name_bytes).decode("latin-1", errors="replace")
         variable_data_length = first_chunk_length - 32
         reader.read(variable_data_length)
+    elif first_chunk_id == 3:
+        if first_chunk_length < 76:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        vars_now = reader.read_u32_le()
+        vars_from = reader.read_u32_le()
+        vars_thru = reader.read_u32_le()
+        reader.read(4)  # key sig, clock, auto-save, play delay
+        reader.read(1)  # gap
+        reader.read(5)  # zero ctrls, send spp, send cont, patch search, auto stop
+        reader.read_u32_le()  # stop time
+        reader.read(1)  # auto rewind
+        reader.read_u32_le()  # rewind time
+        reader.read(4)  # metro play, metro record, metro accent, count-in
+        reader.read(2)  # gap
+        reader.read(1)  # thru on
+        reader.read(19)  # gap
+        reader.read(1)  # auto restart
+        reader.read(4)  # current tempo ofs and tempo offsets 1..3
+        reader.read(2)  # gap
+        reader.read(1)  # punch enabled
+        reader.read_u32_le()  # punch in
+        reader.read_u32_le()  # punch out
+        vars_end_all_time = reader.read_u32_le()
+    elif first_chunk_id == 16:
+        if first_chunk_length < 8:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        reader.read(2)  # gap
+        thru_port = struct.unpack("<b", reader.read(1))[0]
+        thru_channel = struct.unpack("<b", reader.read(1))[0]
+        thru_key_plus = struct.unpack("<b", reader.read(1))[0]
+        thru_vel_plus = struct.unpack("<b", reader.read(1))[0]
+        thru_local_port = struct.unpack("<b", reader.read(1))[0]
+        thru_mode = struct.unpack("<b", reader.read(1))[0]
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -774,6 +844,16 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         new_stream_events=new_stream_events,
         variable_name=variable_name,
         variable_data_length=variable_data_length,
+        vars_now=vars_now,
+        vars_from=vars_from,
+        vars_thru=vars_thru,
+        vars_end_all_time=vars_end_all_time,
+        thru_mode=thru_mode,
+        thru_port=thru_port,
+        thru_channel=thru_channel,
+        thru_key_plus=thru_key_plus,
+        thru_vel_plus=thru_vel_plus,
+        thru_local_port=thru_local_port,
     )
 
 
