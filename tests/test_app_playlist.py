@@ -410,7 +410,7 @@ def write_cp1252_text_midi(path: Path) -> None:
 
 
 def write_wrk_stub(path: Path) -> None:
-    path.write_bytes(b"CAKEWALK\x00\x01\x02\x03")
+    path.write_bytes(b"CAKEWALK\x00\x01\x02\xff")
 
 
 def write_timed_lyrics_midi(path: Path) -> None:

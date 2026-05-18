@@ -24,6 +24,8 @@ class MidiFileError(ValueError):
 class _WrkHeader:
     major_version: int
     minor_version: int
+    first_chunk_id: int | None = None
+    first_chunk_length: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -439,7 +441,27 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     reader.read(1)  # reserved gap byte
     minor_version = reader.read(1)[0]
     major_version = reader.read(1)[0]
-    return _WrkHeader(major_version=major_version, minor_version=minor_version)
+    if reader.remaining <= 0:
+        return _WrkHeader(major_version=major_version, minor_version=minor_version)
+    first_chunk_id = reader.read(1)[0]
+    if first_chunk_id == 0xFF:
+        return _WrkHeader(
+            major_version=major_version,
+            minor_version=minor_version,
+            first_chunk_id=first_chunk_id,
+            first_chunk_length=0,
+        )
+    if reader.remaining < 4:
+        raise MidiFileError("Corrupted Cakewalk WRK file")
+    first_chunk_length = reader.read_u32_le()
+    if reader.remaining < first_chunk_length:
+        raise MidiFileError("Corrupted Cakewalk WRK file")
+    return _WrkHeader(
+        major_version=major_version,
+        minor_version=minor_version,
+        first_chunk_id=first_chunk_id,
+        first_chunk_length=first_chunk_length,
+    )
 
 
 def _read_track(data: bytes) -> MidiTrack:

@@ -60,11 +60,16 @@ class SmfParserTest(unittest.TestCase):
 
     def test_rejects_wrk_files_with_explicit_message(self) -> None:
         with self.assertRaisesRegex(MidiFileError, r"Cakewalk WRK files are not supported yet \(detected version 2\.1\)"):
-            read_temp_smf(b"CAKEWALK\x00\x01\x02\x03", "song.wrk")
+            read_temp_smf(b"CAKEWALK\x00\x01\x02\xff", "song.wrk")
 
     def test_rejects_invalid_wrk_file_format(self) -> None:
         with self.assertRaisesRegex(MidiFileError, "Invalid Cakewalk WRK file format"):
             read_temp_smf(b"not-a-wrk", "song.wrk")
+
+    def test_rejects_corrupted_wrk_chunk_header(self) -> None:
+        corrupted = b"CAKEWALK\x00\x01\x02" + bytes([10]) + struct.pack("<I", 20) + b"\x00\x00"
+        with self.assertRaisesRegex(MidiFileError, "Corrupted Cakewalk WRK file"):
+            read_temp_smf(corrupted, "broken.wrk")
 
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(

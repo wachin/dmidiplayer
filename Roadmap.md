@@ -608,6 +608,7 @@ clearer bites instead of rediscovering the next small step.
   dmidiplayer.
 - [x] Add WRK parser skeleton with explicit unsupported-feature errors.
   - [x] Detect the WRK header and report the file format version in the unsupported message.
+  - [x] Reject obviously corrupted WRK first-chunk headers before claiming generic unsupported status.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
