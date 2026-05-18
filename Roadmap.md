@@ -599,7 +599,7 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Compare parser timing and metadata against C++ Drumstick for
   `examples/mozart_diesirae.mid`.
 - [ ] Add a karaoke `.kar` fixture with lyric meta events split across tracks.
-- [ ] Preserve original track numbers for meta text and channel events.
+- [x] Preserve original track numbers for meta text and channel events.
 - [x] Preserve track names and instrument names as structured metadata.
 - [x] Parse RIFF MIDI container headers and delegate embedded SMF data to
   `read_smf()`.
@@ -608,7 +608,9 @@ clearer bites instead of rediscovering the next small step.
   dmidiplayer.
 - [x] Add WRK parser skeleton with explicit unsupported-feature errors.
   - [x] Detect the WRK header and report the file format version in the unsupported message.
+  - [x] Include unknown first WRK chunk id/name/length when the scaffold cannot decode that chunk yet.
   - [x] Reject obviously corrupted WRK first-chunk headers before claiming generic unsupported status.
+  - [x] Parse `TRACK_CHUNK` when it is the first WRK record and include the detected classic track summary in the unsupported message.
   - [x] Parse `TIMEBASE_CHUNK` when it is the first WRK record and include the detected timebase in the unsupported message.
   - [x] Parse `SOFTVER_CHUNK` when it is the first WRK record and include the detected saving software version in the unsupported message.
   - [x] Parse `TRKNAME_CHUNK` when it is the first WRK record and include the detected track name in the unsupported message.
@@ -623,7 +625,10 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `NTRACK_CHUNK` when it is the first WRK record and include the detected track summary in the unsupported message.
   - [x] Parse `MARKERS_CHUNK` when it is the first WRK record and include the detected marker count and first marker summary in the unsupported message.
   - [x] Parse `SGMNT_CHUNK` when it is the first WRK record and include the detected segment summary in the unsupported message.
+  - [x] Parse `LYRICS_CHUNK` when it is the first WRK record and include the detected lyrics-stream summary in the unsupported message.
+  - [x] Parse `STREAM_CHUNK` when it is the first WRK record and include the detected classic stream summary in the unsupported message.
   - [x] Parse `NSTREAM_CHUNK` when it is the first WRK record and include the detected stream summary in the unsupported message.
+  - [x] Parse `STRTAB_CHUNK` when it is the first WRK record and include the detected string-table summary in the unsupported message.
   - [x] Parse `VARIABLE_CHUNK` when it is the first WRK record and include the detected variable name and payload length in the unsupported message.
   - [x] Parse `VARS_CHUNK` when it is the first WRK record and include the detected global time markers in the unsupported message.
   - [x] Parse `THRU_CHUNK` when it is the first WRK record and include the detected thru settings in the unsupported message.

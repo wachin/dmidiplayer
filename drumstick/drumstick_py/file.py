@@ -14,6 +14,39 @@ from pathlib import Path
 import struct
 
 WRK_HEADER = b"CAKEWALK"
+WRK_CHUNK_NAMES: dict[int, str] = {
+    1: "TRACK_CHUNK",
+    2: "STREAM_CHUNK",
+    3: "VARS_CHUNK",
+    4: "TEMPO_CHUNK",
+    5: "METER_CHUNK",
+    6: "SYSEX_CHUNK",
+    7: "MEMRGN_CHUNK",
+    8: "COMMENTS_CHUNK",
+    9: "TRKOFFS_CHUNK",
+    10: "TIMEBASE_CHUNK",
+    11: "TIMEFMT_CHUNK",
+    12: "TRKREPS_CHUNK",
+    14: "TRKPATCH_CHUNK",
+    15: "NTEMPO_CHUNK",
+    16: "THRU_CHUNK",
+    18: "LYRICS_CHUNK",
+    19: "TRKVOL_CHUNK",
+    20: "SYSEX2_CHUNK",
+    21: "MARKERS_CHUNK",
+    22: "STRTAB_CHUNK",
+    23: "METERKEY_CHUNK",
+    24: "TRKNAME_CHUNK",
+    26: "VARIABLE_CHUNK",
+    27: "NTRKOFS_CHUNK",
+    30: "TRKBANK_CHUNK",
+    36: "NTRACK_CHUNK",
+    44: "NSYSEX_CHUNK",
+    45: "NSTREAM_CHUNK",
+    49: "SGMNT_CHUNK",
+    74: "SOFTVER_CHUNK",
+    255: "END_CHUNK",
+}
 
 
 class MidiFileError(ValueError):
@@ -30,6 +63,13 @@ class _WrkHeader:
     software_version: str | None = None
     track_number: int | None = None
     track_name: str | None = None
+    classic_track_number: int | None = None
+    classic_track_name: str | None = None
+    classic_track_channel: int | None = None
+    classic_track_patch: int | None = None
+    classic_track_selected: bool | None = None
+    classic_track_muted: bool | None = None
+    classic_track_loop: bool | None = None
     comments: str | None = None
     track_volume_track: int | None = None
     track_volume: int | None = None
@@ -57,9 +97,21 @@ class _WrkHeader:
     segment_offset: int | None = None
     segment_name: str | None = None
     segment_events: int | None = None
+    lyrics_stream_track: int | None = None
+    lyrics_stream_events: int | None = None
+    stream_track: int | None = None
+    stream_events: int | None = None
+    first_stream_time: int | None = None
+    first_stream_status: int | None = None
+    first_stream_data1: int | None = None
+    first_stream_data2: int | None = None
+    first_stream_duration: int | None = None
     new_stream_track: int | None = None
     new_stream_name: str | None = None
     new_stream_events: int | None = None
+    string_table_rows: int | None = None
+    first_string_table_name: str | None = None
+    first_string_table_index: int | None = None
     variable_name: str | None = None
     variable_data_length: int | None = None
     vars_now: int | None = None
@@ -122,6 +174,7 @@ def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
 class MidiEvent:
     tick: int
     kind: str
+    track: int | None = None
     channel: int | None = None
     data: bytes = b""
     meta_type: int | None = None
@@ -461,6 +514,23 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", saved by {header.software_version}"
         if header.track_number is not None and header.track_name:
             details += f", track {header.track_number + 1} '{header.track_name}'"
+        if header.classic_track_number is not None:
+            details += f", classic track {header.classic_track_number + 1}"
+            if header.classic_track_name:
+                details += f" '{header.classic_track_name}'"
+            if header.classic_track_channel is not None:
+                details += f" channel {header.classic_track_channel + 1}"
+            if header.classic_track_patch is not None:
+                details += f" patch {header.classic_track_patch}"
+            flags: list[str] = []
+            if header.classic_track_selected:
+                flags.append("selected")
+            if header.classic_track_muted:
+                flags.append("muted")
+            if header.classic_track_loop:
+                flags.append("loop")
+            if flags:
+                details += " " + ",".join(flags)
         if header.comments:
             details += f", comments '{header.comments}'"
         if header.track_volume_track is not None and header.track_volume is not None:
@@ -516,12 +586,42 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" '{header.segment_name}'"
             if header.segment_events is not None:
                 details += f" events {header.segment_events}"
+        if header.lyrics_stream_track is not None:
+            details += f", lyrics track {header.lyrics_stream_track + 1}"
+            if header.lyrics_stream_events is not None:
+                details += f" events {header.lyrics_stream_events}"
+        if header.stream_track is not None:
+            details += f", classic stream track {header.stream_track + 1}"
+            if header.stream_events is not None:
+                details += f" events {header.stream_events}"
+            if header.first_stream_status is not None:
+                first_kind = header.first_stream_status & 0xF0
+                first_channel = (header.first_stream_status & 0x0F) + 1
+                if first_kind == 0x90:
+                    details += (
+                        f" first note at {header.first_stream_time}"
+                        f" ch {first_channel}"
+                        f" key {header.first_stream_data1}"
+                        f" vel {header.first_stream_data2}"
+                        f" dur {header.first_stream_duration}"
+                    )
+                else:
+                    details += (
+                        f" first status 0x{header.first_stream_status:02X}"
+                        f" at {header.first_stream_time}"
+                    )
         if header.new_stream_track is not None:
             details += f", stream track {header.new_stream_track + 1}"
             if header.new_stream_name:
                 details += f" '{header.new_stream_name}'"
             if header.new_stream_events is not None:
                 details += f" events {header.new_stream_events}"
+        if header.string_table_rows is not None:
+            details += f", string table rows {header.string_table_rows}"
+            if header.first_string_table_name is not None:
+                details += f" first '{header.first_string_table_name}'"
+            if header.first_string_table_index is not None:
+                details += f" idx {header.first_string_table_index}"
         if header.variable_name is not None:
             details += f", variable '{header.variable_name}'"
             if header.variable_data_length is not None:
@@ -601,6 +701,18 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" autosend {int(header.new_sysex_autosend)}"
             if header.new_sysex_name:
                 details += f" '{header.new_sysex_name}'"
+        if (
+            header.first_chunk_id is not None
+            and header.first_chunk_id != 0xFF
+            and details == f"detected version {header.major_version}.{header.minor_version}"
+        ):
+            chunk_name = WRK_CHUNK_NAMES.get(header.first_chunk_id)
+            details += (
+                f", first chunk {header.first_chunk_id}"
+            )
+            if chunk_name:
+                details += f" {chunk_name}"
+            details += f" length {header.first_chunk_length}"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -619,11 +731,11 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
         reader.read(header_size - 6)
 
     tracks: list[MidiTrack] = []
-    for _ in range(track_count):
+    for track_number in range(track_count):
         if reader.read(4) != b"MTrk":
             raise MidiFileError("Missing MIDI track chunk")
         track_size = reader.read_u32()
-        tracks.append(_read_track(reader.read(track_size)))
+        tracks.append(_read_track(reader.read(track_size), track_number))
     return MidiFile(path=path, format=midi_format, division=division, tracks=tracks)
 
 
@@ -685,6 +797,13 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     software_version: str | None = None
     track_number: int | None = None
     track_name: str | None = None
+    classic_track_number: int | None = None
+    classic_track_name: str | None = None
+    classic_track_channel: int | None = None
+    classic_track_patch: int | None = None
+    classic_track_selected: bool | None = None
+    classic_track_muted: bool | None = None
+    classic_track_loop: bool | None = None
     comments: str | None = None
     track_volume_track: int | None = None
     track_volume: int | None = None
@@ -712,9 +831,21 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     segment_offset: int | None = None
     segment_name: str | None = None
     segment_events: int | None = None
+    lyrics_stream_track: int | None = None
+    lyrics_stream_events: int | None = None
+    stream_track: int | None = None
+    stream_events: int | None = None
+    first_stream_time: int | None = None
+    first_stream_status: int | None = None
+    first_stream_data1: int | None = None
+    first_stream_data2: int | None = None
+    first_stream_duration: int | None = None
     new_stream_track: int | None = None
     new_stream_name: str | None = None
     new_stream_events: int | None = None
+    string_table_rows: int | None = None
+    first_string_table_name: str | None = None
+    first_string_table_index: int | None = None
     variable_name: str | None = None
     variable_data_length: int | None = None
     vars_now: int | None = None
@@ -756,7 +887,27 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     new_sysex_port: int | None = None
     new_sysex_autosend: bool | None = None
     new_sysex_name: str | None = None
-    if first_chunk_id == 10:
+    if first_chunk_id == 1:
+        if first_chunk_length < 9:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        classic_track_number = reader.read_u16_le()
+        primary_name_length = reader.read(1)[0]
+        if reader.remaining < primary_name_length + 1:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        primary_name = reader.read(primary_name_length).decode("latin-1", errors="replace")
+        alternate_name_length = reader.read(1)[0]
+        if reader.remaining < alternate_name_length + 5:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        alternate_name = reader.read(alternate_name_length).decode("latin-1", errors="replace")
+        classic_track_channel = reader.read(1)[0] & 0x0F
+        classic_track_patch = reader.read(1)[0]
+        reader.read(2)  # velocity and port
+        flags = reader.read(1)[0]
+        classic_track_selected = (flags & 0x01) != 0
+        classic_track_muted = (flags & 0x02) != 0
+        classic_track_loop = (flags & 0x04) != 0
+        classic_track_name = primary_name or alternate_name or None
+    elif first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         timebase = reader.read_u16_le()
@@ -862,6 +1013,24 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         segment_name = reader.read(name_length).decode("latin-1", errors="replace")
         reader.read(20)
         segment_events = reader.read_u32_le()
+    elif first_chunk_id == 18:
+        if first_chunk_length < 6:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        lyrics_stream_track = reader.read_u16_le()
+        lyrics_stream_events = reader.read_u32_le()
+    elif first_chunk_id == 2:
+        if first_chunk_length < 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        stream_track = reader.read_u16_le()
+        stream_events = reader.read_u16_le()
+        if stream_events > 0:
+            if reader.remaining < 8:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_stream_time = int.from_bytes(reader.read(3), "little")
+            first_stream_status = reader.read(1)[0]
+            first_stream_data1 = reader.read(1)[0]
+            first_stream_data2 = reader.read(1)[0]
+            first_stream_duration = reader.read_u16_le()
     elif first_chunk_id == 45:
         if first_chunk_length < 7:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -871,6 +1040,20 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         new_stream_name = reader.read(name_length).decode("latin-1", errors="replace")
         new_stream_events = reader.read_u32_le()
+    elif first_chunk_id == 22:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        string_table_rows = reader.read_u16_le()
+        if string_table_rows > 0:
+            if reader.remaining < 2:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            name_length = reader.read(1)[0]
+            if reader.remaining < name_length + 1:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_string_table_name = reader.read(name_length).decode(
+                "latin-1", errors="replace"
+            )
+            first_string_table_index = reader.read(1)[0]
     elif first_chunk_id == 26:
         if first_chunk_length < 32:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -1009,6 +1192,13 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         software_version=software_version,
         track_number=track_number,
         track_name=track_name,
+        classic_track_number=classic_track_number,
+        classic_track_name=classic_track_name,
+        classic_track_channel=classic_track_channel,
+        classic_track_patch=classic_track_patch,
+        classic_track_selected=classic_track_selected,
+        classic_track_muted=classic_track_muted,
+        classic_track_loop=classic_track_loop,
         comments=comments,
         track_volume_track=track_volume_track,
         track_volume=track_volume,
@@ -1036,9 +1226,21 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         segment_offset=segment_offset,
         segment_name=segment_name,
         segment_events=segment_events,
+        lyrics_stream_track=lyrics_stream_track,
+        lyrics_stream_events=lyrics_stream_events,
+        stream_track=stream_track,
+        stream_events=stream_events,
+        first_stream_time=first_stream_time,
+        first_stream_status=first_stream_status,
+        first_stream_data1=first_stream_data1,
+        first_stream_data2=first_stream_data2,
+        first_stream_duration=first_stream_duration,
         new_stream_track=new_stream_track,
         new_stream_name=new_stream_name,
         new_stream_events=new_stream_events,
+        string_table_rows=string_table_rows,
+        first_string_table_name=first_string_table_name,
+        first_string_table_index=first_string_table_index,
         variable_name=variable_name,
         variable_data_length=variable_data_length,
         vars_now=vars_now,
@@ -1083,7 +1285,7 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     )
 
 
-def _read_track(data: bytes) -> MidiTrack:
+def _read_track(data: bytes, track_number: int) -> MidiTrack:
     reader = _Reader(data)
     tick = 0
     running_status: int | None = None
@@ -1105,7 +1307,15 @@ def _read_track(data: bytes) -> MidiTrack:
         if status == 0xFF:
             meta_type = reader.read(1)[0]
             payload = reader.read(reader.read_varlen())
-            events.append(MidiEvent(tick=tick, kind="meta", data=payload, meta_type=meta_type))
+            events.append(
+                MidiEvent(
+                    tick=tick,
+                    kind="meta",
+                    track=track_number,
+                    data=payload,
+                    meta_type=meta_type,
+                )
+            )
             text = decode_midi_text(payload).strip()
             if meta_type == 0x03 and text and not track_name:
                 track_name = text
@@ -1116,14 +1326,29 @@ def _read_track(data: bytes) -> MidiTrack:
             continue
 
         if status in (0xF0, 0xF7):
-            events.append(MidiEvent(tick=tick, kind="sysex", data=reader.read(reader.read_varlen())))
+            events.append(
+                MidiEvent(
+                    tick=tick,
+                    kind="sysex",
+                    track=track_number,
+                    data=reader.read(reader.read_varlen()),
+                )
+            )
             continue
 
         event_type = status & 0xF0
         channel = status & 0x0F
         size = 1 if event_type in (0xC0, 0xD0) else 2
         payload = reader.read(size)
-        events.append(MidiEvent(tick=tick, kind=_channel_kind(event_type), channel=channel, data=payload))
+        events.append(
+            MidiEvent(
+                tick=tick,
+                kind=_channel_kind(event_type),
+                track=track_number,
+                channel=channel,
+                data=payload,
+            )
+        )
 
     return MidiTrack(events=events, name=track_name, instrument_name=instrument_name)
 

@@ -66,6 +66,15 @@ class SmfParserTest(unittest.TestCase):
         with self.assertRaisesRegex(MidiFileError, r"Cakewalk WRK files are not supported yet \(detected version 2\.1\)"):
             read_temp_smf(b"CAKEWALK\x00\x01\x02\xff", "song.wrk")
 
+    def test_reports_unknown_wrk_first_chunk_summary(self) -> None:
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(7, b"\x01\x02\x03\x04") + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, first chunk 7 MEMRGN_CHUNK length 4\)",
+        ):
+            read_temp_smf(wrk, "memrgn.wrk")
+
     def test_rejects_invalid_wrk_file_format(self) -> None:
         with self.assertRaisesRegex(MidiFileError, "Invalid Cakewalk WRK file format"):
             read_temp_smf(b"not-a-wrk", "song.wrk")
@@ -100,6 +109,23 @@ class SmfParserTest(unittest.TestCase):
             r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 'Piano'\)",
         ):
             read_temp_smf(wrk, "trackname.wrk")
+
+    def test_reports_wrk_classic_track_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<H", 0)
+            + bytes([5])
+            + b"Piano"
+            + bytes([4])
+            + b"Part"
+            + bytes([2, 40, 100, 1, 0x07])
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(1, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, classic track 1 'Piano' channel 3 patch 40 selected,muted,loop\)",
+        ):
+            read_temp_smf(wrk, "track.wrk")
 
     def test_reports_wrk_comments_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 5) + b"Notes"
@@ -224,6 +250,32 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "segment.wrk")
 
+    def test_reports_wrk_lyrics_stream_from_first_chunk(self) -> None:
+        payload = struct.pack("<HI", 0, 9)
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(18, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, lyrics track 1 events 9\)",
+        ):
+            read_temp_smf(wrk, "lyricsstream.wrk")
+
+    def test_reports_wrk_classic_stream_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<HH", 0, 1)
+            + bytes([0x7B, 0x00, 0x00])
+            + bytes([0x90, 60, 100])
+            + struct.pack("<H", 240)
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(2, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, classic stream track 1 events 1 "
+            r"first note at 123 ch 1 key 60 vel 100 dur 240\)",
+        ):
+            read_temp_smf(wrk, "stream.wrk")
+
     def test_reports_wrk_new_stream_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 0) + bytes([5]) + b"Intro" + struct.pack("<I", 7)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(45, payload) + b"\xff"
@@ -233,6 +285,16 @@ class SmfParserTest(unittest.TestCase):
             r"\(detected version 2\.1, stream track 1 'Intro' events 7\)",
         ):
             read_temp_smf(wrk, "nstream.wrk")
+
+    def test_reports_wrk_string_table_from_first_chunk(self) -> None:
+        payload = struct.pack("<H", 2) + bytes([5]) + b"Verse" + bytes([3])
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(22, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, string table rows 2 first 'Verse' idx 3\)",
+        ):
+            read_temp_smf(wrk, "strtab.wrk")
 
     def test_reports_wrk_variable_record_from_first_chunk(self) -> None:
         payload = b"Tempo\x00" + (b"\x00" * 26) + b"\x10\x20\x30\x00"
@@ -692,6 +754,44 @@ class SmfParserTest(unittest.TestCase):
 
         self.assertEqual(midi.tracks[0].name, "Piano")
         self.assertEqual(midi.tracks[0].instrument_name, "Grand Piano")
+
+    def test_preserves_original_track_numbers_for_meta_and_channel_events(self) -> None:
+        track0 = b"".join(
+            [
+                varlen(0),
+                b"\xff\x03",
+                varlen(5),
+                b"Intro",
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        track1 = b"".join(
+            [
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(120),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(1, 480, [track0, track1]), "track-numbers.mid")
+
+        event_summary = [
+            (event.track, event.kind, event.meta_type, event.channel, event.tick)
+            for event in midi.events
+        ]
+        self.assertEqual(
+            event_summary,
+            [
+                (0, "meta", 0x03, None, 0),
+                (0, "meta", 0x2F, None, 0),
+                (1, "note_on", None, 0, 0),
+                (1, "note_off", None, 0, 120),
+                (1, "meta", 0x2F, None, 120),
+            ],
+        )
 
     def test_auto_detects_cp1252_text_events(self) -> None:
         track = b"".join(
