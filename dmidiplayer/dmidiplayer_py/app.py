@@ -2160,8 +2160,7 @@ class MainWindow(QMainWindow):
             placeholder.setEnabled(False)
         else:
             for path in recent_files:
-                action = self.recent_files_menu.addAction(str(path))
-                action.triggered.connect(lambda checked=False, file_name=str(path): self.load_file(file_name))
+                self._create_recent_file_action(path)
         self.recent_files_menu.addSeparator()
         self.clear_recent_action.setEnabled(bool(recent_files))
         self.recent_files_menu.addAction(self.clear_recent_action)
@@ -2478,7 +2477,7 @@ class MainWindow(QMainWindow):
     def _playlist_paths(self) -> list[Path]:
         return [Path(self._playlist_item_path(self.playlist.item(row))) for row in range(self.playlist.count())]
 
-    def _playlist_display_text(self, path: Path) -> str:
+    def _song_display_text(self, path: Path) -> str:
         title = ""
         try:
             midi = read_smf(path)
@@ -2490,6 +2489,9 @@ class MainWindow(QMainWindow):
         if title:
             return title
         return path.name
+
+    def _playlist_display_text(self, path: Path) -> str:
+        return self._song_display_text(path)
 
     def _create_playlist_item(self, path: str | Path) -> QListWidgetItem:
         path = Path(path)
@@ -2503,6 +2505,13 @@ class MainWindow(QMainWindow):
             return ""
         stored = item.data(Qt.ItemDataRole.UserRole)
         return str(stored or "")
+
+    def _create_recent_file_action(self, path: Path) -> QAction:
+        action = self.recent_files_menu.addAction(self._song_display_text(path))
+        action.setData(str(path))
+        action.setToolTip(str(path))
+        action.triggered.connect(lambda checked=False, file_name=str(path): self.load_file(file_name))
+        return action
 
     def _localized_doc_path(self, file_name: str) -> Path:
         locale_name = QLocale.system().name()

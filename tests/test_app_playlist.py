@@ -934,7 +934,7 @@ class AppPlaylistTest(unittest.TestCase):
     def test_successful_load_adds_recent_file_menu_entry(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "recent.mid")
-            write_simple_midi(path)
+            write_titled_midi(path, "Menu Song")
 
             with (
                 patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
@@ -944,7 +944,9 @@ class AppPlaylistTest(unittest.TestCase):
                 window.load_file(str(path))
 
                 self.assertEqual(window.settings.recent_files(), [path])
-                self.assertEqual(window.recent_files_menu.actions()[0].text(), str(path))
+                self.assertEqual(window.recent_files_menu.actions()[0].text(), "Menu Song - recent.mid")
+                self.assertEqual(window.recent_files_menu.actions()[0].data(), str(path))
+                self.assertEqual(window.recent_files_menu.actions()[0].toolTip(), str(path))
                 self.assertTrue(window.clear_recent_action.isEnabled())
 
     def test_clear_recent_files_action_updates_menu(self) -> None:

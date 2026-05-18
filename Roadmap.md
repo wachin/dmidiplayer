@@ -280,6 +280,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [x] Open files from menu/toolbar.
 - [x] Recent files menu, remembering up to ten entries.
+  - [x] Recent file actions now use friendly song titles while preserving the real file path internally.
 - [x] Open files passed on the command line.
 - [x] Open `.lst` playlists passed on the command line.
 - [ ] Integrate with file managers through "Open With...".
