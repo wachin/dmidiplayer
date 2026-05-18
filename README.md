@@ -7,6 +7,10 @@ lives in parallel packages inside the same source tree:
 - `drumstick/drumstick_py`
 - `dmidiplayer/dmidiplayer_py`
 
+If the project is eventually prepared for Debian packaging, see
+`Debian-Packaging-Notes.md` for repository-specific notes about archive
+compatibility, format support, and licensing concerns.
+
 ## Current Test Environment
 
 Manual testing is currently being done on MX Linux 23.

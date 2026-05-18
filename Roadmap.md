@@ -10,6 +10,8 @@ session. Before changing code, read especially:
 - `Next Session: Concrete Tasks`
 - `Known Limitations`
 - `Roadmap-GUI/dmidiplayer-GUI.md`
+- `Debian-Packaging-Notes.md` if the work touches licensing, bundled assets,
+  sample files, or future Debian upload constraints
 
 ## GUI Reference Check
 
@@ -279,6 +281,7 @@ Drumstick documentation. It is the target list for the whole migration.
 ### File Opening And Recent Files
 
 - [x] Open files from menu/toolbar.
+- [x] The file chooser now accepts `.wrk` so the app can surface the explicit unsupported error path.
 - [x] Recent files menu, remembering up to ten entries.
   - [x] Recent file actions now use friendly song titles while preserving the real file path internally.
 - [x] Open files passed on the command line.

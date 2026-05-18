@@ -51,7 +51,8 @@ from .player import SequencePlayer
 from .settings import AppSettings
 
 
-MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi"}
+MIDI_FILE_SUFFIXES = {".kar", ".mid", ".midi", ".rmi"}
+OPENABLE_SONG_FILE_SUFFIXES = MIDI_FILE_SUFFIXES | {".wrk"}
 PLAYLIST_FILE_SUFFIXES = {".lst"}
 APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
@@ -3380,7 +3381,7 @@ class MainWindow(QMainWindow):
             self,
             self.tr("Open Files"),
             str(self.settings.last_folder(Path.home())),
-            self.tr("MIDI and playlists (*.mid *.midi *.kar *.lst);;MIDI (*.mid *.midi *.kar);;Playlists (*.lst);;All files (*)"),
+            self.tr("Songs and playlists (*.mid *.midi *.kar *.rmi *.wrk *.lst);;Songs (*.mid *.midi *.kar *.rmi *.wrk);;Playlists (*.lst);;All files (*)"),
         )
         self.open_paths([Path(file_name) for file_name in files], remember_folder=True)
 
@@ -3392,7 +3393,7 @@ class MainWindow(QMainWindow):
             self.settings.set_last_folder(openable_paths[0].parent)
 
         playlist_paths = [path for path in openable_paths if self._is_playlist_file(path)]
-        midi_paths = [path for path in openable_paths if self._is_supported_file(path)]
+        midi_paths = [path for path in openable_paths if self._is_openable_song_file(path)]
         opened: list[Path] = []
 
         if playlist_paths:
@@ -3412,7 +3413,7 @@ class MainWindow(QMainWindow):
 
     def add_file(self, file_name: str, mark_modified: bool = True) -> bool:
         path = Path(file_name)
-        if not self._is_supported_file(path):
+        if not self._is_openable_song_file(path):
             return False
         for row in range(self.playlist.count()):
             if self._playlist_item_path(self.playlist.item(row)) == str(path):
@@ -3428,11 +3429,14 @@ class MainWindow(QMainWindow):
     def _is_supported_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in MIDI_FILE_SUFFIXES
 
+    def _is_openable_song_file(self, path: Path) -> bool:
+        return path.exists() and path.is_file() and path.suffix.casefold() in OPENABLE_SONG_FILE_SUFFIXES
+
     def _is_playlist_file(self, path: Path) -> bool:
         return path.exists() and path.is_file() and path.suffix.casefold() in PLAYLIST_FILE_SUFFIXES
 
     def _is_openable_path(self, path: Path) -> bool:
-        return self._is_supported_file(path) or self._is_playlist_file(path)
+        return self._is_openable_song_file(path) or self._is_playlist_file(path)
 
     def load_file(self, file_name: str, autoplay: bool | None = None) -> None:
         self.statusBar().showMessage(self.tr("Loading {name}").format(name=Path(file_name).name))

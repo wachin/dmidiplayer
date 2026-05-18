@@ -409,6 +409,10 @@ def write_cp1252_text_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track))
 
 
+def write_wrk_stub(path: Path) -> None:
+    path.write_bytes(b"CAKEWALK\x00\x01\x02\x03")
+
+
 def write_timed_lyrics_midi(path: Path) -> None:
     header = chunk(b"MThd", b"\x00\x00\x00\x01\x01\xe0")
     track = b"".join(
@@ -788,6 +792,25 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.open_paths([ignored], remember_folder=True), [])
                 self.assertEqual(window.playlist.count(), 0)
                 self.assertIsNone(window.settings.folder)
+
+    def test_open_paths_accepts_wrk_and_reports_specific_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrk = Path(tmpdir, "song.wrk")
+            write_wrk_stub(wrk)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("PyQt6.QtWidgets.QMessageBox.critical") as critical,
+            ):
+                window = MainWindow([])
+                opened = window.open_paths([wrk], remember_folder=True)
+
+                self.assertEqual(opened, [wrk])
+                self.assertEqual(window.playlist.count(), 1)
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(wrk))
+                self.assertEqual(window.statusBar().currentMessage(), "Error loading file: Cakewalk WRK files are not supported yet")
+                critical.assert_called_once()
 
     def test_open_paths_loads_playlist_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
