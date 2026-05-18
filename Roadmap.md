@@ -615,6 +615,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `COMMENTS_CHUNK` when it is the first WRK record and include the detected comments text in the unsupported message.
   - [x] Parse `TRKVOL_CHUNK` when it is the first WRK record and include the detected track volume in the unsupported message.
   - [x] Parse `TRKBANK_CHUNK` when it is the first WRK record and include the detected track bank in the unsupported message.
+  - [x] Parse `TRKPATCH_CHUNK` when it is the first WRK record and include the detected track patch in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
