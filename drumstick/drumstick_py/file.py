@@ -31,6 +31,8 @@ class _WrkHeader:
     track_number: int | None = None
     track_name: str | None = None
     comments: str | None = None
+    track_volume_track: int | None = None
+    track_volume: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -393,6 +395,8 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", track {header.track_number + 1} '{header.track_name}'"
         if header.comments:
             details += f", comments '{header.comments}'"
+        if header.track_volume_track is not None and header.track_volume is not None:
+            details += f", track {header.track_volume_track + 1} volume {header.track_volume}"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -478,6 +482,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     track_number: int | None = None
     track_name: str | None = None
     comments: str | None = None
+    track_volume_track: int | None = None
+    track_volume: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -504,6 +510,11 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         if first_chunk_length - 2 < text_length:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         comments = reader.read(text_length).decode("latin-1", errors="replace")
+    elif first_chunk_id == 19:
+        if first_chunk_length < 4:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        track_volume_track = reader.read_u16_le()
+        track_volume = reader.read_u16_le()
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -514,6 +525,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         track_number=track_number,
         track_name=track_name,
         comments=comments,
+        track_volume_track=track_volume_track,
+        track_volume=track_volume,
     )
 
 
