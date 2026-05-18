@@ -631,6 +631,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `METER_CHUNK` when it is the first WRK record and include the detected meter summary in the unsupported message.
   - [x] Parse `TEMPO_CHUNK` when it is the first WRK record and include the detected tempo summary in the unsupported message.
   - [x] Parse `NTEMPO_CHUNK` when it is the first WRK record and include the detected new tempo summary in the unsupported message.
+  - [x] Parse `SYSEX_CHUNK` when it is the first WRK record and include the detected classic SysEx bank summary in the unsupported message.
   - [x] Parse `SYSEX2_CHUNK` when it is the first WRK record and include the detected SysEx bank summary in the unsupported message.
   - [x] Parse `NSYSEX_CHUNK` when it is the first WRK record and include the detected new SysEx bank summary in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
