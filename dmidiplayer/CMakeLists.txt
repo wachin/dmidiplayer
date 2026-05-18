@@ -283,7 +283,7 @@ if(UNIX AND NOT APPLE)
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME})
     install(FILES "org.dmidiplayer.dmidiplayer.desktop"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
-    install(FILES "net.sourceforge.dmidiplayer.metainfo.xml"
+    install(FILES "org.dmidiplayer.dmidiplayer.metainfo.xml"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo)
 
     # uninstall target

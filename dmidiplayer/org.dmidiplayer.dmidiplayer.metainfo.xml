@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Copyright 2021-2024 dmidiplayer developers -->
 <component type="desktop-application">
-    <id>net.sourceforge.dmidiplayer</id>
+    <id>org.dmidiplayer.dmidiplayer</id>
     <name>dmidiplayer</name>
     <summary>Drumstick Multiplatform MIDI File Player</summary>
     <metadata_license>CC0-1.0</metadata_license>
