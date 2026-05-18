@@ -60,6 +60,8 @@ class _WrkHeader:
     new_stream_track: int | None = None
     new_stream_name: str | None = None
     new_stream_events: int | None = None
+    variable_name: str | None = None
+    variable_data_length: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -481,6 +483,10 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" '{header.new_stream_name}'"
             if header.new_stream_events is not None:
                 details += f" events {header.new_stream_events}"
+        if header.variable_name is not None:
+            details += f", variable '{header.variable_name}'"
+            if header.variable_data_length is not None:
+                details += f" bytes {header.variable_data_length}"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -595,6 +601,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     new_stream_track: int | None = None
     new_stream_name: str | None = None
     new_stream_events: int | None = None
+    variable_name: str | None = None
+    variable_data_length: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -710,6 +718,21 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         new_stream_name = reader.read(name_length).decode("latin-1", errors="replace")
         new_stream_events = reader.read_u32_le()
+    elif first_chunk_id == 26:
+        if first_chunk_length < 32:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        name_bytes = bytearray()
+        for _ in range(32):
+            byte = reader.read(1)[0]
+            if byte == 0:
+                break
+            name_bytes.append(byte)
+        consumed = len(name_bytes) + 1
+        if consumed < 32:
+            reader.read(32 - consumed)
+        variable_name = bytes(name_bytes).decode("latin-1", errors="replace")
+        variable_data_length = first_chunk_length - 32
+        reader.read(variable_data_length)
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -749,6 +772,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         new_stream_track=new_stream_track,
         new_stream_name=new_stream_name,
         new_stream_events=new_stream_events,
+        variable_name=variable_name,
+        variable_data_length=variable_data_length,
     )
 
 

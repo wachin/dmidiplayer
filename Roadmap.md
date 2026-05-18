@@ -624,6 +624,7 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `MARKERS_CHUNK` when it is the first WRK record and include the detected marker count and first marker summary in the unsupported message.
   - [x] Parse `SGMNT_CHUNK` when it is the first WRK record and include the detected segment summary in the unsupported message.
   - [x] Parse `NSTREAM_CHUNK` when it is the first WRK record and include the detected stream summary in the unsupported message.
+  - [x] Parse `VARIABLE_CHUNK` when it is the first WRK record and include the detected variable name and payload length in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
