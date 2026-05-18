@@ -808,6 +808,22 @@ class SmfParserTest(unittest.TestCase):
 
         self.assertEqual(midi.text_events[0].text, "Euro €1")
 
+    def test_auto_detects_latin1_karaoke_lyrics(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x05",
+                varlen(3),
+                b"Ol\xe1",
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        midi = read_temp_smf(smf_data(0, 480, [track]), "latin1.kar")
+
+        self.assertEqual(midi.text_events[0].meta_type, 0x05)
+        self.assertEqual(midi.text_events[0].text, "Olá")
+
 
 if __name__ == "__main__":
     unittest.main()
