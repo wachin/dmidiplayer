@@ -20,6 +20,12 @@ class MidiFileError(ValueError):
     """Raised when a MIDI file cannot be parsed."""
 
 
+@dataclass(frozen=True, slots=True)
+class _WrkHeader:
+    major_version: int
+    minor_version: int
+
+
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
     if preferred_encoding is not None:
         return data.decode(preferred_encoding, errors="replace")
@@ -367,7 +373,10 @@ def read_smf(file_name: str | Path) -> MidiFile:
 
 def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
     if _looks_like_wrk(data, path):
-        raise MidiFileError("Cakewalk WRK files are not supported yet")
+        header = _read_wrk_header(data, path)
+        raise MidiFileError(
+            f"Cakewalk WRK files are not supported yet (detected version {header.major_version}.{header.minor_version})"
+        )
     if data.startswith(b"RIFF"):
         data = _unwrap_rmid_data(data)
     reader = _Reader(data)
@@ -418,6 +427,19 @@ def _unwrap_rmid_data(data: bytes) -> bytes:
 
 def _looks_like_wrk(data: bytes, path: Path) -> bool:
     return data.startswith(WRK_HEADER) or path.suffix.casefold() == ".wrk"
+
+
+def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
+    if not data.startswith(WRK_HEADER):
+        raise MidiFileError("Invalid Cakewalk WRK file format")
+    if len(data) < len(WRK_HEADER) + 3:
+        raise MidiFileError("Unexpected end of file")
+    reader = _Reader(data)
+    reader.read(len(WRK_HEADER))
+    reader.read(1)  # reserved gap byte
+    minor_version = reader.read(1)[0]
+    major_version = reader.read(1)[0]
+    return _WrkHeader(major_version=major_version, minor_version=minor_version)
 
 
 def _read_track(data: bytes) -> MidiTrack:

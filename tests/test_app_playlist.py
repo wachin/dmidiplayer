@@ -809,7 +809,10 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(opened, [wrk])
                 self.assertEqual(window.playlist.count(), 1)
                 self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(wrk))
-                self.assertEqual(window.statusBar().currentMessage(), "Error loading file: Cakewalk WRK files are not supported yet")
+                self.assertEqual(
+                    window.statusBar().currentMessage(),
+                    "Error loading file: Cakewalk WRK files are not supported yet (detected version 2.1)",
+                )
                 critical.assert_called_once()
 
     def test_open_paths_loads_playlist_files(self) -> None:

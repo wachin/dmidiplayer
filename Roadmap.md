@@ -607,6 +607,7 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Study `qwrk.cpp` and define the minimum WRK event model needed by
   dmidiplayer.
 - [x] Add WRK parser skeleton with explicit unsupported-feature errors.
+  - [x] Detect the WRK header and report the file format version in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
