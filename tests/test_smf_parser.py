@@ -83,6 +83,15 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "timebase.wrk")
 
+    def test_reports_wrk_software_version_from_first_chunk(self) -> None:
+        payload = bytes([6]) + b"Cake 7"
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(74, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, saved by Cake 7\)",
+        ):
+            read_temp_smf(wrk, "softver.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [

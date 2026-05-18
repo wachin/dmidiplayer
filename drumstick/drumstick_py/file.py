@@ -27,6 +27,7 @@ class _WrkHeader:
     first_chunk_id: int | None = None
     first_chunk_length: int | None = None
     timebase: int | None = None
+    software_version: str | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -383,6 +384,8 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
         details = f"detected version {header.major_version}.{header.minor_version}"
         if header.timebase is not None:
             details += f", timebase {header.timebase}"
+        if header.software_version:
+            details += f", saved by {header.software_version}"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -464,16 +467,25 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     if reader.remaining < first_chunk_length:
         raise MidiFileError("Corrupted Cakewalk WRK file")
     timebase: int | None = None
+    software_version: str | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         timebase = reader.read_u16_le()
+    elif first_chunk_id == 74:
+        if first_chunk_length < 1:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        text_length = reader.read(1)[0]
+        if first_chunk_length - 1 < text_length:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        software_version = reader.read(text_length).decode("latin-1", errors="replace")
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
         first_chunk_id=first_chunk_id,
         first_chunk_length=first_chunk_length,
         timebase=timebase,
+        software_version=software_version,
     )
 
 
