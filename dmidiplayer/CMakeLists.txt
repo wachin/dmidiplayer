@@ -281,7 +281,7 @@ if(UNIX AND NOT APPLE)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES ${QM_FILES}
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME})
-    install(FILES "net.sourceforge.dmidiplayer.desktop"
+    install(FILES "org.dmidiplayer.dmidiplayer.desktop"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
     install(FILES "net.sourceforge.dmidiplayer.metainfo.xml"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo)

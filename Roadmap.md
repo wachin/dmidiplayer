@@ -361,9 +361,9 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] Add a dedicated PyQt6 user guide for the current interface.
 - [ ] Prepare local packaging once the port is stable:
   - [x] launcher scripts;
-  - [ ] `.desktop` file;
+  - [x] `.desktop` file;
   - [ ] resources;
-  - [ ] icons;
+  - [x] icons;
   - [ ] translations;
   - [ ] possible `pyproject.toml`.
 
@@ -629,6 +629,8 @@ clearer bites instead of rediscovering the next small step.
   - [x] Parse `THRU_CHUNK` when it is the first WRK record and include the detected thru settings in the unsupported message.
   - [x] Parse `METERKEY_CHUNK` when it is the first WRK record and include the detected meter/key summary in the unsupported message.
   - [x] Parse `METER_CHUNK` when it is the first WRK record and include the detected meter summary in the unsupported message.
+  - [x] Parse `TEMPO_CHUNK` when it is the first WRK record and include the detected tempo summary in the unsupported message.
+  - [x] Parse `NTEMPO_CHUNK` when it is the first WRK record and include the detected new tempo summary in the unsupported message.
 - [ ] Add encoding detection tests with Latin-1 karaoke text.
 - [ ] Add user-selectable lyrics/text encoding to the sequence model.
 
@@ -640,11 +642,11 @@ clearer bites instead of rediscovering the next small step.
 - [ ] Reset pitch, tempo, and volume when loading a new file if song settings
   are not active.
 - [x] Add preference-backed percussion channel instead of hardcoding channel 10.
-- [ ] Add per-channel mute filtering in `_playable_event()`.
-- [ ] Add per-channel solo filtering with configurable reduction.
-- [ ] Add per-channel volume scaling before global volume scaling.
-- [ ] Suppress program changes on locked channels.
-- [ ] Add GM/GS/XG reset SysEx actions before playback.
+- [x] Add per-channel mute filtering in `_playable_event()`.
+- [x] Add per-channel solo filtering with configurable reduction.
+- [x] Add per-channel volume scaling before global volume scaling.
+- [x] Suppress program changes on locked channels.
+- [x] Add GM/GS/XG reset SysEx actions before playback.
 - [ ] Add latency/late-event counters for scheduler diagnostics.
 
 ### Main Window UX
@@ -656,11 +658,11 @@ clearer bites instead of rediscovering the next small step.
   - [x] Add File -> Open Recent submenu.
   - [x] Add File -> Clear Recent.
 - [x] Add Playback -> Play, Pause, Stop, Previous, Next.
-- [ ] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
+- [x] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
   - [x] Add toolbar visibility toggle.
   - [x] Add status bar visibility toggle.
   - [x] Add keyboard visibility toggle.
-  - [ ] Add rhythm view visibility toggle.
+  - [x] Add rhythm view visibility toggle.
 - [x] Add Tools menu actions for MIDI connections and future preferences.
 - [x] Add Help menu actions for About and local help.
 - [x] Promote toolbar buttons to shared `QAction` instances everywhere.

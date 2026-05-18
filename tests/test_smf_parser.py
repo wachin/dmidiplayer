@@ -309,6 +309,38 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "meter.wrk")
 
+    def test_reports_wrk_tempo_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<H", 1)
+            + struct.pack("<I", 480)
+            + b"\x00" * 4
+            + struct.pack("<H", 120)
+            + b"\x00" * 8
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(4, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, tempo entries 1 first at 480 tempo 12000\)",
+        ):
+            read_temp_smf(wrk, "tempo.wrk")
+
+    def test_reports_wrk_new_tempo_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<H", 1)
+            + struct.pack("<I", 960)
+            + b"\x00" * 4
+            + struct.pack("<H", 135)
+            + b"\x00" * 8
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(15, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, new tempo entries 1 first at 960 tempo 135\)",
+        ):
+            read_temp_smf(wrk, "ntempo.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [

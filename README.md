@@ -189,6 +189,37 @@ previous or next bar. `Jump bar` plus `Go` seeks directly to the requested bar.
 The application stores its configuration in the location selected by Qt
 (`QStandardPaths.AppConfigLocation`).
 
+## Desktop Integration
+
+The repository already includes a desktop launcher definition for the PyQt6
+port:
+
+```text
+dmidiplayer/org.dmidiplayer.dmidiplayer.desktop
+```
+
+It is configured to start the current launcher script:
+
+```text
+Exec=dmidiplayer-py %F
+```
+
+and advertises MIDI, Karaoke, and Cakewalk file associations for future
+packaging work.
+
+For local desktop integration from the current checkout, run:
+
+```bash
+./tools/install-local-desktop.sh
+```
+
+That helper installs:
+
+- a desktop file under `~/.local/share/applications/`
+- application icons under `~/.local/share/icons/hicolor/`
+
+using the current repository launcher path.
+
 On Linux this is normally equivalent to:
 
 ```text

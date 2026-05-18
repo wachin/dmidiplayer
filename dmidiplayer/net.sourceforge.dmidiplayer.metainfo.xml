@@ -17,7 +17,7 @@
             <li>Supports .MID (Standard MIDI files), .RMI (RIFF RMID), .KAR (MIDI Karaoke), and .WRK (Cakewalk) file formats</li>
         </ul>
     </description>
-    <launchable type="desktop-id">net.sourceforge.dmidiplayer.desktop</launchable>
+    <launchable type="desktop-id">org.dmidiplayer.dmidiplayer.desktop</launchable>
     <url type="homepage">https://sourceforge.net/p/dmidiplayer/</url>
     <developer_name>Pedro López-Cabanillas</developer_name>
     <update_contact>plcl_AT_users.sourceforge.net</update_contact>

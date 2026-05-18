@@ -81,6 +81,12 @@ class _WrkHeader:
     plain_meter_measure: int | None = None
     plain_meter_numerator: int | None = None
     plain_meter_denominator: int | None = None
+    tempo_count: int | None = None
+    first_tempo_time: int | None = None
+    first_tempo_value: int | None = None
+    new_tempo_count: int | None = None
+    first_new_tempo_time: int | None = None
+    first_new_tempo_value: int | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -538,6 +544,20 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                     f" first measure {header.plain_meter_measure}"
                     f" {header.plain_meter_numerator}/{header.plain_meter_denominator}"
                 )
+        if header.tempo_count is not None:
+            details += f", tempo entries {header.tempo_count}"
+            if header.first_tempo_time is not None:
+                details += (
+                    f" first at {header.first_tempo_time}"
+                    f" tempo {header.first_tempo_value}"
+                )
+        if header.new_tempo_count is not None:
+            details += f", new tempo entries {header.new_tempo_count}"
+            if header.first_new_tempo_time is not None:
+                details += (
+                    f" first at {header.first_new_tempo_time}"
+                    f" tempo {header.first_new_tempo_value}"
+                )
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -673,6 +693,12 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     plain_meter_measure: int | None = None
     plain_meter_numerator: int | None = None
     plain_meter_denominator: int | None = None
+    tempo_count: int | None = None
+    first_tempo_time: int | None = None
+    first_tempo_value: int | None = None
+    new_tempo_count: int | None = None
+    first_new_tempo_time: int | None = None
+    first_new_tempo_value: int | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -859,6 +885,28 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             plain_meter_numerator = reader.read(1)[0]
             plain_meter_denominator = 2 ** reader.read(1)[0]
             reader.read(4)
+    elif first_chunk_id == 4:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        tempo_count = reader.read_u16_le()
+        if tempo_count > 0:
+            if reader.remaining < 18:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_tempo_time = reader.read_u32_le()
+            reader.read(4)
+            first_tempo_value = reader.read_u16_le() * 100
+            reader.read(8)
+    elif first_chunk_id == 15:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        new_tempo_count = reader.read_u16_le()
+        if new_tempo_count > 0:
+            if reader.remaining < 18:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            first_new_tempo_time = reader.read_u32_le()
+            reader.read(4)
+            first_new_tempo_value = reader.read_u16_le()
+            reader.read(8)
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -919,6 +967,12 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         plain_meter_measure=plain_meter_measure,
         plain_meter_numerator=plain_meter_numerator,
         plain_meter_denominator=plain_meter_denominator,
+        tempo_count=tempo_count,
+        first_tempo_time=first_tempo_time,
+        first_tempo_value=first_tempo_value,
+        new_tempo_count=new_tempo_count,
+        first_new_tempo_time=first_new_tempo_time,
+        first_new_tempo_value=first_new_tempo_value,
     )
 
 
