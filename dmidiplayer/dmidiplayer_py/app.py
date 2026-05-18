@@ -3447,9 +3447,10 @@ class MainWindow(QMainWindow):
             return
         duration = midi.length_microseconds / 1_000_000
         path = Path(file_name)
+        song_summary = self._song_summary_title(path, midi.title)
         self.title_label.setText(
             self.tr("{title} - format {format}, {tracks} track(s), {ticks} ticks, {seconds:.1f} s").format(
-                title=self._song_summary_title(path, midi.title),
+                title=song_summary,
                 format=midi.format,
                 tracks=len(midi.tracks),
                 ticks=midi.length_ticks,
@@ -3475,7 +3476,7 @@ class MainWindow(QMainWindow):
         self._refresh_channels_dialog()
         self._refresh_lyrics_dialog()
         self._sync_playlist_ui()
-        self.statusBar().showMessage(self.tr("Ready: {name}").format(name=midi.title))
+        self.statusBar().showMessage(self.tr("Ready: {name}").format(name=song_summary))
         should_autoplay = self.auto_play_on_load if autoplay is None else autoplay
         if should_autoplay:
             self.play()

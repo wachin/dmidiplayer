@@ -2006,6 +2006,20 @@ class AppPlaylistTest(unittest.TestCase):
                 window.player.finished.emit()
                 self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
 
+    def test_status_bar_ready_message_shows_song_title_and_filename_when_they_differ(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "anthem.mid")
+            write_titled_midi(path, "Grand Finale")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.load_file(str(path))
+
+                self.assertEqual(window.statusBar().currentMessage(), "Ready: Grand Finale - anthem.mid")
+
     def test_playback_actions_are_disabled_until_file_load(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
