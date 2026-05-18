@@ -519,6 +519,26 @@ def write_named_instrument_midi(path: Path) -> None:
     path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
 
 
+def write_titled_midi(path: Path, title: str) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
+    title_bytes = title.encode("utf-8")
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x03",
+            varlen(len(title_bytes)),
+            title_bytes,
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(120),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
 class AppPlaylistTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -706,6 +726,21 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertIn("first", window.title_label.text())
                 self.assertEqual(window.settings.folder, first.parent)
 
+    def test_playlist_items_show_song_title_and_store_real_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            titled = Path(tmpdir, "anthem.mid")
+            write_titled_midi(titled, "Grand Finale")
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(titled)])
+
+                self.assertEqual(window.playlist.item(0).text(), "Grand Finale - anthem.mid")
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(titled))
+                self.assertEqual(window.playlist.item(0).toolTip(), str(titled))
+
     def test_open_paths_does_not_duplicate_existing_playlist_entries(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first = Path(tmpdir, "first.mid")
@@ -722,8 +757,8 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(opened, [first, second])
                 self.assertEqual(window.playlist.count(), 2)
-                self.assertEqual(window.playlist.item(0).text(), str(first))
-                self.assertEqual(window.playlist.item(1).text(), str(second))
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(first))
+                self.assertEqual(window.playlist.item(1).data(Qt.ItemDataRole.UserRole), str(second))
                 self.assertEqual(window.playlist.currentRow(), 0)
 
     def test_open_paths_ignores_unsupported_files(self) -> None:
@@ -804,7 +839,7 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(opened, [playlist_path, third])
                 self.assertEqual(window.playlist.count(), 3)
-                self.assertEqual(window.playlist.item(2).text(), str(third))
+                self.assertEqual(window.playlist.item(2).data(Qt.ItemDataRole.UserRole), str(third))
                 self.assertEqual(window.windowTitle(), "first.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
 
     def test_startup_argument_can_be_playlist_file(self) -> None:
@@ -2134,15 +2169,15 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog.list_widget.setCurrentRow(0)
                 dialog.move_down_button.click()
 
-                self.assertEqual(window.playlist.item(0).text(), str(second))
-                self.assertEqual(dialog.list_widget.item(0).text(), str(second))
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(second))
+                self.assertEqual(dialog.list_widget.item(0).data(Qt.ItemDataRole.UserRole), str(second))
                 self.assertEqual(window.playlist.currentRow(), 1)
 
                 dialog.remove_button.click()
 
                 self.assertEqual(window.playlist.count(), 1)
                 self.assertEqual(dialog.list_widget.count(), 1)
-                self.assertEqual(window.playlist.item(0).text(), str(second))
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(second))
 
     def test_playlist_dialog_title_tracks_playlist_file_and_unsaved_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2193,11 +2228,11 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog.randomize_button.click()
 
                 self.assertEqual(
-                    [window.playlist.item(row).text() for row in range(window.playlist.count())],
+                    [window.playlist.item(row).data(Qt.ItemDataRole.UserRole) for row in range(window.playlist.count())],
                     [str(third), str(second), str(first)],
                 )
                 self.assertEqual(
-                    [dialog.list_widget.item(row).text() for row in range(dialog.list_widget.count())],
+                    [dialog.list_widget.item(row).data(Qt.ItemDataRole.UserRole) for row in range(dialog.list_widget.count())],
                     [str(third), str(second), str(first)],
                 )
                 self.assertEqual(window.statusBar().currentMessage(), "Playlist randomized")
@@ -2223,8 +2258,8 @@ class AppPlaylistTest(unittest.TestCase):
 
                 window.move_up_action.trigger()
 
-                self.assertEqual(window.playlist.item(0).text(), str(second))
-                self.assertEqual(window.playlist.item(1).text(), str(first))
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(second))
+                self.assertEqual(window.playlist.item(1).data(Qt.ItemDataRole.UserRole), str(first))
                 self.assertEqual(window.playlist.currentRow(), 0)
                 self.assertEqual(window.windowTitle(), "second.mid [1/3] - *setlist.lst - dmidiplayer PyQt6")
 
@@ -2250,7 +2285,7 @@ class AppPlaylistTest(unittest.TestCase):
                 window.sort_playlist_action.trigger()
 
                 self.assertEqual(
-                    [window.playlist.item(row).text() for row in range(window.playlist.count())],
+                    [window.playlist.item(row).data(Qt.ItemDataRole.UserRole) for row in range(window.playlist.count())],
                     [str(alpha), str(bravo), str(zulu)],
                 )
                 self.assertEqual(window.playlist.currentRow(), 1)
@@ -2273,7 +2308,7 @@ class AppPlaylistTest(unittest.TestCase):
                 window.remove_selected_action.trigger()
 
                 self.assertEqual(window.playlist.count(), 1)
-                self.assertEqual(window.playlist.currentItem().text(), str(second))
+                self.assertEqual(window.playlist.currentItem().data(Qt.ItemDataRole.UserRole), str(second))
                 self.assertEqual(window.windowTitle(), "second.mid - dmidiplayer PyQt6")
 
     def test_playlist_clear_action_resets_loaded_state(self) -> None:
@@ -2412,8 +2447,8 @@ class AppPlaylistTest(unittest.TestCase):
                 loaded = window.load_playlist_file(playlist_path)
 
                 self.assertEqual(loaded, [first, second])
-                self.assertEqual(window.playlist.item(0).text(), str(first))
-                self.assertEqual(window.playlist.item(1).text(), str(second))
+                self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(first))
+                self.assertEqual(window.playlist.item(1).data(Qt.ItemDataRole.UserRole), str(second))
 
     def test_auto_play_on_load_preference_starts_playback(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

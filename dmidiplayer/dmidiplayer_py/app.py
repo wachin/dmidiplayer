@@ -45,7 +45,7 @@ from PyQt6.QtWidgets import (
     QStyleFactory,
 )
 
-from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard
+from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard, read_smf
 from .i18n import install_translator
 from .player import SequencePlayer
 from .settings import AppSettings
@@ -736,11 +736,16 @@ class PlaylistDialog(QDialog):
 
     def refresh_from_window(self) -> None:
         current_row = self.window.playlist.currentRow()
-        paths = [self.window.playlist.item(row).text() for row in range(self.window.playlist.count())]
         with QSignalBlocker(self.list_widget):
             self.list_widget.clear()
-            for path in paths:
-                self.list_widget.addItem(path)
+            for row in range(self.window.playlist.count()):
+                source_item = self.window.playlist.item(row)
+                if source_item is None:
+                    continue
+                item = QListWidgetItem(source_item.text())
+                item.setData(Qt.ItemDataRole.UserRole, source_item.data(Qt.ItemDataRole.UserRole))
+                item.setToolTip(source_item.toolTip())
+                self.list_widget.addItem(item)
             self.list_widget.setCurrentRow(current_row)
         self.setWindowTitle(self.window._playlist_dialog_title())
         self._update_button_state()
@@ -1637,7 +1642,7 @@ class MainWindow(QMainWindow):
         self.playlist_dialog: PlaylistDialog | None = None
 
         self.playlist = QListWidget()
-        self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(item.text()))
+        self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(self._playlist_item_path(item)))
         self.playlist.currentRowChanged.connect(self._playlist_selection_changed)
         self.title_label = QLabel(self.tr("No file loaded"))
         self.title_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -2304,7 +2309,7 @@ class MainWindow(QMainWindow):
         item = self.playlist.takeItem(row)
         if item is None:
             return
-        removed_file = item.text()
+        removed_file = self._playlist_item_path(item)
         del item
         if self.playlist.count() == 0:
             self.player.clear()
@@ -2316,7 +2321,7 @@ class MainWindow(QMainWindow):
             self._mark_playlist_modified()
             current_item = self.playlist.currentItem()
             if current_item is not None:
-                self.load_file(current_item.text())
+                self.load_file(self._playlist_item_path(current_item))
             return
         self._mark_playlist_modified()
         self._sync_playlist_ui()
@@ -2335,7 +2340,7 @@ class MainWindow(QMainWindow):
         self._mark_playlist_modified()
         self._sync_playlist_ui()
         self.statusBar().showMessage(
-            self.tr("Moved {name} in playlist").format(name=Path(item.text()).name),
+            self.tr("Moved {name} in playlist").format(name=Path(self._playlist_item_path(item)).name),
             5000,
         )
 
@@ -2345,11 +2350,11 @@ class MainWindow(QMainWindow):
         selected_path = None
         current_item = self.playlist.currentItem()
         if current_item is not None:
-            selected_path = current_item.text()
-        paths = sorted((self.playlist.item(row).text() for row in range(self.playlist.count())), key=str.casefold)
+            selected_path = self._playlist_item_path(current_item)
+        paths = sorted(self._playlist_paths(), key=lambda path: self._playlist_display_text(path).casefold())
         self.playlist.clear()
         for path in paths:
-            self.playlist.addItem(path)
+            self.playlist.addItem(self._create_playlist_item(path))
         if selected_path is not None:
             self._select_playlist_file(selected_path)
         self._mark_playlist_modified()
@@ -2362,12 +2367,12 @@ class MainWindow(QMainWindow):
         selected_path = None
         current_item = self.playlist.currentItem()
         if current_item is not None:
-            selected_path = current_item.text()
-        paths = [self.playlist.item(row).text() for row in range(self.playlist.count())]
+            selected_path = self._playlist_item_path(current_item)
+        paths = self._playlist_paths()
         random.shuffle(paths)
         self.playlist.clear()
         for path in paths:
-            self.playlist.addItem(path)
+            self.playlist.addItem(self._create_playlist_item(path))
         if selected_path is not None:
             self._select_playlist_file(selected_path)
         self._mark_playlist_modified()
@@ -2471,7 +2476,33 @@ class MainWindow(QMainWindow):
         return playlist_path
 
     def _playlist_paths(self) -> list[Path]:
-        return [Path(self.playlist.item(row).text()) for row in range(self.playlist.count())]
+        return [Path(self._playlist_item_path(self.playlist.item(row))) for row in range(self.playlist.count())]
+
+    def _playlist_display_text(self, path: Path) -> str:
+        title = ""
+        try:
+            midi = read_smf(path)
+            title = midi.title.strip()
+        except (OSError, MidiFileError):
+            title = ""
+        if title and title != path.name:
+            return self.tr("{title} - {name}").format(title=title, name=path.name)
+        if title:
+            return title
+        return path.name
+
+    def _create_playlist_item(self, path: str | Path) -> QListWidgetItem:
+        path = Path(path)
+        item = QListWidgetItem(self._playlist_display_text(path))
+        item.setData(Qt.ItemDataRole.UserRole, str(path))
+        item.setToolTip(str(path))
+        return item
+
+    def _playlist_item_path(self, item: QListWidgetItem | None) -> str:
+        if item is None:
+            return ""
+        stored = item.data(Qt.ItemDataRole.UserRole)
+        return str(stored or "")
 
     def _localized_doc_path(self, file_name: str) -> Path:
         locale_name = QLocale.system().name()
@@ -3369,11 +3400,11 @@ class MainWindow(QMainWindow):
         if not self._is_supported_file(path):
             return False
         for row in range(self.playlist.count()):
-            if self.playlist.item(row).text() == str(path):
+            if self._playlist_item_path(self.playlist.item(row)) == str(path):
                 self.playlist.setCurrentRow(row)
                 self._sync_playlist_ui()
                 return False
-        self.playlist.addItem(str(path))
+        self.playlist.addItem(self._create_playlist_item(path))
         if mark_modified:
             self._mark_playlist_modified()
         self._sync_playlist_ui()
@@ -3469,12 +3500,12 @@ class MainWindow(QMainWindow):
             return False
         item = self.playlist.item(row)
         self.playlist.setCurrentRow(row)
-        self.load_file(item.text(), autoplay=autoplay)
+        self.load_file(self._playlist_item_path(item), autoplay=autoplay)
         return True
 
     def _select_playlist_file(self, file_name: str) -> None:
         for row in range(self.playlist.count()):
-            if self.playlist.item(row).text() == file_name:
+            if self._playlist_item_path(self.playlist.item(row)) == file_name:
                 self.playlist.setCurrentRow(row)
                 self._sync_playlist_ui()
                 return

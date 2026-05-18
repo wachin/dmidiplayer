@@ -258,6 +258,7 @@ Drumstick documentation. It is the target list for the whole migration.
 
 - [x] Manage playlists from `File -> Play List...`.
 - [x] Create, modify, sort, open, and save playlists.
+  - [x] Playlist rows now show friendly song titles while preserving the real file path internally.
   - [x] Open and save `.lst` playlists.
   - [x] Add and remove playlist entries.
   - [x] Reorder playlist entries up and down.
