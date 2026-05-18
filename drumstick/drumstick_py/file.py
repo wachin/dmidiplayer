@@ -28,6 +28,8 @@ class _WrkHeader:
     first_chunk_length: int | None = None
     timebase: int | None = None
     software_version: str | None = None
+    track_number: int | None = None
+    track_name: str | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -386,6 +388,8 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", timebase {header.timebase}"
         if header.software_version:
             details += f", saved by {header.software_version}"
+        if header.track_number is not None and header.track_name:
+            details += f", track {header.track_number + 1} '{header.track_name}'"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -468,6 +472,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         raise MidiFileError("Corrupted Cakewalk WRK file")
     timebase: int | None = None
     software_version: str | None = None
+    track_number: int | None = None
+    track_name: str | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -479,6 +485,14 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         if first_chunk_length - 1 < text_length:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         software_version = reader.read(text_length).decode("latin-1", errors="replace")
+    elif first_chunk_id == 24:
+        if first_chunk_length < 3:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        track_number = reader.read_u16_le()
+        text_length = reader.read(1)[0]
+        if first_chunk_length - 3 < text_length:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        track_name = reader.read(text_length).decode("latin-1", errors="replace")
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -486,6 +500,8 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         first_chunk_length=first_chunk_length,
         timebase=timebase,
         software_version=software_version,
+        track_number=track_number,
+        track_name=track_name,
     )
 
 
