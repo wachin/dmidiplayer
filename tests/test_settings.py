@@ -96,6 +96,38 @@ class AppSettingsTest(unittest.TestCase):
 
             self.assertIsNone(restored.window_geometry())
 
+    def test_explicit_settings_path_is_used(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir, "portable", "dmidiplayer-py.conf")
+
+            settings = AppSettings(settings_path=settings_path)
+            settings.set_window_geometry(10, 20, 900, 520)
+
+            self.assertEqual(settings.path, settings_path)
+            self.assertTrue(settings_path.exists())
+            restored = AppSettings(settings_path=settings_path)
+            self.assertEqual(restored.window_geometry(), (10, 20, 900, 520))
+
+    def test_dialog_geometry_is_saved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_dialog_geometry("channels", 30, 40, 720, 360)
+            restored = AppSettings(base_dir)
+
+            self.assertEqual(restored.dialog_geometry("channels"), (30, 40, 720, 360))
+
+    def test_invalid_dialog_geometry_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir, "appdata")
+
+            settings = AppSettings(base_dir)
+            settings.set_dialog_geometry("channels", 30, 40, 0, 360)
+            restored = AppSettings(base_dir)
+
+            self.assertIsNone(restored.dialog_geometry("channels"))
+
     def test_percussion_channel_defaults_to_general_midi_channel_10(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = AppSettings(Path(tmpdir, "appdata"))

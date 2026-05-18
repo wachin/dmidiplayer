@@ -173,6 +173,31 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player._events, [])
         self.assertEqual(player._position, 0)
 
+    def test_load_file_resets_per_channel_mix_state(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            player.load_file(str(first))
+
+            player.set_channel_muted(0, True)
+            player.set_channel_solo(1, True)
+            player.set_channel_volume_percent(2, 50)
+            player.set_channel_program(3, 12)
+            player.set_channel_locked(4, True)
+
+            player.load_file(str(second))
+
+        self.assertEqual(player.muted_channels(), set())
+        self.assertEqual(player.solo_channels(), set())
+        self.assertEqual(player.channel_volume_percent(2), 100)
+        self.assertIsNone(player.channel_program(3))
+        self.assertEqual(player.locked_channels(), set())
+
     def test_sent_note_events_are_tracked_as_active_notes(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)

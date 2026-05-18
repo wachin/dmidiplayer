@@ -42,14 +42,18 @@ class AppSettings:
     DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
     DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
 
-    def __init__(self, base_dir: Path | None = None) -> None:
+    def __init__(self, base_dir: Path | None = None, settings_path: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
+        explicit_path = Path(settings_path) if settings_path is not None else None
         try:
-            self.base_dir.mkdir(parents=True, exist_ok=True)
+            target_dir = explicit_path.parent if explicit_path is not None else self.base_dir
+            target_dir.mkdir(parents=True, exist_ok=True)
+            self.base_dir = target_dir if explicit_path is not None else self.base_dir
         except OSError:
             self.base_dir = fallback_config_dir()
             self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.path = self.base_dir / "settings.ini"
+            explicit_path = None
+        self.path = explicit_path or (self.base_dir / "settings.ini")
         self._settings = QSettings(str(self.path), QSettings.Format.IniFormat)
 
     def last_folder(self, fallback: Path) -> Path:
@@ -100,6 +104,26 @@ class AppSettings:
         self._settings.setValue("window/y", y)
         self._settings.setValue("window/width", width)
         self._settings.setValue("window/height", height)
+        self._settings.sync()
+
+    def dialog_geometry(self, name: str) -> WindowGeometry | None:
+        if not name:
+            return None
+        width = self._settings.value(f"dialogs/{name}/width", 0, int)
+        height = self._settings.value(f"dialogs/{name}/height", 0, int)
+        x = self._settings.value(f"dialogs/{name}/x", 0, int)
+        y = self._settings.value(f"dialogs/{name}/y", 0, int)
+        if width <= 0 or height <= 0:
+            return None
+        return (x, y, width, height)
+
+    def set_dialog_geometry(self, name: str, x: int, y: int, width: int, height: int) -> None:
+        if not name or width <= 0 or height <= 0:
+            return
+        self._settings.setValue(f"dialogs/{name}/x", x)
+        self._settings.setValue(f"dialogs/{name}/y", y)
+        self._settings.setValue(f"dialogs/{name}/width", width)
+        self._settings.setValue(f"dialogs/{name}/height", height)
         self._settings.sync()
 
     def percussion_channel(self) -> int:

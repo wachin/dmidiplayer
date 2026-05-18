@@ -7,7 +7,7 @@ import random
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QLocale, QSignalBlocker, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QLocale, QObject, QSignalBlocker, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence, QPalette
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
@@ -207,6 +207,26 @@ CHANNEL_COLOR_PALETTES = (
     ("#ecfeff", "#0f766e", "#134e4a", "#99f6e4"),
     ("#fef2f2", "#b91c1c", "#7f1d1d", "#fecaca"),
 )
+
+DIALOG_GEOMETRY_KEYS = {
+    "playlist_dialog": "playlist",
+    "channels_dialog": "channels",
+    "pianola_dialog": "pianola",
+    "lyrics_dialog": "lyrics",
+}
+
+
+def portable_settings_path(portable_file: str | None, argv0: str) -> Path:
+    launcher_path = Path(argv0).resolve()
+    launcher_dir = launcher_path.parent
+    launcher_name = launcher_path.stem or "dmidiplayer-py"
+    default_path = launcher_dir / f"{launcher_name}.conf"
+    if not portable_file:
+        return default_path
+    candidate = Path(portable_file)
+    if not candidate.is_absolute() and candidate.parent == Path("."):
+        return launcher_dir / candidate.name
+    return candidate.resolve()
 
 
 def gm_program_label(program: int) -> str:
@@ -835,12 +855,40 @@ class RhythmView(QWidget):
 
 
 class ChannelsDialog(QDialog):
+    muteAllRequested = pyqtSignal()
+    unmuteAllRequested = pyqtSignal()
+    clearSolosRequested = pyqtSignal()
+    resetVolumesRequested = pyqtSignal()
+    unlockProgramsRequested = pyqtSignal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("MIDI Channels"))
         self.channel_rows: dict[int, int] = {}
         self._label_changed_callback: object | None = None
         layout = QVBoxLayout(self)
+        controls_row = QHBoxLayout()
+        controls_row.addStretch(1)
+        self.tools_button = QToolButton(self)
+        self.tools_button.setObjectName("channels_tools_button")
+        self.tools_button.setText("≡")
+        self.tools_button.setToolTip(self.tr("Channel tools"))
+        self.tools_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        tools_menu = QMenu(self.tools_button)
+        self.mute_all_action = tools_menu.addAction(self.tr("Mute All"))
+        self.mute_all_action.triggered.connect(self.muteAllRequested)
+        self.unmute_all_action = tools_menu.addAction(self.tr("Unmute All"))
+        self.unmute_all_action.triggered.connect(self.unmuteAllRequested)
+        self.clear_solos_action = tools_menu.addAction(self.tr("Clear Solos"))
+        self.clear_solos_action.triggered.connect(self.clearSolosRequested)
+        tools_menu.addSeparator()
+        self.reset_volumes_action = tools_menu.addAction(self.tr("Reset Volumes"))
+        self.reset_volumes_action.triggered.connect(self.resetVolumesRequested)
+        self.unlock_programs_action = tools_menu.addAction(self.tr("Unlock Programs"))
+        self.unlock_programs_action.triggered.connect(self.unlockProgramsRequested)
+        self.tools_button.setMenu(tools_menu)
+        controls_row.addWidget(self.tools_button)
+        layout.addLayout(controls_row)
         self.table = QTableWidget(0, 7, self)
         self.table.setObjectName("channels_table")
         self.table.setHorizontalHeaderLabels(
@@ -1590,12 +1638,12 @@ class LyricsDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, start_files: list[str]) -> None:
+    def __init__(self, start_files: list[str], settings: AppSettings | None = None) -> None:
         super().__init__()
         self.setWindowTitle(self.tr(APP_TITLE))
         self.resize(900, 520)
         self.setAcceptDrops(True)
-        self.settings = AppSettings()
+        self.settings = settings or AppSettings()
         self._restore_window_geometry()
         self._system_qt_style = QApplication.style().objectName() or "Fusion"
         self._system_palette = QPalette(QApplication.palette())
@@ -1642,16 +1690,21 @@ class MainWindow(QMainWindow):
         self.lyrics_dialog: LyricsDialog | None = None
         self.pianola_dialog: PianolaDialog | None = None
         self.playlist_dialog: PlaylistDialog | None = None
+        self._dialog_geometry_keys: dict[int, str] = {}
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(self._playlist_item_path(item)))
         self.playlist.currentRowChanged.connect(self._playlist_selection_changed)
         self.title_label = QLabel(self.tr("No file loaded"))
         self.title_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.playback_indicator_dots: dict[str, QFrame] = {}
         self.position = QSlider(Qt.Orientation.Horizontal)
         self.position.setTracking(False)
         self.position.setEnabled(False)
         self.position.sliderReleased.connect(self._seek_to_slider)
+        self.position_summary_label = QLabel("1:1", self)
+        self.position_summary_label.setObjectName("position_summary_label")
+        self.position_summary_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.rhythm_view = RhythmView()
         self.keyboard = PianoKeyboard()
@@ -2182,6 +2235,33 @@ class MainWindow(QMainWindow):
     def _dialog_is_visible(self, dialog: QDialog | None) -> bool:
         return dialog is not None and dialog.isVisible()
 
+    def _register_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> None:
+        if id(dialog) in self._dialog_geometry_keys:
+            return
+        self._dialog_geometry_keys[id(dialog)] = geometry_key
+        dialog.installEventFilter(self)
+        self._restore_dialog_geometry(dialog, geometry_key)
+
+    def _restore_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> None:
+        geometry = self.settings.dialog_geometry(geometry_key)
+        if geometry is None:
+            return
+        x, y, width, height = geometry
+        dialog.resize(width, height)
+        dialog.move(x, y)
+
+    def _save_dialog_geometry(self, dialog: QDialog | None, geometry_key: str) -> None:
+        if dialog is None:
+            return
+        geometry = dialog.frameGeometry()
+        self.settings.set_dialog_geometry(geometry_key, geometry.x(), geometry.y(), dialog.width(), dialog.height())
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        geometry_key = self._dialog_geometry_keys.get(id(watched))
+        if geometry_key is not None and event.type() in (QEvent.Type.Hide, QEvent.Type.Close):
+            self._save_dialog_geometry(watched if isinstance(watched, QDialog) else None, geometry_key)
+        return super().eventFilter(watched, event)
+
     def _refresh_window_menu_state(self) -> None:
         action_map = (
             (self.window_playlist_action, self.playlist_dialog),
@@ -2199,6 +2279,9 @@ class MainWindow(QMainWindow):
             if dialog is None:
                 dialog = factory()
                 setattr(self, attribute_name, dialog)
+                geometry_key = DIALOG_GEOMETRY_KEYS.get(attribute_name)
+                if geometry_key is not None:
+                    self._register_dialog_geometry(dialog, geometry_key)
                 if attribute_name == "channels_dialog":
                     self._refresh_channels_dialog()
                 elif attribute_name == "pianola_dialog":
@@ -2239,6 +2322,9 @@ class MainWindow(QMainWindow):
             dialog.raise_()
             dialog.activateWindow()
         elif dialog is not None:
+            geometry_key = DIALOG_GEOMETRY_KEYS.get(attribute_name)
+            if geometry_key is not None:
+                self._save_dialog_geometry(dialog, geometry_key)
             dialog.hide()
         self._refresh_window_menu_state()
 
@@ -2269,6 +2355,7 @@ class MainWindow(QMainWindow):
         self._set_lyrics_encoding(None)
         self.position.setEnabled(False)
         self.title_label.setText(self.tr("No file loaded"))
+        self.position_summary_label.setText("1:1")
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.event_label.setText(self.tr("No file loaded"))
         self.rhythm_view.clear()
@@ -2280,6 +2367,7 @@ class MainWindow(QMainWindow):
         if self.lyrics_dialog is not None:
             self.lyrics_dialog.set_text_events([])
         self._update_midi_output_label()
+        self._set_playback_indicator("empty")
         self._update_action_state()
         self._update_window_title()
         self.statusBar().showMessage(status_message, 5000)
@@ -2636,6 +2724,12 @@ class MainWindow(QMainWindow):
     def _ensure_channels_dialog(self) -> ChannelsDialog:
         if self.channels_dialog is None:
             self.channels_dialog = self._create_channels_dialog()
+            self._register_dialog_geometry(self.channels_dialog, DIALOG_GEOMETRY_KEYS["channels_dialog"])
+            self.channels_dialog.muteAllRequested.connect(self._mute_all_channels)
+            self.channels_dialog.unmuteAllRequested.connect(self._unmute_all_channels)
+            self.channels_dialog.clearSolosRequested.connect(self._clear_channel_solos)
+            self.channels_dialog.resetVolumesRequested.connect(self._reset_channel_volumes)
+            self.channels_dialog.unlockProgramsRequested.connect(self._unlock_all_channel_programs)
             self._refresh_channels_dialog()
         return self.channels_dialog
 
@@ -2679,6 +2773,7 @@ class MainWindow(QMainWindow):
     def _ensure_pianola_dialog(self) -> PianolaDialog:
         if self.pianola_dialog is None:
             self.pianola_dialog = self._create_pianola_dialog()
+            self._register_dialog_geometry(self.pianola_dialog, DIALOG_GEOMETRY_KEYS["pianola_dialog"])
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_single_color,
@@ -2816,6 +2911,7 @@ class MainWindow(QMainWindow):
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
             self.lyrics_dialog = self._create_lyrics_dialog()
+            self._register_dialog_geometry(self.lyrics_dialog, DIALOG_GEOMETRY_KEYS["lyrics_dialog"])
             self.lyrics_dialog.set_display_preferences(
                 self.lyrics_font_family,
                 self.lyrics_font_size,
@@ -2905,6 +3001,43 @@ class MainWindow(QMainWindow):
             self.tr("Channel {number} label updated").format(number=channel + 1),
             3000,
         )
+
+    def _mute_all_channels(self) -> None:
+        channels = self.player.sequence.used_channels()
+        for channel in channels:
+            self.player.set_channel_muted(channel, True)
+        self._refresh_channels_dialog()
+        self.statusBar().showMessage(self.tr("All channels muted"), 3000)
+
+    def _unmute_all_channels(self) -> None:
+        channels = self.player.sequence.used_channels()
+        for channel in channels:
+            self.player.set_channel_muted(channel, False)
+        self._refresh_channels_dialog()
+        self.statusBar().showMessage(self.tr("All channels unmuted"), 3000)
+
+    def _clear_channel_solos(self) -> None:
+        channels = self.player.sequence.used_channels()
+        for channel in channels:
+            self.player.set_channel_solo(channel, False)
+        self._refresh_channels_dialog()
+        self.statusBar().showMessage(self.tr("Channel solos cleared"), 3000)
+
+    def _reset_channel_volumes(self) -> None:
+        channels = self.player.sequence.used_channels()
+        for channel in channels:
+            self.player.set_channel_volume_percent(channel, 100)
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
+        self._refresh_channels_dialog()
+        self.statusBar().showMessage(self.tr("Channel volumes reset"), 3000)
+
+    def _unlock_all_channel_programs(self) -> None:
+        channels = self.player.sequence.used_channels()
+        for channel in channels:
+            self.player.set_channel_locked(channel, False)
+        self._refresh_channels_dialog()
+        self.statusBar().showMessage(self.tr("Program locks cleared"), 3000)
 
     def _default_channel_label(self, channel: int) -> str:
         labels = self.player.sequence.default_channel_labels()
@@ -3130,11 +3263,13 @@ class MainWindow(QMainWindow):
 
     def _playback_started(self) -> None:
         self._update_action_state()
+        self._set_playback_indicator("playing")
         self.statusBar().showMessage(self.tr("Playing"))
 
     def _playback_stopped(self) -> None:
         self._update_action_state()
         message = self.tr("Paused") if self._pause_requested else self.tr("Stopped")
+        self._set_playback_indicator("paused" if self._pause_requested else "stopped")
         self.statusBar().showMessage(message)
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
@@ -3168,8 +3303,8 @@ class MainWindow(QMainWindow):
         right = QVBoxLayout()
         right.setSpacing(8)
         right.addWidget(self._build_transport_summary())
-        right.addWidget(self.title_label)
-        right.addWidget(self.position)
+        right.addWidget(self._build_file_summary_row())
+        right.addWidget(self._build_position_row())
         right.addWidget(self.time_label)
         right.addWidget(self._build_playback_settings())
         right.addWidget(self.rhythm_view)
@@ -3203,6 +3338,65 @@ class MainWindow(QMainWindow):
         details.addRow(self.tr("Pitch:"), self.transport_pitch_label)
         layout.addLayout(details, 1)
         return panel
+
+    def _build_file_summary_row(self) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self.title_label, 1)
+        indicators = QWidget(row)
+        indicators.setObjectName("playback_indicator_strip")
+        indicators_layout = QHBoxLayout(indicators)
+        indicators_layout.setContentsMargins(0, 0, 0, 0)
+        indicators_layout.setSpacing(6)
+        indicator_specs = (
+            ("ready", self.tr("Ready")),
+            ("playing", self.tr("Playing")),
+            ("paused", self.tr("Paused")),
+            ("stopped", self.tr("Stopped")),
+        )
+        for name, tooltip in indicator_specs:
+            dot = QFrame(indicators)
+            dot.setObjectName(f"playback_indicator_{name}")
+            dot.setProperty("active", False)
+            dot.setFixedSize(16, 16)
+            dot.setToolTip(tooltip)
+            self.playback_indicator_dots[name] = dot
+            indicators_layout.addWidget(dot)
+        indicators.setStyleSheet(
+            "#playback_indicator_strip QFrame {"
+            " border-radius: 8px;"
+            " border: 1px solid #6b7280;"
+            " background: #6b7280;"
+            "}"
+            "#playback_indicator_ready[active=\"true\"] { background: #84cc16; border-color: #65a30d; }"
+            "#playback_indicator_playing[active=\"true\"] { background: #22c55e; border-color: #15803d; }"
+            "#playback_indicator_paused[active=\"true\"] { background: #f59e0b; border-color: #b45309; }"
+            "#playback_indicator_stopped[active=\"true\"] { background: #ef4444; border-color: #b91c1c; }"
+        )
+        layout.addWidget(indicators, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._set_playback_indicator("empty")
+        return row
+
+    def _build_position_row(self) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self.position, 1)
+        self.position_summary_label.setMinimumWidth(40)
+        layout.addWidget(self.position_summary_label)
+        return row
+
+    def _set_playback_indicator(self, state: str) -> None:
+        active_name = state if state in self.playback_indicator_dots else ""
+        for name, dot in self.playback_indicator_dots.items():
+            dot.setProperty("active", name == active_name)
+            style = dot.style()
+            style.unpolish(dot)
+            style.polish(dot)
+            dot.update()
 
     def _build_playback_settings(self) -> QWidget:
         panel = QWidget()
@@ -3484,6 +3678,7 @@ class MainWindow(QMainWindow):
             )
         )
         self.event_label.setText(self.tr("File loaded"))
+        self._set_playback_indicator("ready")
         self.position.setEnabled(midi.length_ticks > 0)
         self._reset_loop_controls()
         self._select_playlist_file(file_name)
@@ -3675,6 +3870,7 @@ class MainWindow(QMainWindow):
             self.transport_summary_label.setText(self.tr("{bpm:.0f} BPM").format(bpm=120 * self.player.tempo_percent / 100))
             self.transport_volume_label.setText(f"{self.player.volume_percent}%")
             self.transport_pitch_label.setText(str(self.player.pitch_shift))
+            self.position_summary_label.setText("1:1")
             return
         current_us = self.player.sequence.tick_to_microseconds(tick)
         total_us = self.player.sequence.tick_to_microseconds(maximum)
@@ -3699,6 +3895,7 @@ class MainWindow(QMainWindow):
         self.transport_summary_label.setText(self.tr("{bpm:.2f} BPM").format(bpm=bpm))
         self.transport_volume_label.setText(f"{self.player.volume_percent}%")
         self.transport_pitch_label.setText(str(self.player.pitch_shift))
+        self.position_summary_label.setText(f"{bar}:{beat}")
 
     def _format_time(self, microseconds: int) -> str:
         seconds = max(0, microseconds // 1_000_000)
@@ -3734,6 +3931,7 @@ class MainWindow(QMainWindow):
         if next_row is not None and self._load_playlist_row(next_row, autoplay=True):
             return
         self.event_label.setText(self.tr("End of sequence"))
+        self._set_playback_indicator("stopped")
         self.statusBar().showMessage(self.tr("End of sequence"))
         self.keyboard.clear()
         if self.channels_dialog is not None:
@@ -3746,11 +3944,14 @@ class MainWindow(QMainWindow):
 
     def _output_error(self, message: str) -> None:
         self.event_label.setText(self.tr("MIDI output error: {message}").format(message=message))
+        self._set_playback_indicator("stopped")
         self.statusBar().showMessage(message, 10000)
         QMessageBox.warning(self, self.tr("MIDI output"), message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_window_geometry()
+        for attribute_name, geometry_key in DIALOG_GEOMETRY_KEYS.items():
+            self._save_dialog_geometry(getattr(self, attribute_name), geometry_key)
         self.stop()
         if hasattr(self.output, "close"):
             self.output.close()
@@ -3778,6 +3979,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="dmidiplayer PyQt6 port")
     parser.add_argument("files", nargs="*", help="SMF/KAR files or .lst playlists")
     parser.add_argument(
+        "-p",
+        "--portable",
+        action="store_true",
+        help="Portable settings mode.",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        dest="portable_file",
+        help="Portable settings file name.",
+    )
+    parser.add_argument(
         "--language",
         default="en",
         help="UI language code, for example en, es, es_EC, or system",
@@ -3788,7 +4001,12 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationDomain("dmidiplayer.local")
     app.setApplicationName("dmidiplayer-py")
     install_translator(app, args.language)
-    window = MainWindow(args.files)
+    settings = (
+        AppSettings(settings_path=portable_settings_path(args.portable_file, sys.argv[0]))
+        if args.portable or args.portable_file
+        else AppSettings()
+    )
+    window = MainWindow(args.files, settings=settings)
     window.show()
     return app.exec()
 

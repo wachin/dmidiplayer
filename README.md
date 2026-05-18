@@ -100,6 +100,13 @@ To request another language:
 ./dmidiplayer/dmidiplayer-py --language system dmidiplayer/examples/test.mid
 ```
 
+Portable settings are also available:
+
+```bash
+./dmidiplayer/dmidiplayer-py --portable dmidiplayer/examples/test.mid
+./dmidiplayer/dmidiplayer-py --file my-portable.conf dmidiplayer/examples/test.mid
+```
+
 If the requested `.qm` file does not exist, the application falls back to
 English.
 
@@ -225,6 +232,10 @@ On Linux this is normally equivalent to:
 ```text
 ~/.config/dmidiplayer/dmidiplayer-py/settings.ini
 ```
+
+When `--portable` is used, settings are stored beside the launcher in a local
+portable config file such as `dmidiplayer-py.conf`. When `--file name.conf` is
+used, that portable config file name or path is used instead.
 
 On Windows it corresponds to the user's AppData location, normally under
 `%AppData%` or the equivalent path selected by Qt. The app currently stores the

@@ -64,6 +64,9 @@ class SequencePlayer(QObject):
         self._base_position_us = 0
         self._loop_start_tick = 0
         self._loop_end_tick = self.sequence.length_ticks
+        self._muted_channels.clear()
+        self._solo_channels.clear()
+        self._channel_volume_percents.clear()
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
         self._active_notes.clear()
@@ -81,6 +84,9 @@ class SequencePlayer(QObject):
         self._base_position_us = 0
         self._loop_start_tick = 0
         self._loop_end_tick = 0
+        self._muted_channels.clear()
+        self._solo_channels.clear()
+        self._channel_volume_percents.clear()
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
         self._active_notes.clear()

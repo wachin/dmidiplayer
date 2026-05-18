@@ -25,7 +25,13 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
 
 from drumstick_py import MidiConnection, MidiEvent
-from dmidiplayer_py.app import MainWindow, PreferencesDialog, ToolbarCustomizationDialog, available_qt_styles
+from dmidiplayer_py.app import (
+    MainWindow,
+    PreferencesDialog,
+    ToolbarCustomizationDialog,
+    available_qt_styles,
+    portable_settings_path,
+)
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
 
@@ -93,12 +99,14 @@ class FakeSettings:
     pianola_octave_designation_value = "scientific"
     playlist_path_value: Path | None = None
     window_geometry_value: tuple[int, int, int, int] | None = None
+    dialog_geometry_values: dict[str, tuple[int, int, int, int]] = {}
 
     def __init__(self) -> None:
         self.folder: Path | None = None
         self.saved_midi_destination = ""
         self.recent: list[Path] = []
         self.saved_window_geometry: tuple[int, int, int, int] | None = None
+        self.saved_dialog_geometry: dict[str, tuple[int, int, int, int]] = {}
 
     def last_folder(self, fallback: Path) -> Path:
         return self.folder or fallback
@@ -130,6 +138,14 @@ class FakeSettings:
     def set_window_geometry(self, x: int, y: int, width: int, height: int) -> None:
         self.saved_window_geometry = (x, y, width, height)
         type(self).window_geometry_value = self.saved_window_geometry
+
+    def dialog_geometry(self, name: str) -> tuple[int, int, int, int] | None:
+        return type(self).dialog_geometry_values.get(name)
+
+    def set_dialog_geometry(self, name: str, x: int, y: int, width: int, height: int) -> None:
+        geometry = (x, y, width, height)
+        self.saved_dialog_geometry[name] = geometry
+        type(self).dialog_geometry_values[name] = geometry
 
     def percussion_channel(self) -> int:
         return type(self).percussion_channel_value
@@ -574,6 +590,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.pianola_octave_designation_value = "scientific"
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
+        FakeSettings.dialog_geometry_values = {}
 
     def test_main_window_can_start_offscreen_without_alsa(self) -> None:
         with (
@@ -590,6 +607,16 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertFalse(window.pause_action.isEnabled())
             self.assertTrue(window.stop_action.isEnabled())
             self.assertEqual(window.event_label.text(), "MIDI output: Dummy output")
+
+    def test_portable_settings_path_defaults_to_launcher_directory(self) -> None:
+        path = portable_settings_path(None, "/opt/dmidiplayer/dmidiplayer-py")
+
+        self.assertEqual(path, Path("/opt/dmidiplayer/dmidiplayer-py.conf"))
+
+    def test_portable_settings_path_uses_relative_filename_beside_launcher(self) -> None:
+        path = portable_settings_path("portable.ini", "/opt/dmidiplayer/dmidiplayer-py")
+
+        self.assertEqual(path, Path("/opt/dmidiplayer/portable.ini"))
 
     def test_next_and_previous_select_playlist_items(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -639,6 +666,11 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.transport_summary_label.text(), "120 BPM")
             self.assertEqual(window.transport_volume_label.text(), "100%")
             self.assertEqual(window.transport_pitch_label.text(), "0")
+            self.assertEqual(window.position_summary_label.text(), "1:1")
+            self.assertFalse(window.findChild(QWidget, "playback_indicator_ready").property("active"))
+            self.assertFalse(window.findChild(QWidget, "playback_indicator_playing").property("active"))
+            self.assertFalse(window.findChild(QWidget, "playback_indicator_paused").property("active"))
+            self.assertFalse(window.findChild(QWidget, "playback_indicator_stopped").property("active"))
 
             window.tempo_control.setValue(150)
             window.volume_control.setValue(80)
@@ -662,12 +694,14 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.rhythm_view.summary_label.text(), "Rhythm: 4/4 - Bar 1 Beat 1 - 120 BPM")
                 self.assertEqual(window.rhythm_view.beat_labels[0].text(), "1:X")
                 self.assertEqual(window.rhythm_view.beat_labels[1].text(), "2:-")
+                self.assertEqual(window.position_summary_label.text(), "1:1")
 
                 window._update_position(480, 480)
 
                 self.assertEqual(window.rhythm_view.summary_label.text(), "Rhythm: 4/4 - Bar 1 Beat 2 - 120 BPM")
                 self.assertEqual(window.rhythm_view.beat_labels[0].text(), "1:-")
                 self.assertEqual(window.rhythm_view.beat_labels[1].text(), "2:X")
+                self.assertEqual(window.position_summary_label.text(), "1:2")
 
     def test_loop_controls_use_bar_numbers(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1077,7 +1111,40 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             window.channels_action.trigger()
 
-            self.assertEqual(shown, ["MIDI Channels"])
+        self.assertEqual(shown, ["MIDI Channels"])
+
+    def test_dialog_geometry_is_saved_when_channels_dialog_is_hidden(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+                dialog.resize(700, 330)
+                dialog.move(45, 55)
+
+                window._set_dialog_visibility("channels_dialog", window._create_channels_dialog, False)
+
+                self.assertEqual(FakeSettings.dialog_geometry_values.get("channels"), (45, 55, 700, 330))
+
+    def test_dialog_geometry_is_restored_when_channels_dialog_is_created(self) -> None:
+        FakeSettings.dialog_geometry_values = {"channels": (32, 48, 710, 340)}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+
+                self.assertEqual((dialog.x(), dialog.y(), dialog.width(), dialog.height()), (32, 48, 710, 340))
 
     def test_lyrics_action_opens_dialog(self) -> None:
         shown: list[str] = []
@@ -1163,6 +1230,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.table.item(0, 0).text(), "1")
                 self.assertEqual(dialog.table.item(1, 0).text(), "2")
                 self.assertEqual(dialog.windowTitle(), "MIDI Channels")
+                self.assertIsInstance(dialog.findChild(QToolButton, "channels_tools_button"), QToolButton)
                 self.assertIsInstance(dialog.table.cellWidget(0, 1), QLineEdit)
                 self.assertEqual(dialog.table.cellWidget(0, 1).text(), "Channel 1")
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
@@ -1176,6 +1244,10 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.table.cellWidget(0, 6).currentIndex(), 10)
                 self.assertEqual(dialog.table.cellWidget(1, 6).currentIndex(), 20)
                 self.assertIn("Music Box", dialog.table.cellWidget(0, 6).currentText())
+                self.assertEqual(
+                    [action.text() for action in dialog.tools_button.menu().actions() if not action.isSeparator()],
+                    ["Mute All", "Unmute All", "Clear Solos", "Reset Volumes", "Unlock Programs"],
+                )
 
     def test_pianola_dialog_shows_only_tracks_with_midi(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1630,6 +1702,48 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.player.channel_volume_percent(0), 60)
                 self.assertEqual(window.statusBar().currentMessage(), "Channel 1 volume 60%")
 
+    def test_channels_dialog_tools_menu_can_reset_all_channel_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "multi.mid")
+            write_multichannel_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+
+                window.player.set_channel_muted(0, True)
+                window.player.set_channel_muted(1, True)
+                window.player.set_channel_solo(1, True)
+                window.player.set_channel_volume_percent(0, 60)
+                window.player.set_channel_volume_percent(1, 45)
+                window.player.set_channel_locked(0, True)
+                window.player.set_channel_locked(1, True)
+                window._refresh_channels_dialog()
+
+                dialog.unmute_all_action.trigger()
+                self.assertEqual(window.player.muted_channels(), set())
+                self.assertEqual(window.statusBar().currentMessage(), "All channels unmuted")
+
+                dialog.clear_solos_action.trigger()
+                self.assertEqual(window.player.solo_channels(), set())
+                self.assertEqual(window.statusBar().currentMessage(), "Channel solos cleared")
+
+                dialog.reset_volumes_action.trigger()
+                self.assertEqual(window.player.channel_volume_percent(0), 100)
+                self.assertEqual(window.player.channel_volume_percent(1), 100)
+                self.assertEqual(window.statusBar().currentMessage(), "Channel volumes reset")
+
+                dialog.unlock_programs_action.trigger()
+                self.assertEqual(window.player.locked_channels(), set())
+                self.assertEqual(window.statusBar().currentMessage(), "Program locks cleared")
+
+                dialog.mute_all_action.trigger()
+                self.assertEqual(window.player.muted_channels(), {0, 1})
+                self.assertEqual(window.statusBar().currentMessage(), "All channels muted")
+
     def test_lyrics_dialog_shows_text_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "text.mid")
@@ -2017,6 +2131,33 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.tempo_control.value(), 100)
                 self.assertEqual(window.volume_control.value(), 100)
 
+    def test_loading_new_file_resets_channel_mix_state_without_song_settings(self) -> None:
+        FakeSettings.auto_song_settings_value = False
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first_path = Path(tmpdir, "first.mid")
+            second_path = Path(tmpdir, "second.mid")
+            write_multichannel_midi(first_path)
+            write_multichannel_midi(second_path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first_path)])
+                window.player.set_channel_muted(0, True)
+                window.player.set_channel_solo(1, True)
+                window.player.set_channel_volume_percent(0, 80)
+                window.player.set_channel_program(0, 10)
+                window.player.set_channel_locked(1, True)
+
+                window.load_file(str(second_path))
+
+                self.assertEqual(window.player.muted_channels(), set())
+                self.assertEqual(window.player.solo_channels(), set())
+                self.assertEqual(window.player.channel_volume_percent(0), 100)
+                self.assertIsNone(window.player.channel_program(0))
+                self.assertEqual(window.player.locked_channels(), set())
+
     def test_bar_navigation_actions_seek_to_neighboring_bar(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "two-bars.mid")
@@ -2058,19 +2199,24 @@ class AppPlaylistTest(unittest.TestCase):
                 window.load_file(str(path))
 
                 self.assertEqual(window.statusBar().currentMessage(), "Ready: simple.mid")
+                self.assertTrue(window.findChild(QWidget, "playback_indicator_ready").property("active"))
 
                 window.player._playing = True
                 window.player.started.emit()
                 self.assertEqual(window.statusBar().currentMessage(), "Playing")
+                self.assertTrue(window.findChild(QWidget, "playback_indicator_playing").property("active"))
 
                 window.pause_action.trigger()
                 self.assertEqual(window.statusBar().currentMessage(), "Paused")
+                self.assertTrue(window.findChild(QWidget, "playback_indicator_paused").property("active"))
 
                 window.stop_action.trigger()
                 self.assertEqual(window.statusBar().currentMessage(), "Stopped")
+                self.assertTrue(window.findChild(QWidget, "playback_indicator_stopped").property("active"))
 
                 window.player.finished.emit()
                 self.assertEqual(window.statusBar().currentMessage(), "End of sequence")
+                self.assertTrue(window.findChild(QWidget, "playback_indicator_stopped").property("active"))
 
     def test_status_bar_ready_message_shows_song_title_and_filename_when_they_differ(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

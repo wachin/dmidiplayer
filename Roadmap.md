@@ -338,11 +338,14 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Add a `Window` menu for the main window plus independent auxiliary views.
 - [x] Main window now includes a transport summary panel with large time and compact tempo/volume/pitch readouts closer to the original reference.
 - [x] Main window file summary now shows both song title and filename when they differ.
+- [x] Main window now includes a compact playback indicator strip beside the file summary, closer to the original reference.
+- [x] Main window now includes a compact bar:beat summary beside the transport slider, closer to the original reference.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;
   - [x] Piano Player.
   - [x] Channels window now uses a more compact row layout closer to the original reference.
+  - [x] Channels window now includes a compact popup tools menu for global mute/solo/volume/lock actions, closer to the original reference controls.
   - [x] Lyrics window now uses a compact top control row with a popup actions menu closer to the original reference.
 - [ ] Embedded views that can be shown/hidden:
   - [x] toolbar;
@@ -546,8 +549,10 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
   compensation yet.
 - [ ] Initial transpose affects note events, but still needs integration with song
   settings, locked channels, and final UI.
-- [ ] Per-channel volume and restoring original song/channel volume through song
-  settings are still missing.
+- [x] Reset per-channel mute/solo/volume/program/lock state when loading a new
+  file without song settings.
+- [ ] Restoring original song/channel volume through song settings is still
+  missing.
 - [ ] ALSA output lists/connects destinations from the UI, but backend-querying
   active connection display is still missing.
 - [ ] The current PyQt6 UI is a minimal hand-written window, not a full conversion
@@ -904,7 +909,7 @@ Tasks:
 Exit criteria:
 
 - [x] Widgets can be imported without depending on dmidiplayer.
-- [ ] Dialogs save/restore configuration through `QSettings`.
+- [x] Main auxiliary dialogs now save/restore geometry through `QSettings`.
 
 ## [ ] Phase 5: dmidiplayer Core
 
@@ -929,7 +934,7 @@ Original C++ files to cover:
 - [ ] `settings.*`
   - [ ] port application constants;
   - [x] use `QSettings`;
-  - [ ] portable mode `--portable` and `--file`.
+  - [x] portable mode `--portable` and `--file`.
 - [ ] `instrumentset.*`
   - [ ] load instrument and bank names.
 - [x] `recentfileshelper.*`
