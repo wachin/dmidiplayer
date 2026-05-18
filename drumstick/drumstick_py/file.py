@@ -30,6 +30,7 @@ class _WrkHeader:
     software_version: str | None = None
     track_number: int | None = None
     track_name: str | None = None
+    comments: str | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -390,6 +391,8 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             details += f", saved by {header.software_version}"
         if header.track_number is not None and header.track_name:
             details += f", track {header.track_number + 1} '{header.track_name}'"
+        if header.comments:
+            details += f", comments '{header.comments}'"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -474,6 +477,7 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     software_version: str | None = None
     track_number: int | None = None
     track_name: str | None = None
+    comments: str | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -493,6 +497,13 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         if first_chunk_length - 3 < text_length:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         track_name = reader.read(text_length).decode("latin-1", errors="replace")
+    elif first_chunk_id == 8:
+        if first_chunk_length < 2:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        text_length = reader.read_u16_le()
+        if first_chunk_length - 2 < text_length:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        comments = reader.read(text_length).decode("latin-1", errors="replace")
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -502,6 +513,7 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         software_version=software_version,
         track_number=track_number,
         track_name=track_name,
+        comments=comments,
     )
 
 
