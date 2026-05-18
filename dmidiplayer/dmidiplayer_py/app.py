@@ -1973,9 +1973,10 @@ class MainWindow(QMainWindow):
 
     def _update_action_state(self) -> None:
         has_file = self.player.sequence.midi is not None
+        is_playing = self.player._playing
         current_row = self.playlist.currentRow()
-        self.play_action.setEnabled(has_file)
-        self.pause_action.setEnabled(has_file)
+        self.play_action.setEnabled(has_file and not is_playing)
+        self.pause_action.setEnabled(has_file and is_playing)
         self.previous_bar_action.setEnabled(has_file)
         self.next_bar_action.setEnabled(has_file)
         self.previous_action.setEnabled(current_row > 0)
@@ -2973,12 +2974,12 @@ class MainWindow(QMainWindow):
             config.write(handle)
         self.statusBar().showMessage(self.tr("Saved song settings to {name}").format(name=path.name), 5000)
 
-    def load_song_settings(self) -> None:
+    def load_song_settings(self) -> bool:
         path = self._song_settings_path()
         if path is None or not path.exists():
             if path is not None:
                 self.statusBar().showMessage(self.tr("Song settings not found: {name}").format(name=path.name), 5000)
-            return
+            return False
         config = configparser.ConfigParser()
         config.read(path, encoding="utf-8")
         song = config["song"] if config.has_section("song") else {}
@@ -3006,6 +3007,12 @@ class MainWindow(QMainWindow):
         self._refresh_channels_dialog()
         self._refresh_lyrics_dialog()
         self.statusBar().showMessage(self.tr("Loaded song settings from {name}").format(name=path.name), 5000)
+        return True
+
+    def _reset_song_adjustments_to_defaults(self) -> None:
+        self.pitch_control.setValue(0)
+        self.tempo_control.setValue(100)
+        self.volume_control.setValue(100)
 
     def _create_preferences_dialog(self) -> PreferencesDialog:
         return PreferencesDialog(self, self.settings)
@@ -3122,9 +3129,11 @@ class MainWindow(QMainWindow):
         self.player.stop()
 
     def _playback_started(self) -> None:
+        self._update_action_state()
         self.statusBar().showMessage(self.tr("Playing"))
 
     def _playback_stopped(self) -> None:
+        self._update_action_state()
         message = self.tr("Paused") if self._pause_requested else self.tr("Stopped")
         self.statusBar().showMessage(message)
         if self.channels_dialog is not None:
@@ -3489,7 +3498,10 @@ class MainWindow(QMainWindow):
         self._set_lyrics_encoding(None)
         self._reset_channel_labels()
         if self.auto_song_settings:
-            self.load_song_settings()
+            if not self.load_song_settings():
+                self._reset_song_adjustments_to_defaults()
+        else:
+            self._reset_song_adjustments_to_defaults()
         self._refresh_channels_dialog()
         self._refresh_lyrics_dialog()
         self._sync_playlist_ui()

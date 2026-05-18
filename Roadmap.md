@@ -647,7 +647,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Track active notes per channel in `SequencePlayer`.
 - [x] Send note-off for active notes before seek instead of relying only on
   controller all-notes-off.
-- [ ] Reset pitch, tempo, and volume when loading a new file if song settings
+- [x] Reset pitch, tempo, and volume when loading a new file if song settings
   are not active.
 - [x] Add preference-backed percussion channel instead of hardcoding channel 10.
 - [x] Add per-channel mute filtering in `_playable_event()`.
@@ -655,7 +655,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Add per-channel volume scaling before global volume scaling.
 - [x] Suppress program changes on locked channels.
 - [x] Add GM/GS/XG reset SysEx actions before playback.
-- [ ] Add latency/late-event counters for scheduler diagnostics.
+- [x] Add latency/late-event counters for scheduler diagnostics.
 
 ### Main Window UX
 
@@ -715,7 +715,7 @@ clearer bites instead of rediscovering the next small step.
 ### Tests And Tooling
 
 - [ ] Add import/offscreen startup tests for the main window without ALSA.
-- [ ] Add UI tests for toolbar play/pause/stop state transitions.
+- [x] Add UI tests for toolbar play/pause/stop state transitions.
 - [ ] Add drag/drop event tests using real `QDropEvent` when practical.
 - [ ] Add tests for recent files and playlist persistence.
   - [x] Add recent files persistence tests.

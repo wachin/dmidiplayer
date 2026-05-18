@@ -47,6 +47,9 @@ class SequencePlayer(QObject):
         self._loop_enabled = False
         self._loop_start_tick = 0
         self._loop_end_tick = 0
+        self._late_event_count = 0
+        self._max_late_event_us = 0
+        self._total_late_event_us = 0
         self._clock = QElapsedTimer()
 
     def load_file(self, file_name: str) -> None:
@@ -64,6 +67,7 @@ class SequencePlayer(QObject):
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
         self._active_notes.clear()
+        self._reset_scheduler_diagnostics()
         self.positionChanged.emit(self._position, self.sequence.length_ticks)
 
     def clear(self) -> None:
@@ -80,6 +84,7 @@ class SequencePlayer(QObject):
         self._channel_program_overrides.clear()
         self._locked_channels.clear()
         self._active_notes.clear()
+        self._reset_scheduler_diagnostics()
         self.positionChanged.emit(0, 0)
 
     def play(self) -> None:
@@ -289,12 +294,29 @@ class SequencePlayer(QObject):
         self._loop_end_tick = end
         self._loop_enabled = self._loop_enabled and self._loop_end_tick > self._loop_start_tick
 
+    def scheduler_diagnostics(self) -> dict[str, int]:
+        return {
+            "late_event_count": self._late_event_count,
+            "max_late_event_us": self._max_late_event_us,
+            "total_late_event_us": self._total_late_event_us,
+        }
+
+    def _reset_scheduler_diagnostics(self) -> None:
+        self._late_event_count = 0
+        self._max_late_event_us = 0
+        self._total_late_event_us = 0
+
     def _tick(self) -> None:
         self._position_us = self._elapsed_microseconds()
         limit_us = self._loop_end_microseconds() if self._loop_enabled else self._position_us
         play_until_us = min(self._position_us, limit_us)
         while self._index < len(self._events) and self._event_times_us[self._index] <= play_until_us:
             event = self._events[self._index]
+            lateness_us = max(0, self._position_us - self._event_times_us[self._index])
+            if lateness_us > 0:
+                self._late_event_count += 1
+                self._max_late_event_us = max(self._max_late_event_us, lateness_us)
+                self._total_late_event_us += lateness_us
             output_event = self._playable_event(event)
             try:
                 if output_event is not None:

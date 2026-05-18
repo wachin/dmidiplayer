@@ -1978,6 +1978,29 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.volume_control.value(), 100)
                 self.assertEqual(window.player._position, 1920)
 
+    def test_loading_new_file_resets_pitch_tempo_and_volume_without_song_settings(self) -> None:
+        FakeSettings.auto_song_settings_value = False
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first_path = Path(tmpdir, "first.mid")
+            second_path = Path(tmpdir, "second.mid")
+            write_two_bar_midi(first_path)
+            write_two_bar_midi(second_path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(first_path)])
+                window.pitch_control.setValue(5)
+                window.tempo_control.setValue(150)
+                window.volume_control.setValue(80)
+
+                window.load_file(str(second_path))
+
+                self.assertEqual(window.pitch_control.value(), 0)
+                self.assertEqual(window.tempo_control.value(), 100)
+                self.assertEqual(window.volume_control.value(), 100)
+
     def test_bar_navigation_actions_seek_to_neighboring_bar(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "two-bars.mid")
@@ -2020,6 +2043,7 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.statusBar().currentMessage(), "Ready: simple.mid")
 
+                window.player._playing = True
                 window.player.started.emit()
                 self.assertEqual(window.statusBar().currentMessage(), "Playing")
 
@@ -2075,7 +2099,7 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(first), str(second)])
 
                 self.assertTrue(window.play_action.isEnabled())
-                self.assertTrue(window.pause_action.isEnabled())
+                self.assertFalse(window.pause_action.isEnabled())
                 self.assertFalse(window.previous_action.isEnabled())
                 self.assertTrue(window.next_action.isEnabled())
                 self.assertTrue(window.previous_bar_action.isEnabled())
@@ -2087,6 +2111,36 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertFalse(window.next_action.isEnabled())
                 self.assertTrue(window.move_up_action.isEnabled())
                 self.assertFalse(window.move_down_action.isEnabled())
+
+    def test_toolbar_play_pause_stop_actions_follow_playback_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+
+                self.assertTrue(window.play_action.isEnabled())
+                self.assertFalse(window.pause_action.isEnabled())
+                self.assertTrue(window.stop_action.isEnabled())
+
+                window.player._playing = True
+                window._playback_started()
+
+                self.assertFalse(window.play_action.isEnabled())
+                self.assertTrue(window.pause_action.isEnabled())
+                self.assertTrue(window.stop_action.isEnabled())
+
+                window.player._playing = False
+                window._pause_requested = True
+                window._playback_stopped()
+
+                self.assertTrue(window.play_action.isEnabled())
+                self.assertFalse(window.pause_action.isEnabled())
+                self.assertTrue(window.stop_action.isEnabled())
 
     def test_playlist_reorder_actions_are_disabled_until_selection_allows_them(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

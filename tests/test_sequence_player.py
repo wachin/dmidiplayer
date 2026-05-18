@@ -84,6 +84,66 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player._index, 2)
         self.assertGreaterEqual(output.all_notes_off_count, 1)
 
+    def test_scheduler_diagnostics_count_late_events(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player._elapsed_microseconds = lambda: 250_000
+        player._tick()
+
+        self.assertEqual(
+            player.scheduler_diagnostics(),
+            {
+                "late_event_count": 2,
+                "max_late_event_us": 250_000,
+                "total_late_event_us": 500_000,
+            },
+        )
+
+    def test_scheduler_diagnostics_reset_on_load_and_clear(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+            player.load_file(str(first))
+            player._elapsed_microseconds = lambda: 250_000
+            player._tick()
+
+            self.assertGreater(player.scheduler_diagnostics()["late_event_count"], 0)
+
+            player.load_file(str(second))
+            self.assertEqual(
+                player.scheduler_diagnostics(),
+                {
+                    "late_event_count": 0,
+                    "max_late_event_us": 0,
+                    "total_late_event_us": 0,
+                },
+            )
+
+            player._elapsed_microseconds = lambda: 250_000
+            player._tick()
+            self.assertGreater(player.scheduler_diagnostics()["late_event_count"], 0)
+
+            player.clear()
+            self.assertEqual(
+                player.scheduler_diagnostics(),
+                {
+                    "late_event_count": 0,
+                    "max_late_event_us": 0,
+                    "total_late_event_us": 0,
+                },
+            )
+
     def test_pause_turns_off_current_notes(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
