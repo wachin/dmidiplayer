@@ -92,6 +92,11 @@ class _WrkHeader:
     sysex2_port: int | None = None
     sysex2_autosend: bool | None = None
     sysex2_name: str | None = None
+    new_sysex_bank: int | None = None
+    new_sysex_length: int | None = None
+    new_sysex_port: int | None = None
+    new_sysex_autosend: bool | None = None
+    new_sysex_name: str | None = None
 
 
 def decode_midi_text(data: bytes, preferred_encoding: str | None = None) -> str:
@@ -573,6 +578,16 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
                 details += f" autosend {int(header.sysex2_autosend)}"
             if header.sysex2_name:
                 details += f" '{header.sysex2_name}'"
+        if header.new_sysex_bank is not None:
+            details += (
+                f", new sysex bank {header.new_sysex_bank}"
+                f" bytes {header.new_sysex_length}"
+                f" port {header.new_sysex_port}"
+            )
+            if header.new_sysex_autosend is not None:
+                details += f" autosend {int(header.new_sysex_autosend)}"
+            if header.new_sysex_name:
+                details += f" '{header.new_sysex_name}'"
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
@@ -719,6 +734,11 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
     sysex2_port: int | None = None
     sysex2_autosend: bool | None = None
     sysex2_name: str | None = None
+    new_sysex_bank: int | None = None
+    new_sysex_length: int | None = None
+    new_sysex_port: int | None = None
+    new_sysex_autosend: bool | None = None
+    new_sysex_name: str | None = None
     if first_chunk_id == 10:
         if first_chunk_length < 2:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -940,6 +960,18 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         sysex2_name = reader.read(name_length).decode("latin-1", errors="replace")
         reader.read(sysex2_length)
+    elif first_chunk_id == 44:
+        if first_chunk_length < 10:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        new_sysex_bank = reader.read_u16_le()
+        new_sysex_length = reader.read_u32_le()
+        new_sysex_port = reader.read_u16_le()
+        new_sysex_autosend = reader.read(1)[0] != 0
+        name_length = reader.read(1)[0]
+        if reader.remaining < name_length + new_sysex_length:
+            raise MidiFileError("Corrupted Cakewalk WRK file")
+        new_sysex_name = reader.read(name_length).decode("latin-1", errors="replace")
+        reader.read(new_sysex_length)
     return _WrkHeader(
         major_version=major_version,
         minor_version=minor_version,
@@ -1011,6 +1043,11 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         sysex2_port=sysex2_port,
         sysex2_autosend=sysex2_autosend,
         sysex2_name=sysex2_name,
+        new_sysex_bank=new_sysex_bank,
+        new_sysex_length=new_sysex_length,
+        new_sysex_port=new_sysex_port,
+        new_sysex_autosend=new_sysex_autosend,
+        new_sysex_name=new_sysex_name,
     )
 
 

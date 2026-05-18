@@ -358,6 +358,23 @@ class SmfParserTest(unittest.TestCase):
         ):
             read_temp_smf(wrk, "sysex2.wrk")
 
+    def test_reports_wrk_new_sysex_from_first_chunk(self) -> None:
+        payload = (
+            struct.pack("<H", 3)
+            + struct.pack("<I", 4)
+            + struct.pack("<H", 9)
+            + bytes([1, 5])
+            + b"Patch"
+            + bytes([0x01, 0x02, 0x03, 0x04])
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(44, payload) + b"\xff"
+        with self.assertRaisesRegex(
+            MidiFileError,
+            r"Cakewalk WRK files are not supported yet "
+            r"\(detected version 2\.1, new sysex bank 3 bytes 4 port 9 autosend 1 'Patch'\)",
+        ):
+            read_temp_smf(wrk, "nsysex.wrk")
+
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(
             [
