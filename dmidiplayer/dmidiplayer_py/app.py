@@ -1729,6 +1729,11 @@ class MainWindow(QMainWindow):
         )
         self.tempo_control = self._spinbox(50, 200, 100, self._set_tempo_percent, "%")
         self.volume_control = self._spinbox(0, 200, 100, self._set_volume_percent, "%")
+        self.master_volume_slider = QSlider(Qt.Orientation.Vertical, self)
+        self.master_volume_slider.setObjectName("master_volume_slider")
+        self.master_volume_slider.setRange(0, 200)
+        self.master_volume_slider.setValue(100)
+        self.master_volume_slider.valueChanged.connect(self._master_volume_slider_changed)
         self.loop_check = QCheckBox(self.tr("Loop"))
         self.loop_check.toggled.connect(self._toggle_loop)
         self.loop_start = self._spinbox(1, 1, 1, self._update_loop_range)
@@ -3317,9 +3322,11 @@ class MainWindow(QMainWindow):
         right.addWidget(self.rhythm_view)
         right.addWidget(self._build_midi_destination_row())
         right.addWidget(self.keyboard)
+        right.addWidget(self._build_transport_deck())
         right.addWidget(self.event_label)
         root.addLayout(left, 1)
         root.addLayout(right, 3)
+        root.addWidget(self._build_master_volume_strip(), 0, Qt.AlignmentFlag.AlignTop)
         self.setCentralWidget(central)
 
     def _build_transport_summary(self) -> QWidget:
@@ -3395,6 +3402,50 @@ class MainWindow(QMainWindow):
         self.position_summary_label.setMinimumWidth(40)
         layout.addWidget(self.position_summary_label)
         return row
+
+    def _build_master_volume_strip(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("master_volume_strip")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        label = QLabel(self.tr("Vol"), panel)
+        label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(label)
+        self.master_volume_slider.setFixedHeight(220)
+        layout.addWidget(self.master_volume_slider, 1, Qt.AlignmentFlag.AlignHCenter)
+        return panel
+
+    def _transport_button(self, action: QAction, object_name: str) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName(object_name)
+        button.setDefaultAction(action)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        button.setAutoRaise(False)
+        return button
+
+    def _build_transport_deck(self) -> QWidget:
+        panel = QWidget()
+        panel.setObjectName("transport_deck")
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(0, 6, 0, 0)
+        layout.setSpacing(10)
+        layout.addWidget(self._transport_button(self.previous_action, "transport_previous_button"))
+        layout.addWidget(self._transport_button(self.play_action, "transport_play_button"))
+        layout.addWidget(self._transport_button(self.pause_action, "transport_pause_button"))
+        layout.addWidget(self._transport_button(self.stop_action, "transport_stop_button"))
+        layout.addWidget(self._transport_button(self.next_action, "transport_next_button"))
+        layout.addWidget(self._transport_button(self.previous_bar_action, "transport_previous_bar_button"))
+        layout.addWidget(self._transport_button(self.next_bar_action, "transport_next_bar_button"))
+        self.transport_loop_button = QToolButton(panel)
+        self.transport_loop_button.setObjectName("transport_loop_button")
+        self.transport_loop_button.setText(self.tr("Loop"))
+        self.transport_loop_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.transport_loop_button.setCheckable(True)
+        self.transport_loop_button.toggled.connect(self._transport_loop_toggled)
+        layout.addWidget(self.transport_loop_button)
+        layout.addStretch(1)
+        return panel
 
     def _set_playback_indicator(self, state: str) -> None:
         active_name = state if state in self.playback_indicator_dots else ""
@@ -3829,11 +3880,13 @@ class MainWindow(QMainWindow):
         bar_count = max(1, self.player.sequence.bar_count)
         with (
             QSignalBlocker(self.loop_check),
+            QSignalBlocker(self.transport_loop_button),
             QSignalBlocker(self.loop_start),
             QSignalBlocker(self.loop_end),
             QSignalBlocker(self.jump_bar),
         ):
             self.loop_check.setChecked(False)
+            self.transport_loop_button.setChecked(False)
             self.jump_bar.setRange(1, bar_count)
             self.jump_bar.setValue(1)
             self.loop_start.setRange(1, bar_count)
@@ -3844,6 +3897,8 @@ class MainWindow(QMainWindow):
         self.player.set_loop_enabled(False)
 
     def _toggle_loop(self, enabled: bool) -> None:
+        with QSignalBlocker(self.transport_loop_button):
+            self.transport_loop_button.setChecked(enabled)
         self._update_loop_range()
         self.player.set_loop_enabled(enabled)
 
@@ -3861,6 +3916,11 @@ class MainWindow(QMainWindow):
         end_tick = self.player.sequence.tick_for_bar(end_bar + 1)
         self.player.set_loop_range(start_tick, end_tick)
 
+    def _transport_loop_toggled(self, enabled: bool) -> None:
+        if self.loop_check.isChecked() == enabled:
+            return
+        self.loop_check.setChecked(enabled)
+
     def _set_tempo_percent(self, value: int) -> None:
         self.player.set_tempo_percent(value)
         self.transport_summary_label.setText(self.tr("{bpm:.0f} BPM").format(bpm=120 * value / 100))
@@ -3873,6 +3933,13 @@ class MainWindow(QMainWindow):
     def _set_volume_percent(self, value: int) -> None:
         self.player.set_volume_percent(value)
         self.transport_volume_label.setText(f"{value}%")
+        with QSignalBlocker(self.master_volume_slider):
+            self.master_volume_slider.setValue(value)
+
+    def _master_volume_slider_changed(self, value: int) -> None:
+        if self.volume_control.value() == value:
+            return
+        self.volume_control.setValue(value)
 
     def _set_percussion_channel(self, value: int) -> None:
         self.player.set_percussion_channel(value)

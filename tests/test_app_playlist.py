@@ -681,6 +681,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.transport_volume_label.text(), "100%")
             self.assertEqual(window.transport_pitch_label.text(), "0")
             self.assertEqual(window.position_summary_label.text(), "1:1")
+            self.assertEqual(window.master_volume_slider.value(), 100)
             self.assertFalse(window.findChild(QWidget, "playback_indicator_ready").property("active"))
             self.assertFalse(window.findChild(QWidget, "playback_indicator_playing").property("active"))
             self.assertFalse(window.findChild(QWidget, "playback_indicator_paused").property("active"))
@@ -693,6 +694,48 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.transport_summary_label.text(), "180 BPM")
             self.assertEqual(window.transport_volume_label.text(), "80%")
             self.assertEqual(window.transport_pitch_label.text(), "-3")
+            self.assertEqual(window.master_volume_slider.value(), 80)
+
+            window.master_volume_slider.setValue(55)
+            self.assertEqual(window.volume_control.value(), 55)
+            self.assertEqual(window.transport_volume_label.text(), "55%")
+
+    def test_transport_deck_buttons_reuse_main_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir, "first.mid")
+            second = Path(tmpdir, "second.mid")
+            write_simple_midi(first)
+            write_simple_midi(second)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([])
+                window.add_file(str(first))
+                window.add_file(str(second))
+                window.load_file(str(first))
+
+                next_button = window.findChild(QToolButton, "transport_next_button")
+                previous_button = window.findChild(QToolButton, "transport_previous_button")
+                loop_button = window.findChild(QToolButton, "transport_loop_button")
+
+                self.assertIsNotNone(next_button)
+                self.assertIsNotNone(previous_button)
+                self.assertIsNotNone(loop_button)
+
+                next_button.click()
+                self.assertEqual(window.playlist.currentRow(), 1)
+
+                previous_button.click()
+                self.assertEqual(window.playlist.currentRow(), 0)
+
+                loop_button.setChecked(True)
+                self.assertTrue(window.loop_check.isChecked())
+                self.assertTrue(window.player.loop_enabled)
+
+                window.loop_check.setChecked(False)
+                self.assertFalse(loop_button.isChecked())
 
     def test_rhythm_view_updates_with_bar_and_beat(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

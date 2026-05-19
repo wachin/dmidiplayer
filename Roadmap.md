@@ -340,6 +340,8 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Main window file summary now shows both song title and filename when they differ.
 - [x] Main window now includes a compact playback indicator strip beside the file summary, closer to the original reference.
 - [x] Main window now includes a compact bar:beat summary beside the transport slider, closer to the original reference.
+- [x] Main window now includes a dedicated master-volume strip on the right side, closer to the original reference.
+- [x] Main window now includes a dedicated bottom transport deck reusing the core playback actions, closer to the original reference.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;
