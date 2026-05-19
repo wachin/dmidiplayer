@@ -105,6 +105,7 @@ Portable settings are also available:
 ```bash
 ./dmidiplayer/dmidiplayer-py --portable dmidiplayer/examples/test.mid
 ./dmidiplayer/dmidiplayer-py --file my-portable.conf dmidiplayer/examples/test.mid
+./dmidiplayer/dmidiplayer-py --driver dummy --connection "Practice Port" dmidiplayer/examples/test.mid
 ```
 
 If the requested `.qm` file does not exist, the application falls back to

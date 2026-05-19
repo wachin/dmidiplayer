@@ -1638,7 +1638,13 @@ class LyricsDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, start_files: list[str], settings: AppSettings | None = None) -> None:
+    def __init__(
+        self,
+        start_files: list[str],
+        settings: AppSettings | None = None,
+        output_driver: str = "alsa",
+        output_connection: str | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle(self.tr(APP_TITLE))
         self.resize(900, 520)
@@ -1647,8 +1653,9 @@ class MainWindow(QMainWindow):
         self._restore_window_geometry()
         self._system_qt_style = QApplication.style().objectName() or "Fusion"
         self._system_palette = QPalette(QApplication.palette())
+        self._startup_output_connection = output_connection
         self.manager = BackendManager(self)
-        self.output = self._create_midi_output()
+        self.output = self._create_midi_output(output_driver, output_connection)
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
         self.player.set_send_reset_before_playback(self.settings.midi_reset_before_playback())
@@ -3470,9 +3477,9 @@ class MainWindow(QMainWindow):
         button.setDefaultAction(action)
         return button
 
-    def _create_midi_output(self) -> object:
+    def _create_midi_output(self, driver: str = "alsa", connection: str | None = None) -> object:
         try:
-            return self.manager.create_output("alsa")
+            return self.manager.create_output(driver, connection)
         except MidiOutputError as exc:
             info = self.manager.alsa_audio_info()
             suffix = (
@@ -3515,6 +3522,15 @@ class MainWindow(QMainWindow):
             return
         for connection in connections:
             self.connection_combo.addItem(connection.name, connection)
+        if self._startup_output_connection:
+            preferred = next(
+                (connection for connection in connections if connection.matches(self._startup_output_connection)),
+                None,
+            )
+            if preferred is not None:
+                self.connection_combo.setCurrentIndex(connections.index(preferred))
+            self._update_midi_output_label()
+            return
         if autoconnect:
             self._autoconnect_preferred_midi_output(connections)
 
@@ -3991,6 +4007,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Portable settings file name.",
     )
     parser.add_argument(
+        "-d",
+        "--driver",
+        default="alsa",
+        help="MIDI Out Driver.",
+    )
+    parser.add_argument(
+        "-c",
+        "--connection",
+        help="MIDI Out Connection.",
+    )
+    parser.add_argument(
         "--language",
         default="en",
         help="UI language code, for example en, es, es_EC, or system",
@@ -4006,7 +4033,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.portable or args.portable_file
         else AppSettings()
     )
-    window = MainWindow(args.files, settings=settings)
+    window = MainWindow(
+        args.files,
+        settings=settings,
+        output_driver=args.driver,
+        output_connection=args.connection,
+    )
     window.show()
     return app.exec()
 

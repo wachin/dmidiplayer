@@ -935,6 +935,7 @@ Original C++ files to cover:
   - [ ] port application constants;
   - [x] use `QSettings`;
   - [x] portable mode `--portable` and `--file`.
+  - [x] command-line MIDI output driver and connection selection.
 - [ ] `instrumentset.*`
   - [ ] load instrument and bank names.
 - [x] `recentfileshelper.*`

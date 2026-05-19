@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from unittest.mock import MagicMock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -29,6 +30,7 @@ from dmidiplayer_py.app import (
     MainWindow,
     PreferencesDialog,
     ToolbarCustomizationDialog,
+    main,
     available_qt_styles,
     portable_settings_path,
 )
@@ -301,6 +303,10 @@ class FakeAlsaOutput(OutputStub):
         return self.available_connections
 
     def connect_to(self, connection: MidiConnection) -> None:
+        if isinstance(connection, str):
+            matches = [candidate for candidate in self.available_connections if candidate.matches(connection)]
+            if matches:
+                connection = matches[0]
         if connection not in self.connected:
             self.connected.append(connection)
 
@@ -316,11 +322,17 @@ class FakeAlsaOutput(OutputStub):
 
 class FakeAlsaBackendManager:
     output = FakeAlsaOutput()
+    last_driver: str | None = None
+    last_connection: str | None = None
 
     def __init__(self, parent: object | None = None) -> None:
         type(self).output = FakeAlsaOutput()
 
     def create_output(self, driver: str = "dummy", connection: str | None = None) -> FakeAlsaOutput:
+        type(self).last_driver = driver
+        type(self).last_connection = connection
+        if connection:
+            self.output.connect_to(connection)
         return self.output
 
 
@@ -591,6 +603,8 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.playlist_path_value = None
         FakeSettings.window_geometry_value = None
         FakeSettings.dialog_geometry_values = {}
+        FakeAlsaBackendManager.last_driver = None
+        FakeAlsaBackendManager.last_connection = None
 
     def test_main_window_can_start_offscreen_without_alsa(self) -> None:
         with (
@@ -3304,6 +3318,37 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(window.output.connected_connections()[0].name, "129:0 Hardware Synth: MIDI")
             self.assertEqual(window.connection_combo.currentText(), "129:0 Hardware Synth: MIDI")
             self.assertEqual(FakeSettings.midi_destination_value, "129:0")
+
+    def test_startup_output_connection_is_respected(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeAlsaBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([], output_driver="alsa", output_connection="129:0")
+
+            self.assertEqual(FakeAlsaBackendManager.last_driver, "alsa")
+            self.assertEqual(FakeAlsaBackendManager.last_connection, "129:0")
+            self.assertEqual(window.output.connected_connections()[0].name, "129:0 Hardware Synth: MIDI")
+            self.assertEqual(window.connection_combo.currentText(), "129:0 Hardware Synth: MIDI")
+
+    def test_main_passes_driver_and_connection_options_to_main_window(self) -> None:
+        app_instance = MagicMock()
+        app_instance.exec.return_value = 0
+        fake_window = MagicMock()
+        with (
+            patch("dmidiplayer_py.app.QApplication", return_value=app_instance),
+            patch("dmidiplayer_py.app.install_translator"),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.MainWindow", return_value=fake_window) as main_window_class,
+        ):
+            exit_code = main(["--driver", "dummy", "--connection", "Test Port", "song.mid"])
+
+            self.assertEqual(exit_code, 0)
+            main_window_class.assert_called_once()
+            _, kwargs = main_window_class.call_args
+            self.assertEqual(kwargs["output_driver"], "dummy")
+            self.assertEqual(kwargs["output_connection"], "Test Port")
+            fake_window.show.assert_called_once()
 
     def test_manual_midi_connection_is_saved(self) -> None:
         FakeSettings.midi_destination_value = ""
