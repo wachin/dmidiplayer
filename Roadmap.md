@@ -930,7 +930,7 @@ Original C++ files to cover:
   - [ ] port codec lookup and metadata.
 - [ ] `seqplayer.*`
   - [ ] replace simple timer with precise scheduler;
-  - [ ] respect tempo, pitch shift, volume, mute, lock, and programs;
+  - [x] respect tempo, pitch shift, volume, mute, lock, and programs;
   - [x] implement loop by bars/ticks;
   - [x] emit initial PyQt signals equivalent to C++.
 - [ ] `settings.*`
@@ -946,7 +946,7 @@ Original C++ files to cover:
 Exit criteria:
 
 - [x] Open, play, pause, stop, and seek work with real MIDI output.
-- [ ] Channels respect mute, volume, program, and lock.
+- [x] Channels respect mute, volume, program, and lock.
 - [ ] Loop behavior matches C++.
 
 ## [ ] Phase 6: dmidiplayer PyQt6 UI

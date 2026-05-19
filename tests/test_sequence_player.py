@@ -436,6 +436,34 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertIsNotNone(patched)
         self.assertEqual(patched.data, bytes([40]))
 
+    def test_tick_respects_channel_mute_volume_program_and_lock(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player._events = [
+            MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])),
+            MidiEvent(tick=10, kind="control_change", channel=1, data=bytes([7, 80])),
+            MidiEvent(tick=20, kind="program_change", channel=2, data=bytes([10])),
+            MidiEvent(tick=30, kind="program_change", channel=3, data=bytes([10])),
+        ]
+        player._event_times_us = [0, 10, 20, 30]
+        player.set_channel_muted(0, True)
+        player.set_channel_volume_percent(1, 50)
+        player.set_channel_program(2, 40)
+        output.events.clear()  # drop the immediate program change side effect
+        player.set_channel_locked(3, True)
+        player._elapsed_microseconds = lambda: 100
+
+        player._tick()
+
+        self.assertEqual(
+            [(event.kind, event.channel, event.data) for event in output.events],
+            [
+                ("note_on", 0, bytes([60, 0])),
+                ("control_change", 1, bytes([7, 40])),
+                ("program_change", 2, bytes([40])),
+            ],
+        )
+
     def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
