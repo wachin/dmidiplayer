@@ -314,6 +314,17 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] note-name font;
   - [x] note-name display mode;
   - [x] octave designation.
+  - [ ] Match C++ Pianola key range behavior (global song range, not per-track):
+    - [ ] Compute a *song-wide* MIDI note range `lowest..highest` (from all note on/off/key pressure events), and use that range for every displayed keyboard row (including additional tabs when there are >8 tracks).
+    - [ ] Support a "Tighten the number of keys" option that switches between:
+      - [ ] Default fixed keyboard: 88 keys, starting key A (`DEFAULTNUMBEROFKEYS=88`, `DEFAULTSTARTINGKEY=9`, `DEFAULTBASEOCTAVE=1` in Drumstick).
+      - [ ] Tightened keyboard: expand to whole octaves covering the used range:
+        - `octave_base = floor(lowest / 12)`
+        - `upper_octave = floor(highest / 12)`
+        - `num_keys = (upper_octave - octave_base + 1) * 12 + 1`
+        - `start_key = 0`
+        - apply `base octave = octave_base` to the keyboard(s)
+    - [ ] When the tighten option toggles, recompute and reapply the same global range to all visible keyboards.
 - [x] Persist basic application preferences with `QSettings`.
 
 ### Toolbar Customization
