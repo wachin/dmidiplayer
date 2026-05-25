@@ -1059,7 +1059,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.count(), 0)
                 self.assertIsNone(window.settings.folder)
 
-    def test_open_paths_accepts_wrk_and_reports_specific_error(self) -> None:
+    def test_open_paths_loads_wrk_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             wrk = Path(tmpdir, "song.wrk")
             write_wrk_stub(wrk)
@@ -1075,11 +1075,8 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(opened, [wrk])
                 self.assertEqual(window.playlist.count(), 1)
                 self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(wrk))
-                self.assertEqual(
-                    window.statusBar().currentMessage(),
-                    "Error loading file: Cakewalk WRK files are not supported yet (detected version 2.1, timebase 120)",
-                )
-                critical.assert_called_once()
+                self.assertFalse(window.statusBar().currentMessage().startswith("Error loading file:"))
+                critical.assert_not_called()
 
     def test_open_paths_loads_playlist_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -58,22 +58,44 @@ def read_temp_smf(data: bytes, name: str = "test.mid"):
 
 
 class SmfParserTest(unittest.TestCase):
+    def test_reads_example_test_mid_with_stable_timing(self) -> None:
+        examples = Path(__file__).resolve().parents[1] / "dmidiplayer" / "examples"
+        midi = read_smf(examples / "test.mid")
+        self.assertEqual(midi.format, 0)
+        self.assertEqual(midi.division, 120)
+        self.assertEqual(len(midi.tracks), 1)
+        self.assertEqual(midi.length_ticks, 480)
+        self.assertEqual(midi.length_microseconds, 2_400_000)
+        self.assertEqual(midi.bar_count, 2)
+        self.assertEqual(midi.tempo_changes[0].microseconds_per_quarter, 600_000)
+        self.assertEqual((midi.time_signatures[0].numerator, midi.time_signatures[0].denominator), (3, 4))
+        self.assertEqual((midi.key_signatures[0].sharps_flats, midi.key_signatures[0].minor), (2, False))
+
+    def test_reads_example_mozart_diesirae_mid_with_stable_timing(self) -> None:
+        examples = Path(__file__).resolve().parents[1] / "dmidiplayer" / "examples"
+        midi = read_smf(examples / "mozart_diesirae.mid")
+        self.assertEqual(midi.title, "clarinet")
+        self.assertEqual(midi.format, 1)
+        self.assertEqual(midi.division, 480)
+        self.assertEqual(len(midi.tracks), 12)
+        self.assertEqual(midi.length_ticks, 132_479)
+        self.assertEqual(midi.length_microseconds, 106_837_689)
+        self.assertEqual(midi.bar_count, 69)
+        self.assertEqual(midi.tempo_changes[0].microseconds_per_quarter, 387_096)
+
     def test_rejects_invalid_header(self) -> None:
         with self.assertRaisesRegex(MidiFileError, "Not a Standard MIDI File"):
             read_temp_smf(b"not midi", "not-midi.mid")
 
-    def test_rejects_wrk_files_with_explicit_message(self) -> None:
-        with self.assertRaisesRegex(MidiFileError, r"Cakewalk WRK files are not supported yet \(detected version 2\.1\)"):
-            read_temp_smf(b"CAKEWALK\x00\x01\x02\xff", "song.wrk")
+    def test_reads_empty_wrk_file(self) -> None:
+        midi = read_temp_smf(b"CAKEWALK\x00\x01\x02\xff", "song.wrk")
+        self.assertEqual(midi.format, 1)
+        self.assertGreaterEqual(len(midi.tracks), 1)
 
-    def test_reports_unknown_wrk_first_chunk_summary(self) -> None:
+    def test_reads_wrk_with_unknown_chunk(self) -> None:
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(7, b"\x01\x02\x03\x04") + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, first chunk 7 MEMRGN_CHUNK length 4\)",
-        ):
-            read_temp_smf(wrk, "memrgn.wrk")
+        midi = read_temp_smf(wrk, "memrgn.wrk")
+        self.assertEqual(midi.format, 1)
 
     def test_rejects_invalid_wrk_file_format(self) -> None:
         with self.assertRaisesRegex(MidiFileError, "Invalid Cakewalk WRK file format"):
@@ -84,33 +106,24 @@ class SmfParserTest(unittest.TestCase):
         with self.assertRaisesRegex(MidiFileError, "Corrupted Cakewalk WRK file"):
             read_temp_smf(corrupted, "broken.wrk")
 
-    def test_reports_wrk_timebase_from_first_chunk(self) -> None:
+    def test_reads_wrk_timebase_from_first_chunk(self) -> None:
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(10, struct.pack("<H", 120)) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, timebase 120\)",
-        ):
-            read_temp_smf(wrk, "timebase.wrk")
+        midi = read_temp_smf(wrk, "timebase.wrk")
+        self.assertEqual(midi.division, 120)
 
-    def test_reports_wrk_software_version_from_first_chunk(self) -> None:
+    def test_reads_wrk_software_version_from_first_chunk(self) -> None:
         payload = bytes([6]) + b"Cake 7"
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(74, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, saved by Cake 7\)",
-        ):
-            read_temp_smf(wrk, "softver.wrk")
+        midi = read_temp_smf(wrk, "softver.wrk")
+        self.assertEqual(midi.info.get("wrk_version"), "2.1")
 
-    def test_reports_wrk_track_name_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_name_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 0) + bytes([5]) + b"Piano"
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(24, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 'Piano'\)",
-        ):
-            read_temp_smf(wrk, "trackname.wrk")
+        midi = read_temp_smf(wrk, "trackname.wrk")
+        self.assertEqual(midi.tracks[0].name, "Piano")
 
-    def test_reports_wrk_classic_track_from_first_chunk(self) -> None:
+    def test_reads_wrk_classic_track_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 0)
             + bytes([5])
@@ -120,86 +133,58 @@ class SmfParserTest(unittest.TestCase):
             + bytes([2, 40, 100, 1, 0x07])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(1, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, classic track 1 'Piano' channel 3 patch 40 selected,muted,loop\)",
-        ):
-            read_temp_smf(wrk, "track.wrk")
+        midi = read_temp_smf(wrk, "track.wrk")
+        self.assertEqual(midi.tracks[0].name, "Piano")
 
-    def test_reports_wrk_comments_from_first_chunk(self) -> None:
+    def test_reads_wrk_comments_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 5) + b"Notes"
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(8, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, comments 'Notes'\)",
-        ):
-            read_temp_smf(wrk, "comments.wrk")
+        midi = read_temp_smf(wrk, "comments.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_volume_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_volume_from_first_chunk(self) -> None:
         payload = struct.pack("<HH", 0, 96)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(19, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 volume 96\)",
-        ):
-            read_temp_smf(wrk, "trackvol.wrk")
+        midi = read_temp_smf(wrk, "trackvol.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_bank_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_bank_from_first_chunk(self) -> None:
         payload = struct.pack("<HH", 0, 2048)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(30, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 bank 2048\)",
-        ):
-            read_temp_smf(wrk, "trackbank.wrk")
+        midi = read_temp_smf(wrk, "trackbank.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_patch_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_patch_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 0) + bytes([33])
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(14, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 patch 33\)",
-        ):
-            read_temp_smf(wrk, "trackpatch.wrk")
+        midi = read_temp_smf(wrk, "trackpatch.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_offset_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_offset_from_first_chunk(self) -> None:
         payload = struct.pack("<Hh", 0, -24)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(9, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 offset -24\)",
-        ):
-            read_temp_smf(wrk, "trackoffset.wrk")
+        midi = read_temp_smf(wrk, "trackoffset.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_repetitions_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_repetitions_from_first_chunk(self) -> None:
         payload = struct.pack("<HH", 0, 3)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(12, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 repetitions 3\)",
-        ):
-            read_temp_smf(wrk, "trackreps.wrk")
+        midi = read_temp_smf(wrk, "trackreps.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_time_format_from_first_chunk(self) -> None:
+    def test_reads_wrk_time_format_from_first_chunk(self) -> None:
         payload = struct.pack("<HH", 25, 40)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(11, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, time format 25 offset 40\)",
-        ):
-            read_temp_smf(wrk, "timefmt.wrk")
+        midi = read_temp_smf(wrk, "timefmt.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_new_track_offset_from_first_chunk(self) -> None:
+    def test_reads_wrk_new_track_offset_from_first_chunk(self) -> None:
         payload = struct.pack("<HI", 0, 123456)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(27, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet \(detected version 2\.1, track 1 new offset 123456\)",
-        ):
-            read_temp_smf(wrk, "newtrackoffset.wrk")
+        midi = read_temp_smf(wrk, "newtrackoffset.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_track_chunk_summary_from_first_chunk(self) -> None:
+    def test_reads_wrk_track_chunk_summary_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 0)
             + bytes([5])
@@ -209,14 +194,10 @@ class SmfParserTest(unittest.TestCase):
             + bytes([2, 40, 100, 1, 0])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(36, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, track 1 'Piano' channel 3 patch 40\)",
-        ):
-            read_temp_smf(wrk, "ntrack.wrk")
+        midi = read_temp_smf(wrk, "ntrack.wrk")
+        self.assertEqual(midi.tracks[0].name, "Piano")
 
-    def test_reports_wrk_markers_from_first_chunk(self) -> None:
+    def test_reads_wrk_markers_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<I", 1)
             + bytes([24, 0])
@@ -226,14 +207,10 @@ class SmfParserTest(unittest.TestCase):
             + b"Intro"
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(21, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, markers 1 first at 12345 smpte 24 'Intro'\)",
-        ):
-            read_temp_smf(wrk, "markers.wrk")
+        midi = read_temp_smf(wrk, "markers.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_segment_from_first_chunk(self) -> None:
+    def test_reads_wrk_segment_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<HI", 0, 960)
             + b"\x00" * 8
@@ -243,22 +220,14 @@ class SmfParserTest(unittest.TestCase):
             + struct.pack("<I", 12)
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(49, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, segment track 1 offset 960 'Verse' events 12\)",
-        ):
-            read_temp_smf(wrk, "segment.wrk")
+        midi = read_temp_smf(wrk, "segment.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_lyrics_stream_from_first_chunk(self) -> None:
-        payload = struct.pack("<HI", 0, 9)
+    def test_reads_wrk_lyrics_stream_from_first_chunk(self) -> None:
+        payload = struct.pack("<HI", 0, 0)
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(18, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, lyrics track 1 events 9\)",
-        ):
-            read_temp_smf(wrk, "lyricsstream.wrk")
+        midi = read_temp_smf(wrk, "lyricsstream.wrk")
+        self.assertEqual(midi.format, 1)
 
     def test_reports_wrk_classic_stream_from_first_chunk(self) -> None:
         payload = (
@@ -268,45 +237,32 @@ class SmfParserTest(unittest.TestCase):
             + struct.pack("<H", 240)
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(2, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, classic stream track 1 events 1 "
-            r"first note at 123 ch 1 key 60 vel 100 dur 240\)",
-        ):
-            read_temp_smf(wrk, "stream.wrk")
+        midi = read_temp_smf(wrk, "stream.wrk")
+        midi_events = [event for event in midi.events if event.kind in ("note_on", "note_off")]
+        self.assertEqual([event.tick for event in midi_events], [123, 363])
 
-    def test_reports_wrk_new_stream_from_first_chunk(self) -> None:
-        payload = struct.pack("<H", 0) + bytes([5]) + b"Intro" + struct.pack("<I", 7)
+    def test_reads_wrk_new_stream_from_first_chunk(self) -> None:
+        event = b"\x10\x00\x00" + bytes([1]) + struct.pack("<I", 5) + b"Hello"
+        payload = struct.pack("<H", 0) + bytes([5]) + b"Intro" + struct.pack("<I", 1) + event
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(45, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, stream track 1 'Intro' events 7\)",
-        ):
-            read_temp_smf(wrk, "nstream.wrk")
+        midi = read_temp_smf(wrk, "nstream.wrk")
+        meta_events = [event for event in midi.events if event.kind == "meta"]
+        self.assertEqual(meta_events[0].tick, 16)
+        self.assertEqual(meta_events[0].text, "Hello")
 
-    def test_reports_wrk_string_table_from_first_chunk(self) -> None:
+    def test_reads_wrk_string_table_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 2) + bytes([5]) + b"Verse" + bytes([3])
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(22, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, string table rows 2 first 'Verse' idx 3\)",
-        ):
-            read_temp_smf(wrk, "strtab.wrk")
+        midi = read_temp_smf(wrk, "strtab.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_variable_record_from_first_chunk(self) -> None:
+    def test_reads_wrk_variable_record_from_first_chunk(self) -> None:
         payload = b"Tempo\x00" + (b"\x00" * 26) + b"\x10\x20\x30\x00"
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(26, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, variable 'Tempo' bytes 4\)",
-        ):
-            read_temp_smf(wrk, "variable.wrk")
+        midi = read_temp_smf(wrk, "variable.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_global_vars_from_first_chunk(self) -> None:
+    def test_reads_wrk_global_vars_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<III", 120, 240, 960)
             + b"\x00" * 4
@@ -328,34 +284,22 @@ class SmfParserTest(unittest.TestCase):
             + struct.pack("<I", 1440)
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(3, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, now 120 from 240 thru 960 end 1440\)",
-        ):
-            read_temp_smf(wrk, "vars.wrk")
+        midi = read_temp_smf(wrk, "vars.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_thru_from_first_chunk(self) -> None:
+    def test_reads_wrk_thru_from_first_chunk(self) -> None:
         payload = b"\x00\x00" + bytes([2, 5, 12, 7, 1, 3])
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(16, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, thru mode 3 port 2 channel 5 key\+ 12 vel\+ 7 local 1\)",
-        ):
-            read_temp_smf(wrk, "thru.wrk")
+        midi = read_temp_smf(wrk, "thru.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_meter_key_from_first_chunk(self) -> None:
+    def test_reads_wrk_meter_key_from_first_chunk(self) -> None:
         payload = struct.pack("<H", 1) + struct.pack("<H", 8) + bytes([3, 2, 0xFE])
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(23, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, meter/key entries 1 first measure 8 3/4 key -2\)",
-        ):
-            read_temp_smf(wrk, "meterkey.wrk")
+        midi = read_temp_smf(wrk, "meterkey.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_meter_from_first_chunk(self) -> None:
+    def test_reads_wrk_meter_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 1)
             + b"\x00" * 4
@@ -364,14 +308,10 @@ class SmfParserTest(unittest.TestCase):
             + b"\x00" * 4
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(5, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, meter entries 1 first measure 12 6/8\)",
-        ):
-            read_temp_smf(wrk, "meter.wrk")
+        midi = read_temp_smf(wrk, "meter.wrk")
+        self.assertEqual(midi.format, 1)
 
-    def test_reports_wrk_tempo_from_first_chunk(self) -> None:
+    def test_reads_wrk_tempo_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 1)
             + struct.pack("<I", 480)
@@ -380,14 +320,11 @@ class SmfParserTest(unittest.TestCase):
             + b"\x00" * 8
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(4, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, tempo entries 1 first at 480 tempo 12000\)",
-        ):
-            read_temp_smf(wrk, "tempo.wrk")
+        midi = read_temp_smf(wrk, "tempo.wrk")
+        tempos = [event.tempo_us_per_quarter for event in midi.events if event.tempo_us_per_quarter is not None]
+        self.assertIn(500_000, tempos)
 
-    def test_reports_wrk_new_tempo_from_first_chunk(self) -> None:
+    def test_reads_wrk_new_tempo_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 1)
             + struct.pack("<I", 960)
@@ -396,14 +333,10 @@ class SmfParserTest(unittest.TestCase):
             + b"\x00" * 8
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(15, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, new tempo entries 1 first at 960 tempo 135\)",
-        ):
-            read_temp_smf(wrk, "ntempo.wrk")
+        midi = read_temp_smf(wrk, "ntempo.wrk")
+        self.assertTrue(any(event.tempo_us_per_quarter is not None for event in midi.events))
 
-    def test_reports_wrk_sysex_from_first_chunk(self) -> None:
+    def test_reads_wrk_sysex_from_first_chunk(self) -> None:
         payload = (
             bytes([7])
             + struct.pack("<H", 3)
@@ -412,14 +345,10 @@ class SmfParserTest(unittest.TestCase):
             + bytes([0xF0, 0x7E, 0xF7])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(6, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, classic sysex bank 7 bytes 3 autosend 1 'Old'\)",
-        ):
-            read_temp_smf(wrk, "sysex.wrk")
+        midi = read_temp_smf(wrk, "sysex.wrk")
+        self.assertTrue(any(event.kind == "sysex" for event in midi.events))
 
-    def test_reports_wrk_sysex2_from_first_chunk(self) -> None:
+    def test_reads_wrk_sysex2_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 2)
             + struct.pack("<I", 3)
@@ -429,14 +358,10 @@ class SmfParserTest(unittest.TestCase):
             + bytes([0xF0, 0x7E, 0xF7])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(20, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, sysex bank 2 bytes 3 port 2 autosend 1 'Bank'\)",
-        ):
-            read_temp_smf(wrk, "sysex2.wrk")
+        midi = read_temp_smf(wrk, "sysex2.wrk")
+        self.assertTrue(any(event.kind == "sysex" for event in midi.events))
 
-    def test_reports_wrk_new_sysex_from_first_chunk(self) -> None:
+    def test_reads_wrk_new_sysex_from_first_chunk(self) -> None:
         payload = (
             struct.pack("<H", 3)
             + struct.pack("<I", 4)
@@ -446,12 +371,8 @@ class SmfParserTest(unittest.TestCase):
             + bytes([0x01, 0x02, 0x03, 0x04])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(44, payload) + b"\xff"
-        with self.assertRaisesRegex(
-            MidiFileError,
-            r"Cakewalk WRK files are not supported yet "
-            r"\(detected version 2\.1, new sysex bank 3 bytes 4 port 9 autosend 1 'Patch'\)",
-        ):
-            read_temp_smf(wrk, "nsysex.wrk")
+        midi = read_temp_smf(wrk, "nsysex.wrk")
+        self.assertTrue(any(event.kind == "sysex" for event in midi.events))
 
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(

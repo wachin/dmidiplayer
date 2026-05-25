@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
+import os
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -28,6 +31,46 @@ class MidiOutput(Protocol):
 
 class MidiOutputError(RuntimeError):
     """Raised when a realtime MIDI backend cannot be opened or used."""
+
+
+def _should_suppress_alsa_stderr() -> bool:
+    """Return True when ALSA library stderr should be silenced.
+
+    ALSA can emit diagnostics directly to process stderr even when a Python
+    caller checks the returned error code and raises a clean exception.
+    Default to suppressing this noise while still exposing errors via
+    snd_strerror(). Set DMIDIPLAYER_ALSA_VERBOSE=1 to opt out.
+    """
+
+    return os.environ.get("DMIDIPLAYER_ALSA_VERBOSE", "").strip() not in {"1", "true", "yes", "on"}
+
+
+def _alsa_suppress_stderr(alsa: object) -> bool:
+    return bool(getattr(alsa, "_suppress_stderr", _should_suppress_alsa_stderr()))
+
+
+@contextlib.contextmanager
+def _suppress_stderr_fd(enabled: bool = True):
+    if not enabled:
+        yield
+        return
+    try:
+        saved = os.dup(2)
+    except OSError:
+        yield
+        return
+    devnull_fd: int | None = None
+    try:
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, 2)
+        yield
+    finally:
+        try:
+            os.dup2(saved, 2)
+        finally:
+            os.close(saved)
+            if devnull_fd is not None:
+                os.close(devnull_fd)
 
 
 @dataclass(slots=True)
@@ -157,6 +200,7 @@ class _AlsaLib:
             self.lib = ctypes.CDLL("libasound.so.2")
         except OSError as exc:
             raise MidiOutputError("No se pudo cargar libasound.so.2") from exc
+        self._suppress_stderr = _should_suppress_alsa_stderr()
         self._setup_prototypes()
 
     def _setup_prototypes(self) -> None:
@@ -219,6 +263,26 @@ class _AlsaLib:
         lib.snd_seq_port_info_get_capability.restype = ctypes.c_uint
         lib.snd_seq_query_next_port.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         lib.snd_seq_query_next_port.restype = ctypes.c_int
+        lib.snd_seq_query_subscribe_malloc.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+        lib.snd_seq_query_subscribe_malloc.restype = ctypes.c_int
+        lib.snd_seq_query_subscribe_free.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_query_subscribe_free.restype = None
+        lib.snd_seq_query_subscribe_set_client.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.snd_seq_query_subscribe_set_client.restype = None
+        lib.snd_seq_query_subscribe_set_port.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.snd_seq_query_subscribe_set_port.restype = None
+        lib.snd_seq_query_subscribe_set_root.argtypes = [ctypes.c_void_p, ctypes.POINTER(_SndSeqAddr)]
+        lib.snd_seq_query_subscribe_set_root.restype = None
+        lib.snd_seq_query_subscribe_set_type.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.snd_seq_query_subscribe_set_type.restype = None
+        lib.snd_seq_query_subscribe_set_index.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.snd_seq_query_subscribe_set_index.restype = None
+        lib.snd_seq_query_subscribe_get_num_subs.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_query_subscribe_get_num_subs.restype = ctypes.c_int
+        lib.snd_seq_query_subscribe_get_addr.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_query_subscribe_get_addr.restype = ctypes.POINTER(_SndSeqAddr)
+        lib.snd_seq_query_port_subscribers.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        lib.snd_seq_query_port_subscribers.restype = ctypes.c_int
         lib.snd_strerror.argtypes = [ctypes.c_int]
         lib.snd_strerror.restype = ctypes.c_char_p
 
@@ -243,7 +307,8 @@ class AlsaSequencerOutput(QObject):
         self._open()
 
     def _open(self) -> None:
-        result = self._alsa.lib.snd_seq_open(ctypes.byref(self._seq), b"default", SND_SEQ_OPEN_OUTPUT, 0)
+        with _suppress_stderr_fd(_alsa_suppress_stderr(self._alsa)):
+            result = self._alsa.lib.snd_seq_open(ctypes.byref(self._seq), b"default", SND_SEQ_OPEN_OUTPUT, 0)
         if result < 0:
             raise MidiOutputError(
                 f"No se pudo abrir ALSA sequencer: {self._alsa.error(result)}. "
@@ -253,7 +318,8 @@ class AlsaSequencerOutput(QObject):
         self._alsa.lib.snd_seq_set_client_name(self._seq, self.name.encode())
         caps = SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ
         port_type = SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION
-        self._port = self._alsa.lib.snd_seq_create_simple_port(self._seq, b"MIDI out", caps, port_type)
+        with _suppress_stderr_fd(_alsa_suppress_stderr(self._alsa)):
+            self._port = self._alsa.lib.snd_seq_create_simple_port(self._seq, b"MIDI out", caps, port_type)
         if self._port < 0:
             error = self._alsa.error(self._port)
             self._alsa.lib.snd_seq_close(self._seq)
@@ -274,7 +340,8 @@ class AlsaSequencerOutput(QObject):
         key = (connection.client, connection.port)
         if key in self._connected:
             return
-        result = self._alsa.lib.snd_seq_connect_to(self._seq, self._port, connection.client, connection.port)
+        with _suppress_stderr_fd(_alsa_suppress_stderr(self._alsa)):
+            result = self._alsa.lib.snd_seq_connect_to(self._seq, self._port, connection.client, connection.port)
         if result < 0 and result != -16:
             raise MidiOutputError(f"No se pudo conectar a {connection.name}: {self._alsa.error(result)}")
         self._connected[key] = connection
@@ -290,16 +357,61 @@ class AlsaSequencerOutput(QObject):
         key = (connection.client, connection.port)
         if key not in self._connected:
             return
-        result = self._alsa.lib.snd_seq_disconnect_to(self._seq, self._port, connection.client, connection.port)
+        with _suppress_stderr_fd(_alsa_suppress_stderr(self._alsa)):
+            result = self._alsa.lib.snd_seq_disconnect_to(self._seq, self._port, connection.client, connection.port)
         if result < 0 and result != -2:
             raise MidiOutputError(f"No se pudo desconectar de {connection.name}: {self._alsa.error(result)}")
         self._connected.pop(key, None)
 
     def disconnect_all(self) -> None:
-        for connection in list(self._connected.values()):
+        # Always consult the kernel state first: ALSA subscriptions can be
+        # created outside this process, and we still want a "disconnect all"
+        # action to clear them.
+        for connection in self.connected_connections():
             self.disconnect_from(connection)
 
     def connected_connections(self) -> list["MidiConnection"]:
+        refresh = getattr(self, "_refresh_connected_connections", None)
+        if callable(refresh):
+            return refresh()
+        connected = getattr(self, "_connected", {})
+        if isinstance(connected, dict):
+            return list(connected.values())
+        return []
+
+    def _refresh_connected_connections(self) -> list["MidiConnection"]:
+        """Return active ALSA subscriptions for our output port.
+
+        Previously this class only tracked connections created through this
+        process. ALSA can carry subscriptions created elsewhere, so we query
+        the kernel for current connections and refresh our cache.
+        """
+
+        active = _query_alsa_port_subscribers(
+            self._alsa,
+            self._seq,
+            root_client=self._client,
+            root_port=self._port,
+            query_type=_SND_SEQ_QUERY_SUBS_WRITE,
+        )
+        available: dict[tuple[int, int], MidiConnection] = {}
+        for port in self.connections():
+            if port.client is None or port.port is None:
+                continue
+            available[(port.client, port.port)] = port
+        refreshed: dict[tuple[int, int], MidiConnection] = {}
+        for key in sorted(active):
+            connection = self._connected.get(key) or available.get(key)
+            if connection is None:
+                client, port = key
+                connection = MidiConnection(
+                    driver="alsa",
+                    name=f"{client}:{port}",
+                    client=client,
+                    port=port,
+                )
+            refreshed[key] = connection
+        self._connected = refreshed
         return list(self._connected.values())
 
     def close(self) -> None:
@@ -314,7 +426,8 @@ class AlsaSequencerOutput(QObject):
         alsa_event = self._event_to_alsa(event)
         if alsa_event is None:
             return
-        result = self._alsa.lib.snd_seq_event_output_direct(self._seq, ctypes.byref(alsa_event))
+        with _suppress_stderr_fd(_alsa_suppress_stderr(self._alsa)):
+            result = self._alsa.lib.snd_seq_event_output_direct(self._seq, ctypes.byref(alsa_event))
         if result < 0:
             raise MidiOutputError(f"No se pudo enviar evento MIDI por ALSA: {self._alsa.error(result)}")
         self.eventSent.emit(event)
@@ -417,8 +530,45 @@ class MidiConnection:
         return f"{self.client}:{self.port}"
 
     def matches(self, text: str) -> bool:
-        query = text.casefold()
-        return query in self.name.casefold() or query == self.address
+        query = text.strip()
+        if not query:
+            return False
+        address = self.address
+        if address and query.casefold() == address.casefold():
+            return True
+        needle = _normalize_connection_query(query)
+        if not needle:
+            return False
+        haystacks = [
+            self.name,
+            address,
+            self.client_name,
+            self.port_name,
+            f"{self.client_name}:{self.port_name}" if self.client_name or self.port_name else "",
+        ]
+        for hay in haystacks:
+            normalized = _normalize_connection_query(hay)
+            if normalized and needle in normalized:
+                return True
+        words = [word for word in needle.split(" ") if word]
+        if not words:
+            return False
+        combined = _normalize_connection_query(" ".join(haystacks))
+        return all(word in combined for word in words)
+
+
+def _normalize_connection_query(value: str) -> str:
+    """Normalize ALSA connection search text to make matching preferences robust.
+
+    This keeps only alphanumerics plus ':', collapses whitespace, and removes
+    space around ':' so queries like "128 : 0" match "128:0".
+    """
+
+    text = value.casefold()
+    text = re.sub(r"\\s+", " ", text).strip()
+    text = re.sub(r"\\s*:\\s*", ":", text)
+    text = re.sub(r"[^0-9a-z:_ ]+", " ", text)
+    return re.sub(r"\\s+", " ", text).strip()
 
 
 class BackendManager(QObject):
@@ -459,7 +609,8 @@ class BackendManager(QObject):
 def list_alsa_output_ports() -> list[MidiConnection]:
     alsa = _AlsaLib()
     seq = ctypes.c_void_p()
-    result = alsa.lib.snd_seq_open(ctypes.byref(seq), b"default", SND_SEQ_OPEN_OUTPUT, 0)
+    with _suppress_stderr_fd(_alsa_suppress_stderr(alsa)):
+        result = alsa.lib.snd_seq_open(ctypes.byref(seq), b"default", SND_SEQ_OPEN_OUTPUT, 0)
     if result < 0:
         raise MidiOutputError(f"No se pudo abrir ALSA sequencer: {alsa.error(result)}")
     try:
@@ -529,3 +680,50 @@ def _decode_alsa_string(value: bytes | None) -> str:
     if not value:
         return ""
     return value.decode(errors="replace")
+
+
+_SND_SEQ_QUERY_SUBS_READ = 0
+_SND_SEQ_QUERY_SUBS_WRITE = 1
+
+
+def _query_alsa_port_subscribers(
+    alsa: _AlsaLib,
+    seq: ctypes.c_void_p,
+    *,
+    root_client: int,
+    root_port: int,
+    query_type: int,
+) -> set[tuple[int, int]]:
+    """Return (client, port) subscriber addresses for a given port."""
+
+    query = ctypes.c_void_p()
+    result = alsa.lib.snd_seq_query_subscribe_malloc(ctypes.byref(query))
+    if result < 0:
+        raise MidiOutputError(f"No se pudo reservar consulta de suscripciones ALSA: {alsa.error(result)}")
+    try:
+        root_addr = _SndSeqAddr(root_client, root_port)
+        alsa.lib.snd_seq_query_subscribe_set_root(query, ctypes.byref(root_addr))
+        alsa.lib.snd_seq_query_subscribe_set_client(query, root_client)
+        alsa.lib.snd_seq_query_subscribe_set_port(query, root_port)
+        alsa.lib.snd_seq_query_subscribe_set_type(query, query_type)
+        subscribers: set[tuple[int, int]] = set()
+        index = 0
+        max_seen: int | None = None
+        while True:
+            alsa.lib.snd_seq_query_subscribe_set_index(query, index)
+            res = alsa.lib.snd_seq_query_port_subscribers(seq, query)
+            if res < 0:
+                break
+            addr_ptr = alsa.lib.snd_seq_query_subscribe_get_addr(query)
+            if addr_ptr:
+                addr = addr_ptr.contents
+                subscribers.add((int(addr.client), int(addr.port)))
+            if max_seen is None:
+                count = int(alsa.lib.snd_seq_query_subscribe_get_num_subs(query))
+                max_seen = count if count > 0 else None
+            index += 1
+            if max_seen is not None and index >= max_seen:
+                break
+        return subscribers
+    finally:
+        alsa.lib.snd_seq_query_subscribe_free(query)

@@ -48,7 +48,10 @@ from PyQt6.QtWidgets import (
 from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard, read_smf
 from .i18n import install_translator
 from .instrumentset import bank_label, gm_program_label
+from .connectionsdialog_ui import ConnectionsDialog
+from .loopdialog_ui import LoopDialog
 from .player import SequencePlayer
+from .rhythmview import RhythmView
 from .sequence import supported_text_encodings
 from .settings import AppSettings
 
@@ -204,6 +207,7 @@ ACTION_ICONS = {
     "previous_bar_action": ("media-seek-backward", "media-seek-backward"),
     "next_bar_action": ("media-seek-forward", "media-seek-forward"),
     "jump_bar_action": ("go-jump", "go-jump"),
+    "loop_dialog_action": ("media-playlist-repeat", "media-playlist-repeat"),
     "repeat_playlist_action": ("media-playlist-repeat", "media-playlist-repeat"),
     "shuffle_playlist_action": ("media-playlist-shuffle", "media-playlist-shuffle"),
     "channels_action": ("audio-midi", "audio-midi"),
@@ -660,64 +664,6 @@ class PlaylistDialog(QDialog):
         self.randomize_button.setEnabled(self.window.playlist.count() > 1)
         self.clear_button.setEnabled(self.window.clear_playlist_action.isEnabled())
         self.save_as_button.setEnabled(self.window.save_playlist_as_action.isEnabled())
-
-
-class RhythmView(QWidget):
-    MAX_BEATS = 12
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("rhythm_view")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-
-        self.summary_label = QLabel(self.tr("Rhythm: 4/4 - Bar 1 Beat 1 - 120 BPM"), self)
-        self.summary_label.setObjectName("rhythm_summary_label")
-        layout.addWidget(self.summary_label)
-
-        beats_row = QWidget(self)
-        beats_row.setObjectName("rhythm_beats_row")
-        beats_layout = QHBoxLayout(beats_row)
-        beats_layout.setContentsMargins(0, 0, 0, 0)
-        beats_layout.setSpacing(4)
-        self.beat_labels: list[QLabel] = []
-        for index in range(self.MAX_BEATS):
-            label = QLabel(str(index + 1), beats_row)
-            label.setObjectName(f"rhythm_beat_{index + 1}")
-            label.setMinimumWidth(24)
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setFrameShape(QFrame.Shape.Box)
-            beats_layout.addWidget(label)
-            self.beat_labels.append(label)
-        beats_layout.addStretch(1)
-        layout.addWidget(beats_row)
-
-        self.update_state(4, 4, 1, 1, 120.0)
-
-    def update_state(self, numerator: int, denominator: int, bar: int, beat: int, bpm: float) -> None:
-        visible_beats = max(1, min(self.MAX_BEATS, numerator))
-        current_beat = max(1, min(visible_beats, beat))
-        self.summary_label.setText(
-            self.tr("Rhythm: {numerator}/{denominator} - Bar {bar} Beat {beat} - {bpm:.0f} BPM").format(
-                numerator=numerator,
-                denominator=denominator,
-                bar=bar,
-                beat=current_beat,
-                bpm=bpm,
-            )
-        )
-        for index, label in enumerate(self.beat_labels):
-            beat_number = index + 1
-            is_visible = beat_number <= visible_beats
-            label.setVisible(is_visible)
-            if not is_visible:
-                continue
-            marker = "X" if beat_number == current_beat else "-"
-            label.setText(f"{beat_number}:{marker}")
-
-    def clear(self) -> None:
-        self.update_state(4, 4, 1, 1, 120.0)
 
 
 class ChannelsDialog(QDialog):
@@ -1525,8 +1471,11 @@ class MainWindow(QMainWindow):
         self._system_qt_style = QApplication.style().objectName() or "Fusion"
         self._system_palette = QPalette(QApplication.palette())
         self._startup_output_connection = output_connection
+        self._output_driver = output_driver
         self.manager = BackendManager(self)
         self.output = self._create_midi_output(output_driver, output_connection)
+        if not hasattr(self.output, "connections"):
+            self._output_driver = "dummy"
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
         self.player.set_send_reset_before_playback(self.settings.midi_reset_before_playback())
@@ -1699,6 +1648,9 @@ class MainWindow(QMainWindow):
         self.refresh_midi_action = QAction(self.tr("Refresh MIDI Destinations"), self)
         self.refresh_midi_action.setObjectName("refresh_midi_action")
         self.refresh_midi_action.triggered.connect(self._refresh_midi_connections)
+        self.connections_dialog_action = QAction(self.tr("Connections..."), self)
+        self.connections_dialog_action.setObjectName("connections_dialog_action")
+        self.connections_dialog_action.triggered.connect(self._show_connections_dialog)
         self.connect_midi_action = QAction(self.tr("Connect MIDI Destination"), self)
         self.connect_midi_action.setObjectName("connect_midi_action")
         self.connect_midi_action.triggered.connect(self._connect_selected_midi_output)
@@ -1778,6 +1730,10 @@ class MainWindow(QMainWindow):
         self.jump_bar_action.setObjectName("jump_bar_action")
         self.jump_bar_action.setShortcut(QKeySequence("Ctrl+J"))
         self.jump_bar_action.triggered.connect(self.jump_to_bar)
+        self.loop_dialog_action = QAction(self.tr("Loop..."), self)
+        self.loop_dialog_action.setObjectName("loop_dialog_action")
+        self.loop_dialog_action.setShortcut(QKeySequence("Ctrl+L"))
+        self.loop_dialog_action.triggered.connect(self._show_loop_dialog)
         self.repeat_playlist_action = QAction(self.tr("Repeat Playlist"), self)
         self.repeat_playlist_action.setObjectName("repeat_playlist_action")
         self.repeat_playlist_action.setCheckable(True)
@@ -1869,6 +1825,7 @@ class MainWindow(QMainWindow):
             "previous_bar_action": self.previous_bar_action,
             "next_bar_action": self.next_bar_action,
             "jump_bar_action": self.jump_bar_action,
+            "loop_dialog_action": self.loop_dialog_action,
             "repeat_playlist_action": self.repeat_playlist_action,
             "shuffle_playlist_action": self.shuffle_playlist_action,
             "preferences_action": self.preferences_action,
@@ -1915,6 +1872,7 @@ class MainWindow(QMainWindow):
         self.pause_action.setEnabled(has_file and is_playing)
         self.previous_bar_action.setEnabled(has_file)
         self.next_bar_action.setEnabled(has_file)
+        self.loop_dialog_action.setEnabled(has_file)
         self.previous_action.setEnabled(current_row > 0)
         self.next_action.setEnabled(current_row >= 0 and current_row < self.playlist.count() - 1)
         self.remove_selected_action.setEnabled(current_row >= 0)
@@ -2015,6 +1973,7 @@ class MainWindow(QMainWindow):
         playback_menu.addAction(self.previous_bar_action)
         playback_menu.addAction(self.next_bar_action)
         playback_menu.addAction(self.jump_bar_action)
+        playback_menu.addAction(self.loop_dialog_action)
         playback_menu.addSeparator()
         playback_menu.addAction(self.repeat_playlist_action)
         playback_menu.addAction(self.shuffle_playlist_action)
@@ -2082,6 +2041,7 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(self.preferences_action)
         tools_menu.addSeparator()
         tools_menu.addAction(self.refresh_midi_action)
+        tools_menu.addAction(self.connections_dialog_action)
         tools_menu.addAction(self.connect_midi_action)
         tools_menu.addAction(self.disconnect_midi_action)
 
@@ -3449,6 +3409,35 @@ class MainWindow(QMainWindow):
             )
             return self.manager.create_output("dummy")
 
+    def _apply_midi_output(self, driver: str, connection: object | None) -> None:
+        self.stop()
+        if hasattr(self.output, "close"):
+            self.output.close()
+
+        connection_query = getattr(connection, "name", None)
+        output = self._create_midi_output(driver, connection_query)
+        actual_driver = "alsa" if hasattr(output, "connections") else "dummy"
+
+        self.output = output
+        self._output_driver = actual_driver
+        self.player.output = output
+
+        self.settings.set_midi_driver(actual_driver)
+        if connection_query and actual_driver == "alsa":
+            self.settings.set_midi_destination(str(connection_query))
+
+        self._refresh_midi_connections(autoconnect=True)
+        self._update_midi_output_label()
+
+    def _show_connections_dialog(self) -> None:
+        dialog = ConnectionsDialog(self.manager, parent=self)
+        self._register_dialog_geometry(dialog, "connections")
+        dialog.set_selected_driver(self._output_driver or self.settings.midi_driver())
+        dialog.set_selected_connection_query(self.settings.midi_destination())
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        self._apply_midi_output(dialog.selected_driver(), dialog.selected_connection())
+
     def _refresh_midi_connections(self, autoconnect: bool = False) -> None:
         self.connection_combo.clear()
         if not hasattr(self.output, "connections"):
@@ -3818,6 +3807,26 @@ class MainWindow(QMainWindow):
         start_tick = self.player.sequence.tick_for_bar(start_bar)
         end_tick = self.player.sequence.tick_for_bar(end_bar + 1)
         self.player.set_loop_range(start_tick, end_tick)
+
+    def _create_loop_dialog(self) -> LoopDialog:
+        dialog = LoopDialog(self)
+        self._register_dialog_geometry(dialog, "loop")
+        return dialog
+
+    def _show_loop_dialog(self) -> None:
+        sequence = self.player.sequence
+        if sequence.midi is None:
+            return
+        dialog = self._create_loop_dialog()
+        bar_count = max(1, sequence.bar_count)
+        dialog.set_bar_range(1, bar_count)
+        dialog.set_bars(self.loop_start.value(), self.loop_end.value())
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        start_bar, end_bar = dialog.bars()
+        self.loop_start.setValue(start_bar)
+        self.loop_end.setValue(end_bar)
+        self.loop_check.setChecked(True)
 
     def _transport_loop_toggled(self, enabled: bool) -> None:
         if self.loop_check.isChecked() == enabled:

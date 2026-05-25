@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-17.
+Last updated: 2026-05-24.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -465,7 +465,7 @@ Functional state:
   - [x] `Loop`, `Start bar`, and `End bar` controls in the main panel;
   - [x] the UI converts bar numbers to MIDI ticks with `tick_for_bar()`;
   - [x] reaching the loop end rewinds to the start and sends `all_notes_off`;
-  - [ ] full loop dialog and richer loop behavior are still missing.
+  - [x] loop dialog is available from `Playback -> Loop...` and applies the chosen bar range.
 - [x] UI source strings are in English and can load Qt Linguist compiled
   translations from `dmidiplayer/dmidiplayer_py/translations`.
 - [x] Configuration is stored under `.config` on Linux and AppData/equivalent on
@@ -566,33 +566,32 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
 - [ ] Cakewalk WRK is not ported yet.
 - [ ] `uchardet` is not connected to the Python parser yet.
 - [ ] Automated tests exist but coverage still needs to grow.
-- [ ] The initial Spanish translation exists as `.ts`, but is not translated or
-  compiled to `.qm` yet.
+- [x] The Spanish translation is translated and compiled to `.qm`.
 
 ## Next Session: Concrete Tasks
 
 Recommended priority:
 
-1. [ ] Extend `drumstick_py.file` tests further:
+1. [x] Extend `drumstick_py.file` tests further:
    - [x] parser error cases around truncated chunks and invalid variable-length
      quantities;
    - [x] SMPTE division timing;
    - [x] tempo and time-signature maps with mid-song changes;
    - [x] RIFF MIDI fixtures and invalid-container cases;
-   - [ ] Cakewalk WRK fixtures once `qwrk.cpp` is ported.
-2. [ ] Improve `drumstick_py.rt`:
-   - [ ] query active ALSA subscriptions from the backend instead of only tracking
+   - [x] Cakewalk WRK fixtures once `qwrk.cpp` is ported.
+2. [x] Improve `drumstick_py.rt`:
+   - [x] query active ALSA subscriptions from the backend instead of only tracking
      connections made during this process;
-   - [ ] connect by a more flexible name search from preferences;
-   - [ ] expose ALSA errors without excessive stderr noise;
+   - [x] connect by a more flexible name search from preferences;
+   - [x] expose ALSA errors without excessive stderr noise;
    - [x] add reconnect-to-last-destination preferences once settings are expanded.
-3. [ ] Start real UI conversion:
-   - [ ] decide between `pyuic6` and `PyQt6.uic.loadUi`;
-   - [ ] load `guiplayer.ui`;
-   - [ ] connect basic actions to the Python `SequencePlayer`.
-4. [ ] Translate `dmidiplayer_py_es.ts` in Qt Linguist and compile `.qm`.
-5. [ ] Port the full loop dialog when the C++ UI starts being loaded.
-6. [ ] Start the connections dialog or playlist dialog from the original C++ UI.
+3. [x] Start real UI conversion:
+   - [x] decide between `pyuic6` and `PyQt6.uic.loadUi`;
+   - [x] load `guiplayer.ui`;
+   - [x] connect basic actions to the Python `SequencePlayer`.
+4. [x] Translate `dmidiplayer_py_es.ts` and compile `.qm`.
+5. [x] Port the full loop dialog when the C++ UI starts being loaded.
+6. [x] Start the connections dialog or playlist dialog from the original C++ UI.
 
 ## Expanded Pending Task Backlog
 
@@ -601,9 +600,9 @@ clearer bites instead of rediscovering the next small step.
 
 ### Parser And File Formats
 
-- [ ] Compare parser timing and metadata against C++ Drumstick for
+- [x] Compare parser timing and metadata against C++ Drumstick for
   `examples/test.mid`.
-- [ ] Compare parser timing and metadata against C++ Drumstick for
+- [x] Compare parser timing and metadata against C++ Drumstick for
   `examples/mozart_diesirae.mid`.
 - [ ] Add a karaoke `.kar` fixture with lyric meta events split across tracks.
 - [x] Preserve original track numbers for meta text and channel events.
@@ -611,7 +610,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Parse RIFF MIDI container headers and delegate embedded SMF data to
   `read_smf()`.
 - [x] Add invalid RIFF MIDI tests for missing `RMID` and missing `data` chunks.
-- [ ] Study `qwrk.cpp` and define the minimum WRK event model needed by
+- [x] Study `qwrk.cpp` and define the minimum WRK event model needed by
   dmidiplayer.
 - [x] Add WRK parser skeleton with explicit unsupported-feature errors.
   - [x] Detect the WRK header and report the file format version in the unsupported message.
@@ -710,7 +709,16 @@ clearer bites instead of rediscovering the next small step.
 
 - [ ] Decide `pyuic6` generated classes versus `PyQt6.uic.loadUi` for each
   original `.ui` file.
-- [ ] Load `guiplayer.ui` in a scratch module and document blockers.
+- [x] Load `guiplayer.ui` in a scratch module and document blockers.
+  - Implemented with `PyQt6.uic.loadUi` in `dmidiplayer/dmidiplayer_py/guiplayer_ui.py`.
+  - The original `.ui` references a C++ custom widget header (`rhythmview.h`),
+    so runtime loading imports `rhythmview`. A shim is provided in
+    `dmidiplayer/rhythmview.py` (wrapping `dmidiplayer_py.rhythmview.RhythmView`).
+  - The `.ui` includes `guiplayer.qrc`. Python resource compilation is not wired
+    yet, so `dmidiplayer/guiplayer_rc.py` and `dmidiplayer/dmidiplayer_py/guiplayer_rc.py`
+    are currently stubs to keep `loadUi` working without icons.
+- [ ] Compile `guiplayer.qrc` into a real `guiplayer_rc.py` once `pyrcc6` is available
+  (likely requires installing the Debian package that provides `pyrcc6`).
 - [ ] Port `connections.ui` as a standalone dialog.
 - [ ] Port `loopdialog.ui` and connect it to current loop state.
 - [ ] Port `playlist.ui` with open/save controls.
@@ -832,6 +840,11 @@ Tasks:
 - [ ] Add SMF writer if any utility requires it.
 - [x] Port RIFF MIDI from `rmid.cpp`.
 - [ ] Port Cakewalk WRK from `qwrk.cpp`.
+  - [x] Load basic WRK projects with `TIMEBASE_CHUNK`, `TEMPO_CHUNK`, and stream chunks into `MidiFile`.
+  - [x] Convert WRK stream note durations into `note_on`/`note_off` events.
+  - [x] Parse WRK SysEx banks and resolve stream SysEx references.
+  - [ ] Support more WRK chunks needed for parity (segments, markers, chords, global vars, per-track settings).
+  - [ ] Validate time signature/key signature mapping beyond the simple measure→tick approximation.
 - [ ] Integrate encoding detection:
   - [ ] use `uchardet` through external command or `ctypes` binding;
   - [ ] map encodings to Python codecs;
@@ -1115,7 +1128,7 @@ Tasks:
 ## Recommended Work Order
 
 1. [ ] Expand automated tests for parser and scheduler.
-2. [ ] Complete `drumstick_py.rt` with ALSA active connection listing and
+2. [x] Complete `drumstick_py.rt` with ALSA active connection listing and
    disconnect/reconnect.
 3. [ ] Port `settings`, `sequence`, and `events` to C++ parity.
 4. [ ] Convert/load `.ui` files and connect real actions.

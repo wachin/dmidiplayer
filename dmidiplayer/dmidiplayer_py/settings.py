@@ -41,6 +41,7 @@ class AppSettings:
     DEFAULT_LYRICS_FONT_SIZE = 10
     DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
     DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
+    DEFAULT_MIDI_DRIVER = "alsa"
 
     def __init__(self, base_dir: Path | None = None, settings_path: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()
@@ -341,6 +342,17 @@ class AppSettings:
             self._settings.setValue("midi/destination", destination)
         else:
             self._settings.remove("midi/destination")
+        self._settings.sync()
+
+    def midi_driver(self) -> str:
+        value = self._settings.value("midi/driver", self.DEFAULT_MIDI_DRIVER, str)
+        return value or self.DEFAULT_MIDI_DRIVER
+
+    def set_midi_driver(self, driver: str) -> None:
+        if driver:
+            self._settings.setValue("midi/driver", driver)
+        else:
+            self._settings.remove("midi/driver")
         self._settings.sync()
 
 
