@@ -6,10 +6,13 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DESKTOP_SOURCE="${REPO_ROOT}/dmidiplayer/org.dmidiplayer.dmidiplayer.desktop"
 LAUNCHER_PATH="${REPO_ROOT}/dmidiplayer/dmidiplayer-py"
 ICON_SOURCE_DIR="${REPO_ROOT}/dmidiplayer/icons"
+MIME_SOURCE="${REPO_ROOT}/dmidiplayer/org.dmidiplayer.dmidiplayer.mime.xml"
 
 APPLICATIONS_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/applications"
 ICONS_ROOT="${XDG_DATA_HOME:-${HOME}/.local/share}/icons/hicolor"
 DESKTOP_TARGET="${APPLICATIONS_DIR}/org.dmidiplayer.dmidiplayer.desktop"
+MIME_ROOT="${XDG_DATA_HOME:-${HOME}/.local/share}/mime"
+MIME_PACKAGES_DIR="${MIME_ROOT}/packages"
 
 mkdir -p "${APPLICATIONS_DIR}"
 
@@ -34,9 +37,16 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     desktop-file-validate "${DESKTOP_TARGET}"
 fi
 
+mkdir -p "${MIME_PACKAGES_DIR}"
+install -m 0644 "${MIME_SOURCE}" "${MIME_PACKAGES_DIR}/org.dmidiplayer.dmidiplayer.xml"
+if command -v update-mime-database >/dev/null 2>&1; then
+    update-mime-database "${MIME_ROOT}" >/dev/null 2>&1 || true
+fi
+
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "${APPLICATIONS_DIR}" >/dev/null 2>&1 || true
 fi
 
 printf 'Installed desktop entry to %s\n' "${DESKTOP_TARGET}"
 printf 'Installed icons under %s\n' "${ICONS_ROOT}"
+printf 'Installed MIME types under %s\n' "${MIME_ROOT}"

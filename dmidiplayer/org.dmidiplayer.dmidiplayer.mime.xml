@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Local (user) MIME type definitions to make "Open With..." work reliably on
+  Linux desktops. Installed by tools/install-local-desktop.sh.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-dmidiplayer-playlist">
+    <comment>DMidiPlayer playlist</comment>
+    <glob pattern="*.lst"/>
+  </mime-type>
+
+  <!-- Karaoke is MIDI-compatible; keep a specific type for associations. -->
+  <mime-type type="audio/x-karaoke">
+    <comment>Karaoke MIDI</comment>
+    <glob pattern="*.kar"/>
+  </mime-type>
+
+  <!-- RIFF-wrapped MIDI files are commonly stored as .rmi. -->
+  <mime-type type="audio/x-riff-midi">
+    <comment>RIFF MIDI</comment>
+    <glob pattern="*.rmi"/>
+  </mime-type>
+
+  <!-- Cakewalk project files. The parser is still pending, but advertise the type
+       so the app can surface a clear "unsupported" message when opened. -->
+  <mime-type type="audio/cakewalk">
+    <comment>Cakewalk project</comment>
+    <glob pattern="*.wrk"/>
+  </mime-type>
+</mime-info>
+

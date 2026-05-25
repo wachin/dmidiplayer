@@ -464,7 +464,7 @@ class SequencePlayerTest(unittest.TestCase):
             ],
         )
 
-    def test_play_sends_gm_reset_sysex_when_enabled(self) -> None:
+    def test_play_sends_midi_reset_sysex_when_enabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
         player.set_send_reset_before_playback(True)
@@ -476,11 +476,15 @@ class SequencePlayerTest(unittest.TestCase):
 
         player.play()
 
-        self.assertGreaterEqual(len(output.events), 2)
+        self.assertGreaterEqual(len(output.events), 4)
         self.assertEqual(output.events[0].kind, "sysex")
         self.assertEqual(output.events[0].data, bytes.fromhex("7e 7f 09 01 f7"))
+        self.assertEqual(output.events[1].kind, "sysex")
+        self.assertEqual(output.events[1].data, bytes.fromhex("41 10 42 12 40 00 7f 00 41 f7"))
+        self.assertEqual(output.events[2].kind, "sysex")
+        self.assertEqual(output.events[2].data, bytes.fromhex("43 10 4c 00 00 7e 00 f7"))
 
-    def test_play_does_not_send_gm_reset_sysex_when_disabled(self) -> None:
+    def test_play_does_not_send_reset_sysex_when_disabled(self) -> None:
         output = OutputStub()
         player = SequencePlayer(output)
 
@@ -492,6 +496,25 @@ class SequencePlayerTest(unittest.TestCase):
         player.play()
 
         self.assertNotEqual(output.events[0].kind, "sysex")
+
+    def test_resume_does_not_send_reset_sysex(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        player.set_send_reset_before_playback(True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player.play()
+        sysex_count = sum(1 for event in output.events if getattr(event, "kind", "") == "sysex")
+
+        player.pause()
+        player.play()
+
+        resumed_sysex_count = sum(1 for event in output.events if getattr(event, "kind", "") == "sysex")
+        self.assertEqual(resumed_sysex_count, sysex_count)
 
     def test_loop_rewinds_to_start_tick_when_end_is_reached(self) -> None:
         output = OutputStub()

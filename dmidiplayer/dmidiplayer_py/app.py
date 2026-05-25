@@ -274,7 +274,7 @@ class PreferencesDialog(QDialog):
             self.general_qt_style.addItem(style_name, style_name)
         general_form.addRow(self.tr("Qt Widgets style:"), self.general_qt_style)
 
-        self.general_midi_reset_before_playback = QCheckBox(self.tr("Send GM reset before playback"), general_tab)
+        self.general_midi_reset_before_playback = QCheckBox(self.tr("Send MIDI reset SysEx before playback"), general_tab)
         self.general_midi_reset_before_playback.setObjectName("general_midi_reset_before_playback")
         general_form.addRow("", self.general_midi_reset_before_playback)
         self.tabs.addTab(general_tab, self.tr("General"))

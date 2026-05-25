@@ -100,9 +100,16 @@ class SequencePlayer(QObject):
             self._index = 0
             self._position = 0
             self._position_us = 0
-        if self._send_reset_before_playback:
+        if self._send_reset_before_playback and self._index == 0 and self._position == 0 and self._position_us == 0:
             try:
-                self.output.send_event(MidiEvent(tick=0, kind="sysex", data=bytes.fromhex("7e 7f 09 01 f7")))
+                # Send common "reset to known state" SysEx messages. The ALSA layer
+                # will add 0xF0 and/or 0xF7 if they are omitted.
+                for payload in (
+                    bytes.fromhex("7e 7f 09 01 f7"),  # GM Reset
+                    bytes.fromhex("41 10 42 12 40 00 7f 00 41 f7"),  # GS Reset (Roland)
+                    bytes.fromhex("43 10 4c 00 00 7e 00 f7"),  # XG Reset (Yamaha)
+                ):
+                    self.output.send_event(MidiEvent(tick=0, kind="sysex", data=payload))
             except MidiOutputError as exc:
                 self.outputError.emit(str(exc))
                 return

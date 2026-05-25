@@ -126,7 +126,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] other backends available or reasonable in the Python version.
 - [x] List MIDI destinations and connect/disconnect from the UI.
 - [x] Support dummy output for automated tests.
-- [ ] Send GM/GS/XG reset SysEx before playback when configured.
+- [x] Send GM/GS/XG reset SysEx before playback when configured.
 - [x] Run `all_notes_off` when stopping, pausing, changing files, closing, seeking,
   or changing loop.
 - [x] MIDI output failures must be recoverable UI errors, not process aborts.
@@ -286,7 +286,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] Recent file actions now use friendly song titles while preserving the real file path internally.
 - [x] Open files passed on the command line.
 - [x] Open `.lst` playlists passed on the command line.
-- [ ] Integrate with file managers through "Open With...".
+- [x] Integrate with file managers through "Open With...".
 - [x] Support drag and drop into the main window.
 
 ### Preferences
@@ -1108,7 +1108,7 @@ Tasks:
   - [x] `dmidiplayer-py`
   - [ ] `drumstick-*` utilities.
 - [ ] Evaluate `/usr/local` installation only at the end.
-- [ ] Create `.desktop` file for the Python version.
+- [x] Create `.desktop` file for the Python version.
 - [ ] Ensure resources, icons, and translations are found both from source tree and
   installation.
 
