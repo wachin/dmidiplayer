@@ -37,6 +37,11 @@ from dmidiplayer_py.app import (
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
 
 
+def smf_data(midi_format: int, division: int, tracks: list[bytes]) -> bytes:
+    header = chunk(b"MThd", struct.pack(">HHH", midi_format, len(tracks), division))
+    return header + b"".join(chunk(b"MTrk", track) for track in tracks)
+
+
 class FakeBackendManager:
     def __init__(self, parent: object | None = None) -> None:
         self.output = OutputStub()
@@ -549,6 +554,160 @@ def write_named_instrument_midi(path: Path) -> None:
         ]
     )
     path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
+
+
+def write_cp1252_named_instrument_midi(path: Path) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
+    track = b"".join(
+        [
+            varlen(0),
+            b"\xff\x03\x07Piano \x80",
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(120),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
+def write_program_only_label_midi(path: Path) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 1, 2, 480))
+    track_one = b"".join(
+        [
+            varlen(0),
+            bytes([0xC0, 40]),
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(120),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    track_two = b"".join(
+        [
+            varlen(0),
+            bytes([0x99, 35, 100]),
+            varlen(120),
+            bytes([0x89, 35, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track_one) + chunk(b"MTrk", track_two))
+
+
+def write_bank_select_label_midi(path: Path) -> None:
+    header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
+    track = b"".join(
+        [
+            varlen(0),
+            bytes([0xB0, 0, 16]),
+            varlen(0),
+            bytes([0xB0, 32, 3]),
+            varlen(0),
+            bytes([0xC0, 40]),
+            varlen(0),
+            bytes([0x90, 60, 100]),
+            varlen(120),
+            bytes([0x80, 60, 0]),
+            varlen(0),
+            b"\xff\x2f\x00",
+        ]
+    )
+    path.write_bytes(header + chunk(b"MTrk", track))
+
+
+def riff_chunk(name: bytes, payload: bytes) -> bytes:
+    padding = b"\x00" if len(payload) % 2 else b""
+    return name + struct.pack("<I", len(payload)) + payload + padding
+
+
+def rmid_data(smf_payload: bytes, extra_chunks: list[bytes] | None = None) -> bytes:
+    chunks = [riff_chunk(b"data", smf_payload)]
+    if extra_chunks is not None:
+        chunks.extend(extra_chunks)
+    payload = b"RMID" + b"".join(chunks)
+    return b"RIFF" + struct.pack("<I", len(payload)) + payload
+
+
+def write_rmid_info_midi(path: Path) -> None:
+    smf_payload = smf_data(
+        0,
+        480,
+        [
+            b"".join(
+                [
+                    varlen(0),
+                    b"\xff\x03\x04RIFF",
+                    varlen(0),
+                    b"\xff\x2f\x00",
+                ]
+            )
+        ],
+    )
+    info_payload = b"".join(
+        [
+            riff_chunk(b"IART", b"OpenAI Band\x00"),
+            riff_chunk(b"ISFT", b"dmidiplayer\x00"),
+        ]
+    )
+    path.write_bytes(rmid_data(smf_payload, [riff_chunk(b"LIST", b"INFO" + info_payload)]))
+
+
+def write_rmid_info_title_midi(path: Path) -> None:
+    smf_payload = smf_data(
+        0,
+        480,
+        [
+            b"".join(
+                [
+                    varlen(0),
+                    bytes([0x90, 60, 100]),
+                    varlen(120),
+                    bytes([0x80, 60, 0]),
+                    varlen(0),
+                    b"\xff\x2f\x00",
+                ]
+            )
+        ],
+    )
+    info_payload = b"".join(
+        [
+            riff_chunk(b"INAM", b"Info Title\x00"),
+            riff_chunk(b"IART", b"OpenAI Band\x00"),
+        ]
+    )
+    path.write_bytes(rmid_data(smf_payload, [riff_chunk(b"LIST", b"INFO" + info_payload)]))
+
+
+def write_rmid_cp1252_info_midi(path: Path) -> None:
+    smf_payload = smf_data(
+        0,
+        480,
+        [
+            b"".join(
+                [
+                    varlen(0),
+                    bytes([0x90, 60, 100]),
+                    varlen(120),
+                    bytes([0x80, 60, 0]),
+                    varlen(0),
+                    b"\xff\x2f\x00",
+                ]
+            )
+        ],
+    )
+    info_payload = b"".join(
+        [
+            riff_chunk(b"IART", b"Precio \x8010\x00"),
+            riff_chunk(b"ISFT", b"dmidiplayer\x00"),
+        ]
+    )
+    path.write_bytes(rmid_data(smf_payload, [riff_chunk(b"LIST", b"INFO" + info_payload)]))
 
 
 def write_titled_midi(path: Path, title: str) -> None:
@@ -1289,7 +1448,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(dialog.windowTitle(), "MIDI Channels")
                 self.assertIsInstance(dialog.findChild(QToolButton, "channels_tools_button"), QToolButton)
                 self.assertIsInstance(dialog.table.cellWidget(0, 1), QLineEdit)
-                self.assertEqual(dialog.table.cellWidget(0, 1).text(), "Channel 1")
+                self.assertEqual(dialog.table.cellWidget(0, 1).text(), "Music Box")
                 self.assertIsInstance(dialog.table.cellWidget(0, 2), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 3), QCheckBox)
                 self.assertIsInstance(dialog.table.cellWidget(0, 4), QWidget)
@@ -2039,6 +2198,19 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(dialog.encoding_combo.currentData(), None)
                 self.assertIn("Text: Precio €10", dialog.browser.toPlainText())
+
+    def test_lyrics_dialog_lists_extended_supported_encodings(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            dialog = window._ensure_lyrics_dialog()
+            values = [dialog.encoding_combo.itemData(index) for index in range(dialog.encoding_combo.count())]
+
+            self.assertIn("cp437", values)
+            self.assertIn("utf-16", values)
+            self.assertNotEqual(dialog.encoding_combo.findData("latin-1"), -1)
 
     def test_lyrics_dialog_manual_encoding_override_redecodes_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3590,6 +3762,96 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.channel_labels[0], "Grand Piano")
                 self.assertEqual(window.channel_labels[1], "Violin")
+
+    def test_song_settings_encoding_updates_default_channel_label_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "named-cp1252.mid")
+            write_cp1252_named_instrument_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+                self.assertEqual(window.channel_labels[0], "Piano €")
+                self.assertEqual(window.player.sequence.midi_track_infos()[0]["track_name"], "Piano €")
+
+                window._set_lyrics_encoding("latin-1")
+                window._reset_channel_labels()
+
+                self.assertEqual(window.channel_labels[0], "Piano \x80")
+                self.assertEqual(window.player.sequence.midi_track_infos()[0]["track_name"], "Piano \x80")
+
+    def test_channel_labels_fall_back_to_program_and_percussion_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "programs.mid")
+            write_program_only_label_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                self.assertEqual(window.channel_labels[0], "Violin")
+                self.assertEqual(window.channel_labels[9], "Percussion 36")
+
+    def test_channels_dialog_shows_detected_bank_in_program_tooltip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "banked.mid")
+            write_bank_select_label_midi(path)
+
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_channels_dialog()
+
+                program_combo = dialog.table.cellWidget(0, 6)
+                self.assertIsInstance(program_combo, QComboBox)
+                self.assertEqual(program_combo.toolTip(), "Bank 2051 (MSB 16, LSB 3)")
+                self.assertEqual(dialog.table.item(0, 0).toolTip(), "Bank 2051 (MSB 16, LSB 3)")
+
+    def test_rmid_info_metadata_appears_in_file_summary_tooltip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "info.rmi")
+            write_rmid_info_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                tooltip = window.title_label.toolTip()
+                self.assertIn("Artist: OpenAI Band", tooltip)
+                self.assertIn("Software: dmidiplayer", tooltip)
+
+    def test_rmid_info_name_is_used_in_main_summary_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "info-title.rmi")
+            write_rmid_info_title_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                self.assertIn("Info Title - info-title.rmi - format 0, 1 track(s)", window.title_label.text())
+
+    def test_rmid_info_tooltip_redecodes_when_encoding_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            midi_path = Path(tmpdir, "cp1252-info.rmi")
+            write_rmid_cp1252_info_midi(midi_path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(midi_path)])
+
+                self.assertIn("Artist: Precio €10", window.title_label.toolTip())
+
+                window._set_lyrics_encoding("latin-1")
+
+                self.assertIn("Artist: Precio \x8010", window.title_label.toolTip())
 
 
 if __name__ == "__main__":

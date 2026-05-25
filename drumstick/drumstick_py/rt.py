@@ -424,7 +424,7 @@ class MidiConnection:
 class BackendManager(QObject):
     """Small stand-in for Drumstick::rt::BackendManager.
 
-    Real ALSA/FluidSynth/PipeWire outputs are tracked in Roadmap.md.  The dummy
+    Real ALSA/FluidSynth/PipeWire outputs are tracked in ROADMAP.md.  The dummy
     output lets the GUI, parser, and sequencer be ported and tested first.
     """
 

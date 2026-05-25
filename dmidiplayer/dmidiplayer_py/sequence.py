@@ -2,11 +2,46 @@
 
 from __future__ import annotations
 
+import codecs
+from encodings.aliases import aliases
 from dataclasses import dataclass
 from pathlib import Path
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from drumstick_py import MidiEvent, MidiFile, TextEvent, read_smf
+from drumstick_py.file import decode_midi_text
+from .instrumentset import gm_program_name, percussion_name
+
+
+def supported_text_encodings() -> list[tuple[str, str]]:
+    preferred = [
+        ("UTF-8", "utf-8"),
+        ("Latin-1", "latin-1"),
+        ("CP1252", "cp1252"),
+        ("CP437", "cp437"),
+        ("CP850", "cp850"),
+        ("CP852", "cp852"),
+        ("ISO-8859-15", "iso8859-15"),
+        ("Mac Roman", "mac-roman"),
+        ("KOI8-R", "koi8-r"),
+        ("UTF-16", "utf-16"),
+        ("UTF-16 LE", "utf-16-le"),
+        ("UTF-16 BE", "utf-16-be"),
+    ]
+    seen = {encoding for _, encoding in preferred}
+    entries = list(preferred)
+    discovered: set[str] = set()
+    for alias in aliases.values():
+        try:
+            canonical = codecs.lookup(alias).name
+        except LookupError:
+            continue
+        discovered.add(canonical)
+    for encoding in sorted(discovered):
+        if encoding in seen:
+            continue
+        entries.append((encoding.upper(), encoding))
+    return entries
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +163,41 @@ class Sequence(QObject):
             programs.setdefault(event.channel, event.data[0])
         return programs
 
+    def initial_banks(self) -> dict[int, int]:
+        banks: dict[int, int] = {}
+        bank_msb: dict[int, int] = {}
+        bank_lsb: dict[int, int] = {}
+        if self.midi is None:
+            return banks
+        for event in self.midi.events:
+            if event.channel is None or event.kind != "control_change" or len(event.data) < 2:
+                continue
+            controller = event.data[0]
+            value = event.data[1]
+            if controller == 0:
+                bank_msb[event.channel] = value
+                banks[event.channel] = (value * 0x80) + bank_lsb.get(event.channel, 0)
+            elif controller == 32:
+                bank_lsb[event.channel] = value
+                banks[event.channel] = (bank_msb.get(event.channel, 0) * 0x80) + value
+        return banks
+
+    def info_metadata(self) -> dict[str, str]:
+        if self.midi is None:
+            return {}
+        if not self.midi.info_data:
+            return dict(self.midi.info)
+        return {
+            key: decode_midi_text(data, self._text_encoding).strip()
+            for key, data in self.midi.info_data.items()
+            if decode_midi_text(data, self._text_encoding).strip()
+        }
+
+    def _decode_track_text(self, data: bytes, fallback: str) -> str:
+        if not data:
+            return fallback
+        return decode_midi_text(data, self._text_encoding).strip()
+
     def text_events(self) -> list[object]:
         if self.midi is None:
             return []
@@ -154,6 +224,8 @@ class Sequence(QObject):
             channels = {event.channel for event in track.events if event.channel is not None}
             if not channels:
                 continue
+            track_name = self._decode_track_text(track.name_data, track.name)
+            instrument_name = self._decode_track_text(track.instrument_name_data, track.instrument_name)
             notes: list[int] = []
             for event in track.events:
                 if event.kind in ("note_on", "note_off", "key_pressure") and event.data:
@@ -164,16 +236,16 @@ class Sequence(QObject):
                 {
                     "track": track_number,
                     "channels": channels,
-                    "title": track.name or track.instrument_name,
-                    "track_name": track.name,
-                    "instrument_name": track.instrument_name,
+                    "title": track_name or instrument_name,
+                    "track_name": track_name,
+                    "instrument_name": instrument_name,
                     "min_note": min_note,
                     "max_note": max_note,
                 }
             )
         return tracks
 
-    def default_channel_labels(self) -> dict[int, str]:
+    def default_channel_labels(self, percussion_channel: int = 9) -> dict[int, str]:
         if self.midi is None:
             return {}
         labels: dict[int, str] = {}
@@ -183,4 +255,24 @@ class Sequence(QObject):
                 continue
             for channel in sorted(set(info["channels"])):
                 labels.setdefault(int(channel), title)
+        programs = self.initial_programs()
+        first_notes: dict[int, int] = {}
+        for event in self.midi.events:
+            if event.channel is None or channel_has_label(labels, event.channel):
+                continue
+            if event.kind not in ("note_on", "note_off", "key_pressure") or not event.data:
+                continue
+            first_notes.setdefault(event.channel, event.data[0])
+        for channel in self.used_channels():
+            if channel_has_label(labels, channel):
+                continue
+            if channel == percussion_channel and channel in first_notes:
+                labels[channel] = percussion_name(first_notes[channel])
+                continue
+            if channel in programs:
+                labels[channel] = gm_program_name(programs[channel])
         return labels
+
+
+def channel_has_label(labels: dict[int, str], channel: int) -> bool:
+    return channel in labels and bool(labels[channel].strip())

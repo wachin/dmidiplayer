@@ -232,6 +232,8 @@ class MidiTrack:
     events: list[MidiEvent] = field(default_factory=list)
     name: str = ""
     instrument_name: str = ""
+    name_data: bytes = b""
+    instrument_name_data: bytes = b""
 
 
 @dataclass(slots=True)
@@ -240,6 +242,8 @@ class MidiFile:
     format: int
     division: int
     tracks: list[MidiTrack]
+    info: dict[str, str] = field(default_factory=dict)
+    info_data: dict[str, bytes] = field(default_factory=dict)
     _events_cache: list[MidiEvent] | None = field(default=None, init=False, repr=False)
     _length_ticks_cache: int | None = field(default=None, init=False, repr=False)
     _tempo_changes_cache: list[TempoChange] | None = field(default=None, init=False, repr=False)
@@ -336,6 +340,14 @@ class MidiFile:
             if event.kind == "meta" and event.meta_type in (0x03, 0x01) and event.text.strip():
                 self._title_cache = event.text.strip()
                 return self._title_cache
+        info_name_data = self.info_data.get("Name", b"")
+        if info_name_data:
+            self._title_cache = decode_midi_text(info_name_data).strip()
+            return self._title_cache
+        info_name = self.info.get("Name", "").strip()
+        if info_name:
+            self._title_cache = info_name
+            return self._title_cache
         self._title_cache = self.path.name
         return self._title_cache
 
@@ -716,8 +728,10 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
         raise MidiFileError(
             f"Cakewalk WRK files are not supported yet ({details})"
         )
+    info: dict[str, str] = {}
+    info_data: dict[str, bytes] = {}
     if data.startswith(b"RIFF"):
-        data = _unwrap_rmid_data(data)
+        data, info, info_data = _unwrap_rmid_data(data)
     reader = _Reader(data)
     if reader.read(4) != b"MThd":
         raise MidiFileError("Not a Standard MIDI File")
@@ -736,10 +750,10 @@ def _read_midi_file_bytes(data: bytes, path: Path) -> MidiFile:
             raise MidiFileError("Missing MIDI track chunk")
         track_size = reader.read_u32()
         tracks.append(_read_track(reader.read(track_size), track_number))
-    return MidiFile(path=path, format=midi_format, division=division, tracks=tracks)
+    return MidiFile(path=path, format=midi_format, division=division, tracks=tracks, info=info, info_data=info_data)
 
 
-def _unwrap_rmid_data(data: bytes) -> bytes:
+def _unwrap_rmid_data(data: bytes) -> tuple[bytes, dict[str, str], dict[str, bytes]]:
     reader = _Reader(data)
     if reader.read(4) != b"RIFF":
         raise MidiFileError("Not a Standard MIDI File")
@@ -750,6 +764,9 @@ def _unwrap_rmid_data(data: bytes) -> bytes:
     if form_type != b"RMID":
         raise MidiFileError("Unsupported RIFF MIDI form")
 
+    info: dict[str, str] = {}
+    info_data: dict[str, bytes] = {}
+    midi_data: bytes | None = None
     container_limit = min(len(data), riff_size + 8)
     while reader._pos + 8 <= container_limit:
         chunk_id = reader.read(4)
@@ -760,8 +777,55 @@ def _unwrap_rmid_data(data: bytes) -> bytes:
         if chunk_size % 2 and reader._pos < container_limit:
             reader.read(1)
         if chunk_id == b"data":
-            return chunk_data
+            midi_data = chunk_data
+        elif chunk_id == b"LIST" and len(chunk_data) >= 4 and chunk_data[:4] == b"INFO":
+            parsed_info, parsed_info_data = _parse_riff_info(chunk_data[4:])
+            info.update(parsed_info)
+            info_data.update(parsed_info_data)
+    if midi_data is not None:
+        return midi_data, info, info_data
     raise MidiFileError("RIFF MIDI data chunk not found")
+
+
+def _parse_riff_info(data: bytes) -> tuple[dict[str, str], dict[str, bytes]]:
+    key_map = {
+        b"IALB": "Album",
+        b"IARL": "Archival Location",
+        b"IART": "Artist",
+        b"ICMS": "Commissioned",
+        b"ICMT": "Comments",
+        b"ICOP": "Copyright",
+        b"ICRD": "Creation date",
+        b"IENG": "Engineer",
+        b"IGNR": "Genre",
+        b"IKEY": "Keywords",
+        b"IMED": "Medium",
+        b"INAM": "Name",
+        b"IPRD": "Product",
+        b"ISBJ": "Subject",
+        b"ISFT": "Software",
+        b"ISRC": "Source",
+        b"ISR": "Source Form",
+        b"ITCH": "Technician",
+    }
+    info: dict[str, str] = {}
+    info_data: dict[str, bytes] = {}
+    reader = _Reader(data)
+    while reader.remaining >= 8:
+        chunk_id = reader.read(4)
+        chunk_size = reader.read_u32_le()
+        if reader.remaining < chunk_size:
+            break
+        chunk_data = reader.read(chunk_size)
+        if chunk_size % 2 and reader.remaining:
+            reader.read(1)
+        text = chunk_data.rstrip(b"\x00").decode("latin-1", errors="replace").strip()
+        if not text:
+            continue
+        key = key_map.get(chunk_id, chunk_id.decode("latin-1", errors="replace"))
+        info[key] = text
+        info_data[key] = chunk_data.rstrip(b"\x00")
+    return info, info_data
 
 
 def _looks_like_wrk(data: bytes, path: Path) -> bool:
@@ -1292,6 +1356,8 @@ def _read_track(data: bytes, track_number: int) -> MidiTrack:
     events: list[MidiEvent] = []
     track_name = ""
     instrument_name = ""
+    track_name_data = b""
+    instrument_name_data = b""
 
     while reader.remaining:
         tick += reader.read_varlen()
@@ -1319,8 +1385,10 @@ def _read_track(data: bytes, track_number: int) -> MidiTrack:
             text = decode_midi_text(payload).strip()
             if meta_type == 0x03 and text and not track_name:
                 track_name = text
+                track_name_data = payload
             elif meta_type == 0x04 and text and not instrument_name:
                 instrument_name = text
+                instrument_name_data = payload
             if meta_type == 0x2F:
                 break
             continue
@@ -1350,7 +1418,13 @@ def _read_track(data: bytes, track_number: int) -> MidiTrack:
             )
         )
 
-    return MidiTrack(events=events, name=track_name, instrument_name=instrument_name)
+    return MidiTrack(
+        events=events,
+        name=track_name,
+        instrument_name=instrument_name,
+        name_data=track_name_data,
+        instrument_name_data=instrument_name_data,
+    )
 
 
 def _channel_kind(event_type: int) -> str:

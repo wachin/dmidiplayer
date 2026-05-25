@@ -515,6 +515,35 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(player._index, 0)
         self.assertGreaterEqual(output.all_notes_off_count, 1)
 
+    def test_loop_rewinds_without_emitting_finished(self) -> None:
+        output = OutputStub()
+        player = SequencePlayer(output)
+        finished_count = 0
+
+        def on_finished() -> None:
+            nonlocal finished_count
+            finished_count += 1
+
+        player.finished.connect(on_finished)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "simple.mid")
+            write_simple_midi(path)
+            player.load_file(str(path))
+
+        player.set_loop_range(0, 240)
+        player.set_loop_enabled(True)
+        player._playing = True
+        player._position_us = 300_000
+        player._base_position_us = 300_000
+
+        player._tick()
+
+        self.assertEqual(finished_count, 0)
+        self.assertTrue(player._playing)
+        self.assertEqual(player._position, 0)
+        self.assertEqual(player._index, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

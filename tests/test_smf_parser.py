@@ -488,6 +488,80 @@ class SmfParserTest(unittest.TestCase):
         with self.assertRaisesRegex(MidiFileError, "RIFF MIDI data chunk not found"):
             read_temp_smf(midi_bytes, "missing-data.rmi")
 
+    def test_reads_rmid_info_metadata(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                b"\xff\x03",
+                varlen(4),
+                b"RIFF",
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        info_payload = b"".join(
+            [
+                riff_chunk(b"IART", b"OpenAI Band\x00"),
+                riff_chunk(b"ISFT", b"dmidiplayer\x00"),
+            ]
+        )
+        midi = read_temp_smf(
+            rmid_data(smf_data(0, 480, [track]), extra_chunks=[riff_chunk(b"LIST", b"INFO" + info_payload)]),
+            "info.rmi",
+        )
+
+        self.assertEqual(midi.info["Artist"], "OpenAI Band")
+        self.assertEqual(midi.info["Software"], "dmidiplayer")
+        self.assertEqual(midi.info_data["Artist"], b"OpenAI Band")
+        self.assertEqual(midi.info_data["Software"], b"dmidiplayer")
+
+    def test_rmid_info_name_auto_detects_cp1252_for_title(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(120),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        info_payload = b"".join(
+            [
+                riff_chunk(b"INAM", b"Precio \x8010\x00"),
+            ]
+        )
+        midi = read_temp_smf(
+            rmid_data(smf_data(0, 480, [track]), extra_chunks=[riff_chunk(b"LIST", b"INFO" + info_payload)]),
+            "cp1252-title.rmi",
+        )
+
+        self.assertEqual(midi.title, "Precio €10")
+
+    def test_uses_rmid_info_name_as_title_fallback(self) -> None:
+        track = b"".join(
+            [
+                varlen(0),
+                bytes([0x90, 60, 100]),
+                varlen(120),
+                bytes([0x80, 60, 0]),
+                varlen(0),
+                b"\xff\x2f\x00",
+            ]
+        )
+        info_payload = b"".join(
+            [
+                riff_chunk(b"INAM", b"Info Title\x00"),
+                riff_chunk(b"IART", b"OpenAI Band\x00"),
+            ]
+        )
+        midi = read_temp_smf(
+            rmid_data(smf_data(0, 480, [track]), extra_chunks=[riff_chunk(b"LIST", b"INFO" + info_payload)]),
+            "info-title.rmi",
+        )
+
+        self.assertEqual(midi.title, "Info Title")
+
     def test_rejects_truncated_track_chunk(self) -> None:
         header = chunk(b"MThd", struct.pack(">HHH", 0, 1, 480))
         data = header + b"MTrk" + struct.pack(">I", 10) + b"\x00\xff\x2f\x00"

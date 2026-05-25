@@ -9,3 +9,6 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+
+# automation script
+God-Bless-You-10-rounds-repo-root_v1.sh

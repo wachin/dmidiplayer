@@ -47,7 +47,9 @@ from PyQt6.QtWidgets import (
 
 from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard, read_smf
 from .i18n import install_translator
+from .instrumentset import bank_label, gm_program_label
 from .player import SequencePlayer
+from .sequence import supported_text_encodings
 from .settings import AppSettings
 
 
@@ -58,137 +60,6 @@ APP_TITLE = "dmidiplayer PyQt6"
 HELP_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
 ICONS_DIR = Path(__file__).resolve().parents[1] / "icons"
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
-GENERAL_MIDI_PROGRAMS = (
-    "Acoustic Grand Piano",
-    "Bright Acoustic Piano",
-    "Electric Grand Piano",
-    "Honky-tonk Piano",
-    "Electric Piano 1",
-    "Electric Piano 2",
-    "Harpsichord",
-    "Clavinet",
-    "Celesta",
-    "Glockenspiel",
-    "Music Box",
-    "Vibraphone",
-    "Marimba",
-    "Xylophone",
-    "Tubular Bells",
-    "Dulcimer",
-    "Drawbar Organ",
-    "Percussive Organ",
-    "Rock Organ",
-    "Church Organ",
-    "Reed Organ",
-    "Accordion",
-    "Harmonica",
-    "Tango Accordion",
-    "Acoustic Guitar (nylon)",
-    "Acoustic Guitar (steel)",
-    "Electric Guitar (jazz)",
-    "Electric Guitar (clean)",
-    "Electric Guitar (muted)",
-    "Overdriven Guitar",
-    "Distortion Guitar",
-    "Guitar Harmonics",
-    "Acoustic Bass",
-    "Electric Bass (finger)",
-    "Electric Bass (pick)",
-    "Fretless Bass",
-    "Slap Bass 1",
-    "Slap Bass 2",
-    "Synth Bass 1",
-    "Synth Bass 2",
-    "Violin",
-    "Viola",
-    "Cello",
-    "Contrabass",
-    "Tremolo Strings",
-    "Pizzicato Strings",
-    "Orchestral Harp",
-    "Timpani",
-    "String Ensemble 1",
-    "String Ensemble 2",
-    "Synth Strings 1",
-    "Synth Strings 2",
-    "Choir Aahs",
-    "Voice Oohs",
-    "Synth Choir",
-    "Orchestra Hit",
-    "Trumpet",
-    "Trombone",
-    "Tuba",
-    "Muted Trumpet",
-    "French Horn",
-    "Brass Section",
-    "Synth Brass 1",
-    "Synth Brass 2",
-    "Soprano Sax",
-    "Alto Sax",
-    "Tenor Sax",
-    "Baritone Sax",
-    "Oboe",
-    "English Horn",
-    "Bassoon",
-    "Clarinet",
-    "Piccolo",
-    "Flute",
-    "Recorder",
-    "Pan Flute",
-    "Blown Bottle",
-    "Shakuhachi",
-    "Whistle",
-    "Ocarina",
-    "Lead 1 (square)",
-    "Lead 2 (sawtooth)",
-    "Lead 3 (calliope)",
-    "Lead 4 (chiff)",
-    "Lead 5 (charang)",
-    "Lead 6 (voice)",
-    "Lead 7 (fifths)",
-    "Lead 8 (bass + lead)",
-    "Pad 1 (new age)",
-    "Pad 2 (warm)",
-    "Pad 3 (polysynth)",
-    "Pad 4 (choir)",
-    "Pad 5 (bowed)",
-    "Pad 6 (metallic)",
-    "Pad 7 (halo)",
-    "Pad 8 (sweep)",
-    "FX 1 (rain)",
-    "FX 2 (soundtrack)",
-    "FX 3 (crystal)",
-    "FX 4 (atmosphere)",
-    "FX 5 (brightness)",
-    "FX 6 (goblins)",
-    "FX 7 (echoes)",
-    "FX 8 (sci-fi)",
-    "Sitar",
-    "Banjo",
-    "Shamisen",
-    "Koto",
-    "Kalimba",
-    "Bag Pipe",
-    "Fiddle",
-    "Shanai",
-    "Tinkle Bell",
-    "Agogo",
-    "Steel Drums",
-    "Woodblock",
-    "Taiko Drum",
-    "Melodic Tom",
-    "Synth Drum",
-    "Reverse Cymbal",
-    "Guitar Fret Noise",
-    "Breath Noise",
-    "Seashore",
-    "Bird Tweet",
-    "Telephone Ring",
-    "Helicopter",
-    "Applause",
-    "Gunshot",
-)
-
 CHANNEL_COLOR_PALETTES = (
     ("#fee2e2", "#dc2626", "#991b1b", "#fca5a5"),
     ("#ffedd5", "#ea580c", "#9a3412", "#fdba74"),
@@ -227,11 +98,6 @@ def portable_settings_path(portable_file: str | None, argv0: str) -> Path:
     if not candidate.is_absolute() and candidate.parent == Path("."):
         return launcher_dir / candidate.name
     return candidate.resolve()
-
-
-def gm_program_label(program: int) -> str:
-    program = max(0, min(127, program))
-    return f"{program}: {GENERAL_MIDI_PROGRAMS[program]}"
 
 
 TEXT_EVENT_LABELS = {
@@ -917,6 +783,7 @@ class ChannelsDialog(QDialog):
         muted_channels: set[int] | None = None,
         solo_channels: set[int] | None = None,
         channel_programs: dict[int, int] | None = None,
+        channel_banks: dict[int, int] | None = None,
         locked_channels: set[int] | None = None,
         channel_volumes: dict[int, int] | None = None,
         channel_labels: dict[int, str] | None = None,
@@ -930,6 +797,7 @@ class ChannelsDialog(QDialog):
         muted_channels = muted_channels or set()
         solo_channels = solo_channels or set()
         channel_programs = channel_programs or {}
+        channel_banks = channel_banks or {}
         locked_channels = locked_channels or set()
         channel_volumes = channel_volumes or {}
         channel_labels = channel_labels or {}
@@ -1002,6 +870,10 @@ class ChannelsDialog(QDialog):
                 for program in range(128):
                     program_combo.addItem(gm_program_label(program), program)
                 program_combo.setCurrentIndex(channel_programs.get(channel, 0))
+                if channel in channel_banks:
+                    tooltip = bank_label(channel_banks[channel])
+                    channel_item.setToolTip(tooltip)
+                    program_combo.setToolTip(tooltip)
                 if program_changed is not None:
                     program_combo.currentIndexChanged.connect(lambda value, ch=channel: program_changed(ch, value))
                 self.table.setCellWidget(row, 6, program_combo)
@@ -1377,9 +1249,8 @@ class LyricsDialog(QDialog):
         self.encoding_combo = QComboBox(self)
         self.encoding_combo.setObjectName("lyrics_encoding_combo")
         self.encoding_combo.addItem(self.tr("Auto"), None)
-        self.encoding_combo.addItem("UTF-8", "utf-8")
-        self.encoding_combo.addItem("Latin-1", "latin-1")
-        self.encoding_combo.addItem("CP1252", "cp1252")
+        for label, encoding in supported_text_encodings():
+            self.encoding_combo.addItem(label, encoding)
         self.encoding_combo.currentIndexChanged.connect(self._apply_filter)
         filter_row.addWidget(QLabel(self.tr("Encoding:")))
         filter_row.addWidget(self.encoding_combo)
@@ -2367,6 +2238,7 @@ class MainWindow(QMainWindow):
         self._set_lyrics_encoding(None)
         self.position.setEnabled(False)
         self.title_label.setText(self.tr("No file loaded"))
+        self.title_label.setToolTip("")
         self.position_summary_label.setText("1:1")
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.event_label.setText(self.tr("No file loaded"))
@@ -2599,6 +2471,32 @@ class MainWindow(QMainWindow):
             return self.tr("{title} - {name}").format(title=title, name=path.name)
         return title or path.name
 
+    def _metadata_summary_tooltip(self, info: dict[str, str]) -> str:
+        if not info:
+            return ""
+        ordered_keys = (
+            "Name",
+            "Artist",
+            "Album",
+            "Genre",
+            "Comments",
+            "Copyright",
+            "Software",
+            "Creation date",
+        )
+        lines: list[str] = []
+        for key in ordered_keys:
+            value = str(info.get(key, "")).strip()
+            if value:
+                lines.append(f"{key}: {value}")
+        for key in sorted(info):
+            if key in ordered_keys:
+                continue
+            value = str(info[key]).strip()
+            if value:
+                lines.append(f"{key}: {value}")
+        return "\n".join(lines)
+
     def _playlist_display_text(self, path: Path) -> str:
         return self._song_display_text(path)
 
@@ -2752,6 +2650,7 @@ class MainWindow(QMainWindow):
         if self.channels_dialog is None:
             return
         initial_programs = self.player.sequence.initial_programs()
+        initial_banks = self.player.sequence.initial_banks()
         channel_programs = {
             channel: (
                 self.player.channel_program(channel)
@@ -2765,6 +2664,7 @@ class MainWindow(QMainWindow):
             muted_channels=self.player.muted_channels(),
             solo_channels=self.player.solo_channels(),
             channel_programs=channel_programs,
+            channel_banks=initial_banks,
             locked_channels=self.player.locked_channels(),
             channel_volumes={channel: self.player.channel_volume_percent(channel) for channel in self.player.sequence.used_channels()},
             channel_labels=self.channel_labels,
@@ -3052,7 +2952,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(self.tr("Program locks cleared"), 3000)
 
     def _default_channel_label(self, channel: int) -> str:
-        labels = self.player.sequence.default_channel_labels()
+        labels = self.player.sequence.default_channel_labels(self.player.percussion_channel - 1)
         if channel in labels:
             return labels[channel]
         return self.tr("Channel {number}").format(number=channel + 1)
@@ -3079,6 +2979,8 @@ class MainWindow(QMainWindow):
     def _set_lyrics_encoding(self, encoding: str | None) -> None:
         self.lyrics_encoding = encoding
         self.player.sequence.set_text_encoding(encoding)
+        if self.player.sequence.midi is not None:
+            self.title_label.setToolTip(self._metadata_summary_tooltip(self.player.sequence.info_metadata()))
 
     def _lyrics_encoding_selection_changed(self) -> None:
         if self.lyrics_dialog is None:
@@ -3744,6 +3646,7 @@ class MainWindow(QMainWindow):
                 seconds=duration,
             )
         )
+        self.title_label.setToolTip(self._metadata_summary_tooltip(self.player.sequence.info_metadata()))
         self.event_label.setText(self.tr("File loaded"))
         self._set_playback_indicator("ready")
         self.position.setEnabled(midi.length_ticks > 0)

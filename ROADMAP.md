@@ -394,8 +394,8 @@ removing or replacing the original C++ code.
 
 - `drumstick/drumstick_py/`
   - [x] `file.py`: initial dependency-free SMF reader with tempo map, real duration,
-    time signatures, key signatures, text metadata, bar calculations, and basic
-    metadata.
+    time signatures, key signatures, text metadata, bar calculations, basic
+    metadata, and RIFF INFO metadata.
   - [x] `rt.py`: `BackendManager`, dummy output, diagnostics with
     `python3-alsaaudio`, initial ALSA sequencer output through `libasound`, ALSA
     destination listing, and port connection.
@@ -423,7 +423,7 @@ removing or replacing the original C++ code.
   - [x] format 1 multi-track event merging;
   - [x] running status events and malformed running-status error reporting;
   - [x] SysEx `0xF0` and `0xF7` events;
-  - [x] time signature, key signature, lyrics, and marker metadata.
+  - [x] time signature, key signature, lyrics, marker, and RIFF INFO metadata.
 - [x] ALSA connection handling added after the initial handoff:
   - [x] active output connections are tracked by `AlsaSequencerOutput`;
   - [x] the UI can disconnect active ALSA destinations;
@@ -927,6 +927,9 @@ Original C++ files to cover:
   - [x] use `drumstick_py.file`;
   - [x] calculate real times with the tempo map;
   - [x] preserve text, lyrics, markers, bars, and key signatures;
+  - [x] apply selected text encoding to track and instrument metadata in the sequence model;
+  - [x] expose a broader supported text-encoding list to the Lyrics UI;
+  - [x] decode RIFF INFO metadata through the selected sequence encoding;
   - [ ] port codec lookup and metadata.
 - [ ] `seqplayer.*`
   - [ ] replace simple timer with precise scheduler;
@@ -939,7 +942,9 @@ Original C++ files to cover:
   - [x] portable mode `--portable` and `--file`.
   - [x] command-line MIDI output driver and connection selection.
 - [ ] `instrumentset.*`
-  - [ ] load instrument and bank names.
+  - [x] load General MIDI instrument names and percussion labels.
+  - [x] parse and surface MIDI bank select values.
+  - [ ] load bank names.
 - [x] `recentfileshelper.*`
   - [x] save and populate recent files menu.
 
@@ -947,7 +952,7 @@ Exit criteria:
 
 - [x] Open, play, pause, stop, and seek work with real MIDI output.
 - [x] Channels respect mute, volume, program, and lock.
-- [ ] Loop behavior matches C++.
+- [x] Loop behavior matches C++.
 
 ## [ ] Phase 6: dmidiplayer PyQt6 UI
 
