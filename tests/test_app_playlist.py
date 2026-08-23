@@ -1520,7 +1520,7 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertNotIn(60, keyboard._active)
                 self.assertNotIn(60, keyboard._active_velocities)
 
-    def test_pianola_dialog_keyboards_follow_used_note_ranges(self) -> None:
+    def test_pianola_dialog_keyboards_use_global_song_range(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "ranges.mid")
             write_track_range_midi(path)
@@ -1534,10 +1534,12 @@ class AppPlaylistTest(unittest.TestCase):
                 keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
                 keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
 
-                self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 60))
-                self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 84))
+                # C++ parity: tightened key range from the song-wide lowest/highest
+                # notes (48..84 -> whole octaves 48..96), same for every track row.
+                self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 96))
+                self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (48, 96))
 
-    def test_pianola_dialog_can_expand_ranges_to_used_octaves(self) -> None:
+    def test_pianola_dialog_can_switch_to_fixed_88_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "ranges.mid")
             write_track_range_midi(path)
@@ -1552,11 +1554,11 @@ class AppPlaylistTest(unittest.TestCase):
                 keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
                 range_mode_combo = dialog.findChild(QComboBox, "pianola_range_mode_combo")
 
-                range_mode_combo.setCurrentIndex(range_mode_combo.findData("octaves"))
+                range_mode_combo.setCurrentIndex(range_mode_combo.findData("fixed"))
 
-                self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (48, 71))
-                self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (72, 95))
-                self.assertEqual(window.statusBar().currentMessage(), "Piano Player range: Used octaves")
+                self.assertEqual((keyboard_one._min_note, keyboard_one._max_note), (21, 108))
+                self.assertEqual((keyboard_two._min_note, keyboard_two._max_note), (21, 108))
+                self.assertEqual(window.statusBar().currentMessage(), "Piano Player range: Fixed 88 keys")
 
     def test_pianola_dialog_can_change_note_label_modes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1574,7 +1576,10 @@ class AppPlaylistTest(unittest.TestCase):
 
                 note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
                 self.assertEqual(keyboard_one._note_label_mode, "minimal")
-                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C3", 60: "C4"})
+                self.assertEqual(
+                    keyboard_one.visible_note_labels(),
+                    {48: "C3", 60: "C4", 72: "C5", 84: "C6", 96: "C7"},
+                )
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player labels: Minimal")
 
                 note_labels_combo.setCurrentIndex(note_labels_combo.findData("always"))
@@ -1598,11 +1603,17 @@ class AppPlaylistTest(unittest.TestCase):
                 octave_combo = dialog.findChild(QComboBox, "pianola_octave_designation_combo")
 
                 note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
-                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C3", 60: "C4"})
+                self.assertEqual(
+                    keyboard_one.visible_note_labels(),
+                    {48: "C3", 60: "C4", 72: "C5", 84: "C6", 96: "C7"},
+                )
 
                 octave_combo.setCurrentIndex(octave_combo.findData("yamaha"))
 
-                self.assertEqual(keyboard_one.visible_note_labels(), {48: "C2", 60: "C3"})
+                self.assertEqual(
+                    keyboard_one.visible_note_labels(),
+                    {48: "C2", 60: "C3", 72: "C4", 84: "C5", 96: "C6"},
+                )
                 self.assertEqual(window.statusBar().currentMessage(), "Piano Player octaves: Yamaha")
 
     def test_pianola_dialog_can_use_channel_based_colors(self) -> None:

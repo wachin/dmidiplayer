@@ -864,9 +864,10 @@ class PianolaDialog(QDialog):
         self._track_channels: dict[int, set[int]] = {}
         self._track_visibility: dict[int, QCheckBox] = {}
         self._track_keyboard_containers: dict[int, QWidget] = {}
-        self._track_note_ranges: dict[int, tuple[int, int]] = {}
         self._track_primary_channels: dict[int, int | None] = {}
-        self._range_mode = "exact"
+        self._song_note_range: tuple[int, int] = (21, 108)
+        # C++ parity: Pianola::setNoteRange() starts tightened (m_tightenKeys = true).
+        self._range_mode = "tightened"
         self._note_label_mode = "never"
         self._color_mode = "blue"
         self._single_highlight_color = AppSettings.DEFAULT_PIANOLA_SINGLE_COLOR
@@ -878,8 +879,8 @@ class PianolaDialog(QDialog):
         button_row.addWidget(QLabel(self.tr("Range:"), self))
         self.range_mode_combo = QComboBox(self)
         self.range_mode_combo.setObjectName("pianola_range_mode_combo")
-        self.range_mode_combo.addItem(self.tr("Exact"), "exact")
-        self.range_mode_combo.addItem(self.tr("Used octaves"), "octaves")
+        self.range_mode_combo.addItem(self.tr("Used octaves"), "tightened")
+        self.range_mode_combo.addItem(self.tr("Fixed 88 keys"), "fixed")
         self.range_mode_combo.currentIndexChanged.connect(self._range_mode_changed)
         button_row.addWidget(self.range_mode_combo)
         button_row.addWidget(QLabel(self.tr("Labels:"), self))
@@ -966,20 +967,37 @@ class PianolaDialog(QDialog):
         labels = ", ".join(str(channel + 1) for channel in sorted(channels))
         return self.tr("Channels: {channels}").format(channels=labels)
 
-    def _effective_note_range(self, min_note: int, max_note: int) -> tuple[int, int]:
-        if self._range_mode == "octaves":
-            return ((min_note // 12) * 12, min(127, ((max_note // 12) * 12) + 11))
-        return (min_note, max_note)
+    DEFAULT_NUMBER_OF_KEYS = 88
+    DEFAULT_STARTING_KEY = 9  # A, within the base octave (A0 = MIDI 21)
+    DEFAULT_BASE_OCTAVE = 1
+
+    def _keyboard_note_range(self) -> tuple[int, int]:
+        """Song-wide keyboard range, mirroring Pianola::setNoteRange().
+
+        Tightened mode expands the song range to whole octaves covering every
+        used note; the fixed mode always shows the default 88-key keyboard.
+        """
+        if self._range_mode != "tightened":
+            first = self.DEFAULT_BASE_OCTAVE * 12 + self.DEFAULT_STARTING_KEY
+            return (first, first + self.DEFAULT_NUMBER_OF_KEYS - 1)
+        lowest, highest = self._song_note_range
+        octave_base = lowest // 12
+        upper_octave = highest // 12
+        num_keys = (upper_octave - octave_base + 1) * 12 + 1
+        first = octave_base * 12
+        return (first, min(127, first + num_keys - 1))
 
     def set_tracks(self, tracks: list[dict[str, object]]) -> None:
         self._track_keyboards.clear()
         self._track_visibility.clear()
         self._track_keyboard_containers.clear()
-        self._track_note_ranges.clear()
         self._track_primary_channels.clear()
         self._track_channels = {
             int(track["track"]): set(track["channels"]) for track in tracks
         }
+        song_min = min((int(track.get("min_note", 21)) for track in tracks), default=21)
+        song_max = max((int(track.get("max_note", 108)) for track in tracks), default=108)
+        self._song_note_range = (song_min, song_max)
         self.tabs.clear()
         if not tracks:
             empty = QLabel(self.tr("No MIDI tracks available"), self)
@@ -995,9 +1013,7 @@ class PianolaDialog(QDialog):
                 track_number = int(track["track"])
                 channels = set(track["channels"])
                 title = str(track.get("title", ""))
-                min_note = int(track.get("min_note", 21))
-                max_note = int(track.get("max_note", 108))
-                display_min_note, display_max_note = self._effective_note_range(min_note, max_note)
+                display_min_note, display_max_note = self._keyboard_note_range()
                 row = QWidget(page)
                 row_layout = QVBoxLayout(row)
                 row_layout.setContentsMargins(0, 0, 0, 0)
@@ -1035,7 +1051,6 @@ class PianolaDialog(QDialog):
                 self._track_keyboards[track_number] = keyboard
                 self._track_visibility[track_number] = visible_checkbox
                 self._track_keyboard_containers[track_number] = keyboard_container
-                self._track_note_ranges[track_number] = (min_note, max_note)
                 self._track_primary_channels[track_number] = min(channels) if channels else None
                 primary_channel = self._track_primary_channels[track_number]
                 if primary_channel is not None:
@@ -1077,14 +1092,13 @@ class PianolaDialog(QDialog):
         self.allTracksVisibilityChanged.emit(False)
 
     def _range_mode_changed(self, index: int) -> None:
-        self._range_mode = str(self.range_mode_combo.itemData(index) or "exact")
+        self._range_mode = str(self.range_mode_combo.itemData(index) or "tightened")
         self._apply_track_ranges()
         self.rangeModeChanged.emit(self._range_mode)
 
     def _apply_track_ranges(self) -> None:
-        for track_number, keyboard in self._track_keyboards.items():
-            min_note, max_note = self._track_note_ranges.get(track_number, (21, 108))
-            display_min_note, display_max_note = self._effective_note_range(min_note, max_note)
+        display_min_note, display_max_note = self._keyboard_note_range()
+        for keyboard in self._track_keyboards.values():
             keyboard.set_note_range(display_min_note, display_max_note)
 
     def _note_label_mode_changed(self, index: int) -> None:
@@ -2696,7 +2710,7 @@ class MainWindow(QMainWindow):
         )
 
     def _pianola_range_mode_changed(self, mode: str) -> None:
-        mode_label = self.tr("Used octaves") if mode == "octaves" else self.tr("Exact")
+        mode_label = self.tr("Fixed 88 keys") if mode == "fixed" else self.tr("Used octaves")
         self.statusBar().showMessage(
             self.tr("Piano Player range: {mode}").format(mode=mode_label),
             3000,
