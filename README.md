@@ -350,7 +350,7 @@ playlist, and `Previous` / `Next` navigate through it:
 
 The application window should open and playback should be available:
 
-![](vx_images/01-dmidiplayer_port-qt_py.png)
+![](images/00-dmidiplayer.png)
 
 Other examples:
 
