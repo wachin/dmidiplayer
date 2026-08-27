@@ -207,32 +207,34 @@ still richer channel behaviors pending.
 
 The `Piano Player` window is opened from the `View` menu.
 
-This first slice shows only MIDI-bearing tracks from the loaded file. Tracks
-are split across tabs with up to 8 tracks per tab:
+This window shows one piano keyboard per MIDI channel (0-15) that is actually
+used in the loaded file. This matches the original C++ dmidiplayer behaviour:
+multiple tracks sharing the same channel are merged into a single row, so the
+total number of rows never exceeds 16.
+
+Channels are split across tabs with up to 8 channels per tab:
 
 - the first tab opens by default
-- tracks 1-8 appear in the first tab
-- tracks 9-16 appear in the second tab when needed
-- later tracks continue in a third tab when needed
+- channels 1-8 appear in the first tab
+- channels 9-16 appear in the second tab when needed
 
-Each visible row shows a track label, a channel summary, and a keyboard.
-During playback, note activity is reflected in the keyboards for tracks whose
-MIDI channels are active.
+Each visible row shows a channel label and a keyboard. During playback, note
+activity is reflected in the keyboards for their respective MIDI channels.
 
-Each row also has a `Show` checkbox so you can collapse that track's keyboard
-without removing the track heading. The window includes `Show All` and `Hide
-All` buttons for quick visibility changes across every displayed track.
+Each row also has a `Show` checkbox so you can collapse that channel's keyboard
+without removing the channel heading. The window includes `Show All` and `Hide
+All` buttons for quick visibility changes across every displayed channel.
 
 The window also includes a `Fullscreen` button. Press `Esc` to leave
 fullscreen mode quickly.
 
-In the current slice, each track keyboard is narrowed to the note range that
-track actually uses, so low and high parts do not all share the same oversized
-span.
+The keyboard range uses a global song-wide behaviour: the note range covers
+the lowest and highest notes across the entire file, applied identically to
+every displayed keyboard.
 
-Use the `Range` selector to switch between the exact note span of each track
-and `Used octaves`, which expands the display to complete octaves for a more
-comfortable reading layout.
+Use the `Range` selector to switch between `Used octaves` (which expands the
+display to complete octaves for a more comfortable reading layout) and `Fixed
+88 keys` (standard piano layout).
 
 Use the `Labels` selector to choose how note names appear on the keys:
 `Never`, `Minimal`, `When active`, or `Always`.

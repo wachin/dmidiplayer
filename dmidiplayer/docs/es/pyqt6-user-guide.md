@@ -211,32 +211,37 @@ todavía faltan comportamientos de canal más avanzados.
 
 La ventana `Piano Player` se abre desde el menú `View`.
 
-Este primer tramo muestra solo las pistas que realmente contienen MIDI dentro
-del archivo cargado. Las pistas se reparten en pestañas con un maximo de 8
-pistas por pestaña:
+Esta ventana muestra un teclado de piano por cada canal MIDI (0-15) que
+realmente se usa en el archivo cargado. Esto coincide con el comportamiento
+del dmidiplayer C++ original: varias pistas que comparten el mismo canal se
+fusionan en una sola fila, por lo que el número total de filas nunca supera
+16.
+
+Los canales se reparten en pestañas con un máximo de 8 canales por pestaña:
 
 - la primera pestaña se abre por defecto
-- las pistas 1-8 aparecen en la primera pestaña
-- las pistas 9-16 aparecen en la segunda pestaña cuando hace falta
-- las pistas posteriores continúan en una tercera pestaña cuando hace falta
+- los canales 1-8 aparecen en la primera pestaña
+- los canales 9-16 aparecen en la segunda pestaña cuando hace falta
 
-Cada fila visible muestra una etiqueta de pista, un resumen de canales y un
-teclado. Durante la reproduccion, la actividad de notas se refleja en los
-teclados de las pistas cuyos canales MIDI estan activos.
+Cada fila visible muestra una etiqueta de canal y un teclado. Durante la
+reproducción, la actividad de notas se refleja en los teclados de sus
+correspondientes canales MIDI.
 
-Cada fila tambien tiene una casilla `Show` para ocultar o mostrar el teclado
-de esa pista sin perder el encabezado. La ventana incluye botones `Show All`
-y `Hide All` para cambiar rapidamente la visibilidad de todas las pistas
-mostradas.
+Cada fila también tiene una casilla `Show` para ocultar o mostrar el teclado
+de ese canal sin perder el encabezado. La ventana incluye botones `Show All`
+y `Hide All` para cambiar rápidamente la visibilidad de todos los canales
+mostrados.
 
-La ventana tambien incluye un boton `Fullscreen`. Puedes usar `Esc` para salir
-rapidamente del modo de pantalla completa.
+La ventana también incluye un botón `Fullscreen`. Puedes usar `Esc` para salir
+rápidamente del modo de pantalla completa.
 
-En el tramo actual, cada teclado de pista se ajusta al rango de notas que esa
-pista realmente usa, de modo que las partes graves y agudas no comparten todas
-el mismo rango sobredimensionado.
+El rango del teclado utiliza un comportamiento global de la canción: el rango
+de notas cubre las notas más bajas y más altas de todo el archivo, aplicado
+idénticamente a cada teclado mostrado.
 
-Usa el selector `Range` para cambiar entre el rango exacto de notas de cada
+Usa el selector `Range` para cambiar entre `Used octaves` (que expande la
+visualización a octavas completas para una lectura más cómoda) y `Fixed
+88 keys` (distribución de piano estándar).
 pista y `Used octaves`, que amplia la vista a octavas completas para una
 lectura mas comoda.
 

@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-05-24.
+Last updated: 2026-08-27.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -201,17 +201,18 @@ Drumstick documentation. It is the target list for the whole migration.
 
 ### Player Piano / Pianola
 
-- [x] Show only the tracks/channels that are actually present in the loaded MIDI data.
-- [x] Use tabs inside the Pianola window when the MIDI file contains many tracks.
-  - [x] First tab opens by default and shows up to 8 MIDI tracks.
-  - [x] If the file has more than 8 MIDI tracks, show tracks 9-16 in a second tab.
-  - [x] If the file has more than 16 MIDI tracks, show the remaining tracks in a third tab.
-  - [x] Each tab must let the user click and view the instruments/tracks they need.
-- [x] Show one row per MIDI-bearing track in the current Pianola window slice.
-- [x] Each row should have track label, channel summary, and keyboard in the current Pianola window slice.
+- [x] Show only the MIDI channels that are actually present in the loaded MIDI data.
+  Matches C++ behaviour: one piano keyboard per MIDI channel (max 16), not per
+  track.  Multiple tracks sharing the same channel are merged into one row.
+- [x] Use tabs inside the Pianola window when the MIDI file contains many channels.
+  - [x] First tab opens by default and shows up to 8 MIDI channels.
+  - [x] If the file uses more than 8 MIDI channels, show channels 9-16 in a second tab.
+  - [x] Each tab must let the user click and view the instruments/channels they need.
+- [x] Show one row per MIDI channel in the current Pianola window slice.
+- [x] Each row should have channel label and keyboard in the current Pianola window slice.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
-- [x] Allow show/hide individual track keyboards in the current Pianola window slice.
-- [x] Allow show all / hide all track keyboards in the current Pianola window slice.
+- [x] Allow show/hide individual channel keyboards in the current Pianola window slice.
+- [x] Allow show all / hide all channel keyboards in the current Pianola window slice.
 - [x] Allow customizable colors per channel/state.
 - [x] Allow velocity tinting.
 - [x] Show note names according to preference:
@@ -316,7 +317,7 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] note-name display mode;
   - [x] octave designation.
   - [x] Match C++ Pianola key range behavior (global song range, not per-track):
-    - [x] Compute a *song-wide* MIDI note range `lowest..highest` (from all note on/off/key pressure events), and use that range for every displayed keyboard row (including additional tabs when there are >8 tracks).
+    - [x] Compute a *song-wide* MIDI note range `lowest..highest` (from all note on/off/key pressure events), and use that range for every displayed keyboard row (including additional tabs when there are >8 channels).
     - [x] Support a "Tighten the number of keys" option that switches between:
       - [x] Default fixed keyboard: 88 keys, starting key A (`DEFAULTNUMBEROFKEYS=88`, `DEFAULTSTARTINGKEY=9`, `DEFAULTBASEOCTAVE=1` in Drumstick).
       - [x] Tightened keyboard: expand to whole octaves covering the used range:
@@ -417,11 +418,13 @@ removing or replacing the original C++ code.
   - [x] `app.py`: initial PyQt6 window with list, controls, position slider,
     keyboard, ALSA destination selector, compact toolbar, two-row musical
     controls, time/BPM/bar display, previous/next bar navigation, direct bar
-    jump, and bar-based loop controls.
+    jump, bar-based loop controls, and a Pianola that shows one keyboard
+    per MIDI channel (matching C++ behaviour).
   - [x] `i18n.py`: Qt `.qm` translation loading with English as source language.
   - [x] `settings.py`: persistent configuration through
     `QStandardPaths.AppConfigLocation` and `QSettings`.
-  - [x] `sequence.py`: model that loads SMF through `drumstick_py`.
+  - [x] `sequence.py`: model that loads SMF through `drumstick_py`, with
+    `pianola_channel_infos()` providing per-channel data for the Pianola.
   - [x] `player.py`: `QTimer` player with real-time clock based on the tempo map.
   - [x] `__main__.py`: `python3 -m dmidiplayer_py` entry point.
 - [x] `dmidiplayer/dmidiplayer-py`: local launcher that configures `PYTHONPATH`.
@@ -495,6 +498,10 @@ Functional state:
 - [x] The UI lists ALSA destinations and can connect directly to QSynth, FluidSynth,
   or another compatible MIDI port. If QSynth/FluidSynth is detected at startup,
   it tries to auto-connect.
+- [x] The Pianola shows one keyboard per MIDI channel (max 16), matching the
+  C++ behaviour.  Each tab holds up to 8 channels.  The previous track-based
+  display showed too many rows (e.g. 18 instead of 14 for a multi-track
+  file) because multiple MIDI tracks can share the same channel.
 
 Current execution:
 
@@ -572,7 +579,7 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
   active connection display is still missing.
 - [ ] The current PyQt6 UI is a minimal hand-written window, not a full conversion
   of `guiplayer.ui`.
-- [ ] Full channels, playlist dialog, lyrics, full pianola, preferences, and help are
+- [ ] Full channels, playlist dialog, lyrics, preferences, and help are
   not yet ported.
 - [ ] Temporary playlist navigation and auto-advance exist, but full playlist dialog,
   `.lst` open/save, repeat, and shuffle are still missing.
