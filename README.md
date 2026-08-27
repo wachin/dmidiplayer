@@ -332,6 +332,12 @@ Another useful example:
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/mozart_diesirae.mid
 ```
 
+aquí otro:
+
+``` bash
+./dmidiplayer/dmidiplayer-py ../Amor_amor_amor-Annette_Moreno_MIDI_Jorge_Gómez.mid
+```
+
 There is also a bundled example playlist with several songs:
 
 ``` bash

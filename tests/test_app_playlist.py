@@ -1462,7 +1462,7 @@ class AppPlaylistTest(unittest.TestCase):
                     ["Mute All", "Unmute All", "Clear Solos", "Reset Volumes", "Unlock Programs"],
                 )
 
-    def test_pianola_dialog_shows_only_tracks_with_midi(self) -> None:
+    def test_pianola_dialog_shows_only_channels_with_midi(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")
             write_many_track_midi(path, total_tracks=4, midi_track_indexes=[1, 3])
@@ -1474,14 +1474,13 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
                 tab = dialog.tabs.widget(0)
-                labels = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_track_label_")]
-                details = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_track_detail_")]
+                labels = [label.text() for label in tab.findChildren(QLabel) if label.objectName().startswith("pianola_channel_label_")]
 
+                # 4 tracks, but only channels 1 and 3 have MIDI data
                 self.assertEqual(dialog.tabs.count(), 1)
-                self.assertEqual(labels, ["Track 2 - Part 2", "Track 4 - Part 4"])
-                self.assertEqual(details, ["Channels: 2", "Channels: 4"])
+                self.assertEqual(labels, ["Channel 2 - Part 2", "Channel 4 - Part 4"])
 
-    def test_pianola_dialog_splits_tracks_into_tabs_of_eight(self) -> None:
+    def test_pianola_dialog_splits_channels_into_tabs_of_eight(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "many-tracks.mid")
             write_many_track_midi(path, total_tracks=17, midi_track_indexes=list(range(17)))
@@ -1493,10 +1492,10 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
 
-                self.assertEqual(dialog.tabs.count(), 3)
-                self.assertEqual(dialog.tabs.tabText(0), "Tracks 1-8")
-                self.assertEqual(dialog.tabs.tabText(1), "Tracks 9-16")
-                self.assertEqual(dialog.tabs.tabText(2), "Tracks 17-17")
+                # 17 tracks but only 16 unique MIDI channels (0-15)
+                self.assertEqual(dialog.tabs.count(), 2)
+                self.assertEqual(dialog.tabs.tabText(0), "Channels 1-8")
+                self.assertEqual(dialog.tabs.tabText(1), "Channels 9-16")
                 self.assertEqual(dialog.tabs.currentIndex(), 0)
 
     def test_pianola_dialog_tracks_follow_played_channel_activity(self) -> None:
@@ -1510,7 +1509,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
 
                 window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
                 self.assertIn(60, keyboard._active)
@@ -1531,8 +1530,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
 
                 # C++ parity: tightened key range from the song-wide lowest/highest
                 # notes (48..84 -> whole octaves 48..96), same for every track row.
@@ -1550,8 +1549,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
                 range_mode_combo = dialog.findChild(QComboBox, "pianola_range_mode_combo")
 
                 range_mode_combo.setCurrentIndex(range_mode_combo.findData("fixed"))
@@ -1571,7 +1570,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
                 note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
 
                 note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
@@ -1598,7 +1597,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
                 note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
                 octave_combo = dialog.findChild(QComboBox, "pianola_octave_designation_combo")
 
@@ -1627,8 +1626,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
                 color_mode_combo = dialog.findChild(QComboBox, "pianola_color_mode_combo")
 
                 default_color = keyboard_one._white_high_color.name()
@@ -1651,7 +1650,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
 
                 keyboard_one.note_on(60, 20)
                 soft = keyboard_one.active_note_color(60).name()
@@ -1691,7 +1690,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
 
                 keyboard.notePressed.emit(61, 88)
                 keyboard.noteReleased.emit(61)
@@ -1713,18 +1712,18 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                checkbox = dialog.findChild(QCheckBox, "pianola_track_visible_1")
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                checkbox = dialog.findChild(QCheckBox, "pianola_channel_visible_1")
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
 
                 checkbox.setChecked(False)
 
                 self.assertTrue(keyboard.parentWidget().isHidden())
-                self.assertEqual(window.statusBar().currentMessage(), "Track 1 hidden in Piano Player")
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 1 hidden in Piano Player")
 
                 checkbox.setChecked(True)
 
                 self.assertFalse(keyboard.parentWidget().isHidden())
-                self.assertEqual(window.statusBar().currentMessage(), "Track 1 shown in Piano Player")
+                self.assertEqual(window.statusBar().currentMessage(), "Channel 1 shown in Piano Player")
 
     def test_pianola_dialog_show_all_and_hide_all_buttons_toggle_track_keyboards(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1739,8 +1738,8 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_pianola_dialog()
                 show_all_button = dialog.findChild(QPushButton, "pianola_show_all_button")
                 hide_all_button = dialog.findChild(QPushButton, "pianola_hide_all_button")
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_2")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
 
                 hide_all_button.click()
 
@@ -1807,7 +1806,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
 
                 window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
                 self.assertIn(60, keyboard._active)
@@ -3181,7 +3180,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_track_keyboard_1")
+                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
 
                 self.assertEqual(dialog.color_mode_combo.currentData(), "blue")
                 self.assertEqual(dialog.note_labels_combo.currentData(), "minimal")

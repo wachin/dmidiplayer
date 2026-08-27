@@ -245,6 +245,40 @@ class Sequence(QObject):
             )
         return tracks
 
+    def pianola_channel_infos(self, percussion_channel: int = 9) -> list[dict[str, object]]:
+        """Return per-channel info for the Pianola, matching C++ behaviour.
+
+        The C++ Pianola shows one piano keyboard per MIDI channel (0-15),
+        only for channels that are actually used in the loaded file.  This
+        method produces the same channel-oriented data so the Python port
+        can display the same number of rows.
+        """
+        if self.midi is None:
+            return []
+        used = self.used_channels()
+        if not used:
+            return []
+        labels = self.default_channel_labels(percussion_channel)
+        notes_by_channel: dict[int, list[int]] = {ch: [] for ch in used}
+        for event in self.midi.events:
+            ch = event.channel
+            if ch is None or ch not in notes_by_channel:
+                continue
+            if event.kind in ("note_on", "note_off", "key_pressure") and event.data:
+                notes_by_channel[ch].append(event.data[0])
+        infos: list[dict[str, object]] = []
+        for ch in used:
+            note_list = notes_by_channel.get(ch, [])
+            infos.append(
+                {
+                    "channel": ch,
+                    "title": labels.get(ch, ""),
+                    "min_note": min(note_list, default=21),
+                    "max_note": max(note_list, default=108),
+                }
+            )
+        return infos
+
     def default_channel_labels(self, percussion_channel: int = 9) -> dict[int, str]:
         if self.midi is None:
             return {}
