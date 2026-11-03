@@ -189,9 +189,13 @@ class SmfParserTest(unittest.TestCase):
             struct.pack("<H", 0)
             + bytes([5])
             + b"Piano"
-            + bytes([4])
-            + b"Part"
-            + bytes([2, 40, 100, 1, 0])
+            + struct.pack("<hh", -1, 40)
+            + struct.pack("<HH", 100, 64)
+            + bytes([0, 0])
+            + b"\x00" * 7
+            + bytes([1])
+            + bytes([2])
+            + bytes([0])
         )
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(36, payload) + b"\xff"
         midi = read_temp_smf(wrk, "ntrack.wrk")
@@ -373,6 +377,181 @@ class SmfParserTest(unittest.TestCase):
         wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(44, payload) + b"\xff"
         midi = read_temp_smf(wrk, "nsysex.wrk")
         self.assertTrue(any(event.kind == "sysex" for event in midi.events))
+
+    def test_wrk_classic_track_applies_channel_transpose_and_velocity(self) -> None:
+        track_payload = (
+            struct.pack("<H", 1)
+            + bytes([5])
+            + b"Piano"
+            + bytes([0])
+            + bytes([3, 2, 10, 0, 0])
+        )
+        stream_payload = (
+            struct.pack("<HH", 1, 1)
+            + bytes([0x00, 0x00, 0x00, 0x90, 60, 100])
+            + struct.pack("<H", 240)
+        )
+        wrk = (
+            b"CAKEWALK\x00\x01\x02"
+            + wrk_chunk(1, track_payload)
+            + wrk_chunk(2, stream_payload)
+            + b"\xff"
+        )
+        midi = read_temp_smf(wrk, "transpose.wrk")
+        note_on = next(event for event in midi.events if event.kind == "note_on")
+        self.assertEqual(note_on.channel, 3)
+        self.assertEqual(note_on.data, bytes([62, 110]))
+
+    def test_wrk_new_track_emits_bank_select_and_program(self) -> None:
+        payload = (
+            struct.pack("<H", 4)
+            + bytes([4])
+            + b"Bass"
+            + struct.pack("<h", 129)
+            + struct.pack("<h", 35)
+            + struct.pack("<H", 100)
+            + struct.pack("<H", 64)
+            + bytes([0, 0])
+            + b"\x00" * 7
+            + bytes([0])
+            + bytes([2])
+            + bytes([0])
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(36, payload) + b"\xff"
+        midi = read_temp_smf(wrk, "ntrack.wrk")
+        controls = [
+            event
+            for event in midi.events
+            if event.kind == "control_change" and event.tick == 0
+        ]
+        self.assertEqual({(event.channel, event.data[0], event.data[1]) for event in controls}, {(2, 0, 1), (2, 32, 1)})
+        programs = [event for event in midi.events if event.kind == "program_change"]
+        self.assertEqual(programs[0].channel, 2)
+        self.assertEqual(programs[0].data, bytes([35]))
+
+    def test_wrk_track_patch_chunk_uses_configured_channel(self) -> None:
+        track_payload = struct.pack("<H", 1) + bytes([0]) + bytes([0]) + bytes([5, 0, 0, 0, 0])
+        wrk = (
+            b"CAKEWALK\x00\x01\x02"
+            + wrk_chunk(1, track_payload)
+            + wrk_chunk(14, struct.pack("<HB", 1, 40))
+            + b"\xff"
+        )
+        midi = read_temp_smf(wrk, "trkpatch.wrk")
+        programs = [event for event in midi.events if event.kind == "program_change"]
+        self.assertEqual(programs[0].channel, 5)
+        self.assertEqual(programs[0].data, bytes([40]))
+
+    def test_wrk_track_volume_chunk_emits_main_volume(self) -> None:
+        track_payload = struct.pack("<H", 1) + bytes([0]) + bytes([0]) + bytes([5, 0, 0, 0, 0])
+        wrk = (
+            b"CAKEWALK\x00\x01\x02"
+            + wrk_chunk(1, track_payload)
+            + wrk_chunk(19, struct.pack("<HH", 1, 200))
+            + b"\xff"
+        )
+        midi = read_temp_smf(wrk, "trkvol.wrk")
+        controls = sorted(
+            (event.data[0], event.data[1])
+            for event in midi.events
+            if event.kind == "control_change"
+        )
+        self.assertEqual(controls, [(7, 1), (39, 72)])
+
+    def test_wrk_track_bank_chunk_emits_bank_select(self) -> None:
+        track_payload = struct.pack("<H", 1) + bytes([0]) + bytes([0]) + bytes([5, 0, 0, 0, 0])
+        wrk = (
+            b"CAKEWALK\x00\x01\x02"
+            + wrk_chunk(1, track_payload)
+            + wrk_chunk(30, struct.pack("<HH", 1, 260))
+            + b"\xff"
+        )
+        midi = read_temp_smf(wrk, "trkbank.wrk")
+        controls = sorted(
+            (event.data[0], event.data[1])
+            for event in midi.events
+            if event.kind == "control_change"
+        )
+        self.assertEqual(controls, [(0, 2), (32, 4)])
+
+    def test_wrk_markers_chunk_emits_marker_events(self) -> None:
+        payload = (
+            struct.pack("<I", 2)
+            + bytes([24, 0])
+            + bytes([0x39, 0x30, 0x00])
+            + b"\x00" * 5
+            + bytes([5])
+            + b"Intro"
+            + bytes([0, 0])
+            + bytes([0x78, 0x00, 0x00])
+            + b"\x00" * 5
+            + bytes([5])
+            + b"Outro"
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(21, payload) + b"\xff"
+        midi = read_temp_smf(wrk, "markers.wrk")
+        markers = sorted(
+            (event.tick, event.meta_type, event.text)
+            for event in midi.text_events
+            if event.meta_type == 0x06
+        )
+        self.assertEqual(
+            markers,
+            [(120, 0x06, "Outro"), (12345, 0x06, "Intro")],
+        )
+
+    def test_wrk_segment_chunk_emits_marker_and_stream_events(self) -> None:
+        note = bytes([0x00, 0x00, 0x00, 0x90, 60, 100]) + struct.pack("<H", 120)
+        expression = bytes([0x60, 0x00, 0x00, 0x05]) + struct.pack("<H", 1) + struct.pack("<I", 5) + b"Hello"
+        chord = bytes([0x00, 0x00, 0x00, 0x07]) + struct.pack("<I", 4) + b"Cmaj" + b"\x00" * 13
+        hairpin = bytes([0x00, 0x00, 0x00, 0x06]) + struct.pack("<HH", 1, 240) + b"\x00" * 4
+        inline_sysex = bytes([0x00, 0x00, 0x00, 0x08]) + struct.pack("<H", 3) + bytes([0xF0, 0x7E, 0xF7])
+        sysex_ref = bytes([0x00, 0x00, 0x00, 0xF0, 0x00])
+        payload = (
+            struct.pack("<HI", 2, 480)
+            + b"\x00" * 8
+            + bytes([5])
+            + b"Verse"
+            + b"\x00" * 20
+            + struct.pack("<I", 6)
+            + note
+            + expression
+            + chord
+            + hairpin
+            + inline_sysex
+            + sysex_ref
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(49, payload) + b"\xff"
+        midi = read_temp_smf(wrk, "segment.wrk")
+        markers = [
+            (event.tick, event.text)
+            for event in midi.text_events
+            if event.meta_type == 0x06
+        ]
+        self.assertEqual(markers, [(480, "Verse")])
+        cues = sorted(
+            (event.tick, event.text)
+            for event in midi.text_events
+            if event.meta_type == 0x07
+        )
+        self.assertEqual(cues, [(0, "Cmaj"), (96, "Hello")])
+        self.assertTrue(any(event.kind == "sysex" and event.data == bytes([0xF0, 0x7E, 0xF7]) for event in midi.events))
+        note_ons = [event for event in midi.events if event.kind == "note_on"]
+        self.assertEqual(note_ons[0].track, 2)
+        self.assertEqual(note_ons[0].channel, 0)
+
+    def test_wrk_segment_without_events_does_not_fail(self) -> None:
+        payload = (
+            struct.pack("<HI", 0, 960)
+            + b"\x00" * 8
+            + bytes([5])
+            + b"Verse"
+            + b"\x00" * 20
+            + struct.pack("<I", 12)
+        )
+        wrk = b"CAKEWALK\x00\x01\x02" + wrk_chunk(49, payload) + b"\xff"
+        midi = read_temp_smf(wrk, "segment-empty.wrk")
+        self.assertEqual(midi.format, 1)
 
     def test_reads_rmid_wrapped_smf(self) -> None:
         track = b"".join(

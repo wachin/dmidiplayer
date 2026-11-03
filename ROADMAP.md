@@ -583,7 +583,8 @@ hardware MIDI, QSynth, or another ALSA synthesizer.
   not yet ported.
 - [ ] Temporary playlist navigation and auto-advance exist, but full playlist dialog,
   `.lst` open/save, repeat, and shuffle are still missing.
-- [ ] Cakewalk WRK is not ported yet.
+- [ ] Cakewalk WRK loads streams, tempo, meter/key, SysEx banks, markers, segments and
+  per-track settings, but is still not at full parity with `qwrk.cpp`.
 - [ ] `uchardet` is not connected to the Python parser yet.
 - [ ] Automated tests exist but coverage still needs to grow.
 - [x] The Spanish translation is translated and compiled to `.qm`.
@@ -864,6 +865,17 @@ Tasks:
   - [x] Convert WRK stream note durations into `note_on`/`note_off` events.
   - [x] Parse WRK SysEx banks and resolve stream SysEx references.
   - [ ] Support more WRK chunks needed for parity (segments, markers, chords, global vars, per-track settings).
+    - [x] Per-track settings from `TRACK_CHUNK`/`NTRACK_CHUNK`: channel, transposition
+      (pitch), velocity offset, port and mute flag, applied to every stream event like
+      C++ `TrackMapRec`.
+    - [x] `TRKPATCH_CHUNK` emits a program change on the configured channel.
+    - [x] `TRKVOL_CHUNK` emits CC7 (or CC39+CC7 for values of 128 and above).
+    - [x] `TRKBANK_CHUNK` and the `NTRACK_CHUNK` bank field emit CC0/CC32 bank select.
+    - [x] `MARKERS_CHUNK` emits marker meta events.
+    - [x] `SGMNT_CHUNK` emits its segment name as a marker and shares the variable-length
+      note-array reader with `NSTREAM_CHUNK`/`LYRICS_CHUNK`.
+    - [x] Note-array special records: expression (5) and chord (7) become cue meta events,
+      hairpin (6) is skipped, and inline SysEx (8) is stored as bank 0.
   - [ ] Validate time signature/key signature mapping beyond the simple measure→tick approximation.
 - [ ] Integrate encoding detection:
   - [ ] use `uchardet` through external command or `ctypes` binding;

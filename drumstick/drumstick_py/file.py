@@ -1031,21 +1031,19 @@ def _read_wrk_header(data: bytes, path: Path) -> _WrkHeader:
         new_track_offset_track = reader.read_u16_le()
         new_track_offset = reader.read_u32_le()
     elif first_chunk_id == 36:
-        if first_chunk_length < 9:
+        # NTRACK_CHUNK has a single name, unlike the classic TRACK_CHUNK.
+        if first_chunk_length < 3:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         track_chunk_number = reader.read_u16_le()
         name_length = reader.read(1)[0]
-        if reader.remaining < name_length + 1:
+        if reader.remaining < name_length:
             raise MidiFileError("Corrupted Cakewalk WRK file")
         primary_name = reader.read(name_length).decode("latin-1", errors="replace")
-        alt_name_length = reader.read(1)[0]
-        if reader.remaining < alt_name_length + 5:
-            raise MidiFileError("Corrupted Cakewalk WRK file")
-        alternate_name = reader.read(alt_name_length).decode("latin-1", errors="replace")
-        track_chunk_channel = reader.read(1)[0] & 0x0F
-        track_chunk_patch = reader.read(1)[0]
-        reader.read(3)  # velocity, port, flags
-        track_chunk_name = primary_name or alternate_name or None
+        track_chunk_name = primary_name or None
+        if reader.remaining >= 4 + 4 + 2 + 2 + 7 + 1 + 1 + 1:
+            reader.read(4 + 4 + 2 + 2 + 7)  # bank, patch, volume, pan, key, velocity, gap
+            reader.read(1)  # port
+            track_chunk_channel = reader.read(1)[0] & 0x0F
     elif first_chunk_id == 21:
         if first_chunk_length < 4:
             raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -1392,6 +1390,216 @@ class _WrkSysexBank:
     data: bytes
 
 
+@dataclass(slots=True)
+class _WrkTrackSettings:
+    """Per-track settings from TRACK/NTRACK chunks, mirroring C++ TrackMapRec."""
+
+    channel: int | None = None
+    pitch: int = 0
+    velocity: int = 0
+    port: int = 0
+    muted: bool = False
+
+
+def _wrk_clamp(value: int) -> int:
+    return max(0, min(127, value))
+
+
+def _wrk_signed_u8(value: int) -> int:
+    return value - 256 if value >= 128 else value
+
+
+def _wrk_signed_u16(value: int) -> int:
+    return value - 65536 if value >= 32768 else value
+
+
+def _wrk_add_program(add_event: object, track_number: int, channel: int, patch: int) -> None:
+    add = add_event  # type: ignore[assignment]
+    if 0 <= patch < 128:
+        add(
+            track_number,
+            MidiEvent(
+                tick=0,
+                kind="program_change",
+                track=track_number,
+                channel=channel,
+                data=bytes([patch]),
+            ),
+        )
+
+
+def _wrk_add_control(add_event: object, track_number: int, channel: int, controller: int, value: int) -> None:
+    add = add_event  # type: ignore[assignment]
+    add(
+        track_number,
+        MidiEvent(
+            tick=0,
+            kind="control_change",
+            track=track_number,
+            channel=channel,
+            data=bytes([controller, _wrk_clamp(value)]),
+        ),
+    )
+
+
+def _wrk_add_bank_select(add_event: object, track_number: int, channel: int, bank: int) -> None:
+    # C++ Sequence::wrkTrackBank() assumes the GM/GS bank method: MSB then LSB.
+    _wrk_add_control(add_event, track_number, channel, 0, bank // 0x80)
+    _wrk_add_control(add_event, track_number, channel, 32, bank % 0x80)
+
+
+def _wrk_add_track_volume(add_event: object, track_number: int, channel: int, volume: int) -> None:
+    # C++ Sequence::wrkTrackVol(): plain CC7 below 128, otherwise LSB+MSB volume.
+    if volume < 128:
+        _wrk_add_control(add_event, track_number, channel, 7, volume)
+        return
+    _wrk_add_control(add_event, track_number, channel, 39, volume % 0x80)
+    _wrk_add_control(add_event, track_number, channel, 7, volume // 0x80)
+
+
+def _read_wrk_note_array(
+    chunk: _WrkReader,
+    track_number: int,
+    events: int,
+    sysex_banks: dict[int, _WrkSysexBank],
+    add_event: object,
+    settings_lookup: object,
+) -> None:
+    """Variable-length event records shared by NSTREAM, LYRICS and SGMNT chunks.
+
+    Mirrors QWrk::processNoteArray(): channel voice records plus the special
+    expression (5), hairpin (6), chord (7) and inline SysEx (8) records.
+    """
+    add = add_event  # type: ignore[assignment]
+    settings = settings_lookup(track_number)  # type: ignore[operator]
+    channel_override = settings.channel if 0 <= (settings.channel or -1) < 16 else None
+    for _ in range(events):
+        if chunk.remaining < 4:
+            # The C++ reader stops at the chunk boundary instead of failing.
+            break
+        tick = chunk.read_u24_le()
+        status = chunk.read_u8()
+        if status >= 0x90:
+            kind = status & 0xF0
+            channel = channel_override if channel_override is not None else status & 0x0F
+            if chunk.remaining < 1:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            data1 = chunk.read_u8()
+            data2: int | None = None
+            if kind in (0x90, 0xA0, 0xB0, 0xE0):
+                if chunk.remaining < 1:
+                    raise MidiFileError("Corrupted Cakewalk WRK file")
+                data2 = chunk.read_u8()
+            duration = 0
+            if kind == 0x90:
+                if chunk.remaining < 2:
+                    raise MidiFileError("Corrupted Cakewalk WRK file")
+                duration = chunk.read_u16_le()
+            if kind == 0x90 and data2 is not None:
+                key = _wrk_clamp(data1 + settings.pitch)
+                velocity = _wrk_clamp(data2 + settings.velocity)
+                add(
+                    track_number,
+                    MidiEvent(
+                        tick=tick,
+                        kind="note_on",
+                        track=track_number,
+                        channel=channel,
+                        data=bytes([key, velocity]),
+                    ),
+                )
+                add(
+                    track_number,
+                    MidiEvent(
+                        tick=tick + duration,
+                        kind="note_off",
+                        track=track_number,
+                        channel=channel,
+                        data=bytes([key, 0]),
+                    ),
+                )
+            elif kind in (0xA0, 0xB0, 0xE0) and data2 is not None:
+                add(
+                    track_number,
+                    MidiEvent(
+                        tick=tick,
+                        kind=_channel_kind(kind),
+                        track=track_number,
+                        channel=channel,
+                        data=bytes([data1, data2]),
+                    ),
+                )
+            elif kind in (0xC0, 0xD0):
+                add(
+                    track_number,
+                    MidiEvent(
+                        tick=tick,
+                        kind=_channel_kind(kind),
+                        track=track_number,
+                        channel=channel,
+                        data=bytes([data1]),
+                    ),
+                )
+            elif kind == 0xF0:
+                bank_data = sysex_banks.get(data1)
+                if bank_data and bank_data.data:
+                    add(
+                        track_number,
+                        MidiEvent(tick=tick, kind="sysex", track=track_number, data=bank_data.data),
+                    )
+        elif status == 5:  # expression
+            if chunk.remaining < 2 + 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            chunk.read_u16_le()  # expression code
+            text_len = chunk.read_u32_le()
+            if chunk.remaining < text_len:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            text_bytes = chunk.read(text_len) if text_len else b""
+            add(
+                track_number,
+                MidiEvent(tick=tick, kind="meta", track=track_number, data=text_bytes, meta_type=0x07),
+            )
+        elif status == 6:  # hairpin, no playback equivalent in the C++ player
+            if chunk.remaining < 2 + 2 + 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            chunk.read_u16_le()
+            chunk.read_u16_le()
+            chunk.skip(4)
+        elif status == 7:  # chord
+            if chunk.remaining < 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            text_len = chunk.read_u32_le()
+            if chunk.remaining < text_len + 13:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            text_bytes = chunk.read(text_len) if text_len else b""
+            chunk.read(13)
+            add(
+                track_number,
+                MidiEvent(tick=tick, kind="meta", track=track_number, data=text_bytes, meta_type=0x07),
+            )
+        elif status == 8:  # inline SysEx, stored as bank 0 like the C++ player does
+            if chunk.remaining < 2:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            sysex_len = chunk.read_u16_le()
+            if chunk.remaining < sysex_len:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            sysex_data = chunk.read(sysex_len) if sysex_len else b""
+            if sysex_data:
+                sysex_banks[0] = _WrkSysexBank(bank=0, autosend=False, data=sysex_data)
+        else:
+            if chunk.remaining < 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            text_len = chunk.read_u32_le()
+            if chunk.remaining < text_len:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            text_bytes = chunk.read(text_len) if text_len else b""
+            meta_type = status if status in (1, 2, 3, 4) else 0x01
+            add(
+                track_number,
+                MidiEvent(tick=tick, kind="meta", track=track_number, data=text_bytes, meta_type=meta_type),
+            )
+
+
 def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
     header = _read_wrk_header(data, path)
     reader = _WrkReader(data)
@@ -1402,6 +1610,7 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
     division = 120
     tracks: dict[int, MidiTrack] = {}
     sysex_banks: dict[int, _WrkSysexBank] = {}
+    track_settings: dict[int, _WrkTrackSettings] = {}
 
     def ensure_track(track_number: int) -> MidiTrack:
         track = tracks.get(track_number)
@@ -1412,6 +1621,19 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
 
     def add_event(track_number: int, event: MidiEvent) -> None:
         ensure_track(track_number).events.append(event)
+
+    def settings_for(track_number: int) -> _WrkTrackSettings:
+        settings = track_settings.get(track_number)
+        if settings is None:
+            settings = _WrkTrackSettings()
+            track_settings[track_number] = settings
+        return settings
+
+    def track_channel(track_number: int, fallback: int = 0) -> int:
+        channel = settings_for(track_number).channel
+        if channel is None or not 0 <= channel < 16:
+            return fallback
+        return channel
 
     while reader.remaining:
         chunk_id = reader.read_u8()
@@ -1443,7 +1665,7 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
             continue
 
         if chunk_id in (1, 36):  # TRACK_CHUNK / NTRACK_CHUNK (track header variants)
-            if chunk.remaining >= 3:
+            if chunk_id == 1 and chunk.remaining >= 3:
                 track_number = chunk.read_u16_le()
                 primary_len = chunk.read_u8() if chunk.remaining else 0
                 primary = chunk.read_byte_array(primary_len)
@@ -1454,6 +1676,43 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
                     track = ensure_track(track_number)
                     track.name_data = primary
                     track.name = decode_midi_text(primary, "latin-1").strip()
+                settings = settings_for(track_number)
+                if chunk.remaining >= 1 + 1 + 1 + 1 + 1:
+                    settings.channel = chunk.read_u8() & 0x0F
+                    settings.pitch = _wrk_signed_u8(chunk.read_u8())
+                    settings.velocity = _wrk_signed_u8(chunk.read_u8())
+                    settings.port = chunk.read_u8()
+                    settings.muted = bool(chunk.read_u8() & 0x02)
+            elif chunk_id == 36 and chunk.remaining >= 3:
+                track_number = chunk.read_u16_le()
+                name_len = chunk.read_u8() if chunk.remaining else 0
+                name_data = chunk.read_byte_array(name_len)
+                if name_data:
+                    track = ensure_track(track_number)
+                    track.name_data = name_data
+                    track.name = decode_midi_text(name_data, "latin-1").strip()
+                if chunk.remaining >= 2 + 2 + 2 + 2 + 1 + 1 + 7 + 1 + 1 + 1:
+                    bank = _wrk_signed_u16(chunk.read_u16_le())
+                    patch = _wrk_signed_u16(chunk.read_u16_le())
+                    chunk.read_u16_le()  # volume
+                    chunk.read_u16_le()  # pan
+                    settings = settings_for(track_number)
+                    settings.pitch = _wrk_signed_u8(chunk.read_u8())
+                    settings.velocity = _wrk_signed_u8(chunk.read_u8())
+                    chunk.skip(7)
+                    settings.port = chunk.read_u8()
+                    channel = _wrk_signed_u8(chunk.read_u8())
+                    settings.channel = channel if channel >= 0 else None
+                    settings.muted = chunk.read_u8() != 0
+                    if bank > -1:
+                        _wrk_add_bank_select(add_event, track_number, track_channel(track_number), bank)
+                    if patch > -1:
+                        _wrk_add_program(
+                            add_event,
+                            track_number,
+                            track_channel(track_number),
+                            patch,
+                        )
             continue
 
         if chunk_id in (4, 15):  # TEMPO_CHUNK / NTEMPO_CHUNK
@@ -1585,11 +1844,85 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
                 add_event(0, MidiEvent(tick=0, kind="sysex", track=0, data=sysex_data))
             continue
 
+        if chunk_id == 14:  # TRKPATCH_CHUNK
+            if chunk.remaining >= 2 + 1:
+                track_number = chunk.read_u16_le()
+                patch = _wrk_signed_u8(chunk.read_u8())
+                _wrk_add_program(add_event, track_number, track_channel(track_number), patch)
+            continue
+
+        if chunk_id == 19:  # TRKVOL_CHUNK
+            if chunk.remaining >= 2 + 2:
+                track_number = chunk.read_u16_le()
+                volume = chunk.read_u16_le()
+                _wrk_add_track_volume(add_event, track_number, track_channel(track_number), volume)
+            continue
+
+        if chunk_id == 30:  # TRKBANK_CHUNK
+            if chunk.remaining >= 2 + 2:
+                track_number = chunk.read_u16_le()
+                bank = chunk.read_u16_le()
+                _wrk_add_bank_select(add_event, track_number, track_channel(track_number), bank)
+            continue
+
+        if chunk_id == 21:  # MARKERS_CHUNK
+            if chunk.remaining < 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            markers = chunk.read_u32_le()
+            for _ in range(markers):
+                if chunk.remaining < 1 + 1 + 3 + 5 + 1:
+                    raise MidiFileError("Corrupted Cakewalk WRK file")
+                chunk.read_u8()  # smpte
+                chunk.skip(1)
+                tick = chunk.read_u24_le()
+                chunk.skip(5)
+                name_len = chunk.read_u8()
+                if chunk.remaining < name_len:
+                    raise MidiFileError("Corrupted Cakewalk WRK file")
+                name_data = chunk.read(name_len) if name_len else b""
+                if name_data:
+                    add_event(
+                        0,
+                        MidiEvent(tick=tick, kind="meta", track=0, data=name_data, meta_type=0x06),
+                    )
+            continue
+
+        if chunk_id == 49:  # SGMNT_CHUNK
+            if chunk.remaining < 2 + 4 + 8 + 1 + 20 + 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            track_number = chunk.read_u16_le()
+            offset = chunk.read_u32_le()
+            chunk.skip(8)
+            name_len = chunk.read_u8()
+            if chunk.remaining < name_len + 20 + 4:
+                raise MidiFileError("Corrupted Cakewalk WRK file")
+            name_data = chunk.read(name_len) if name_len else b""
+            chunk.skip(20)
+            if name_data:
+                add_event(
+                    track_number,
+                    MidiEvent(tick=offset, kind="meta", track=track_number, data=name_data, meta_type=0x06),
+                )
+            segment_events = chunk.read_u32_le()
+            _read_wrk_note_array(
+                chunk,
+                track_number,
+                segment_events,
+                sysex_banks,
+                add_event,
+                settings_for,
+            )
+            continue
+
         if chunk_id == 2:  # STREAM_CHUNK (fixed-size records)
             if chunk.remaining < 4:
                 raise MidiFileError("Corrupted Cakewalk WRK file")
             track_number = chunk.read_u16_le()
             events = chunk.read_u16_le()
+            stream_settings = settings_for(track_number)
+            stream_channel = (
+                stream_settings.channel if 0 <= (stream_settings.channel or -1) < 16 else None
+            )
             for _ in range(events):
                 if chunk.remaining < 3 + 1 + 1 + 1 + 2:
                     raise MidiFileError("Corrupted Cakewalk WRK file")
@@ -1599,8 +1932,10 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
                 data2 = chunk.read_u8()
                 duration = chunk.read_u16_le()
                 kind = status & 0xF0
-                channel = status & 0x0F
+                channel = stream_channel if stream_channel is not None else status & 0x0F
                 if kind == 0x90:
+                    key = _wrk_clamp(data1 + stream_settings.pitch)
+                    velocity = _wrk_clamp(data2 + stream_settings.velocity)
                     add_event(
                         track_number,
                         MidiEvent(
@@ -1608,7 +1943,7 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
                             kind="note_on",
                             track=track_number,
                             channel=channel,
-                            data=bytes([data1, data2]),
+                            data=bytes([key, velocity]),
                         ),
                     )
                     add_event(
@@ -1618,7 +1953,7 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
                             kind="note_off",
                             track=track_number,
                             channel=channel,
-                            data=bytes([data1, 0]),
+                            data=bytes([key, 0]),
                         ),
                     )
                 elif kind in (0xA0, 0xB0, 0xE0):
@@ -1656,52 +1991,22 @@ def _read_wrk_file_bytes(data: bytes, path: Path) -> MidiFile:
             track_number = chunk.read_u16_le()
             if chunk_id == 45:
                 name_len = chunk.read_u8() if chunk.remaining else 0
-                chunk.read_byte_array(name_len)
+                name_data = chunk.read_byte_array(name_len)
+                if name_data:
+                    track = ensure_track(track_number)
+                    track.name_data = name_data
+                    track.name = decode_midi_text(name_data, "latin-1").strip()
             if chunk.remaining < 4:
                 raise MidiFileError("Corrupted Cakewalk WRK file")
             events = chunk.read_u32_le()
-
-            for _ in range(events):
-                if chunk.remaining < 3 + 1:
-                    raise MidiFileError("Corrupted Cakewalk WRK file")
-                tick = chunk.read_u24_le()
-                status = chunk.read_u8()
-                if status >= 0x90:
-                    kind = status & 0xF0
-                    channel = status & 0x0F
-                    if chunk.remaining < 1:
-                        raise MidiFileError("Corrupted Cakewalk WRK file")
-                    data1 = chunk.read_u8()
-                    data2: int | None = None
-                    if kind in (0x90, 0xA0, 0xB0, 0xE0):
-                        if chunk.remaining < 1:
-                            raise MidiFileError("Corrupted Cakewalk WRK file")
-                        data2 = chunk.read_u8()
-                    duration = 0
-                    if kind == 0x90:
-                        if chunk.remaining < 2:
-                            raise MidiFileError("Corrupted Cakewalk WRK file")
-                        duration = chunk.read_u16_le()
-                    if kind == 0x90 and data2 is not None:
-                        add_event(track_number, MidiEvent(tick=tick, kind="note_on", track=track_number, channel=channel, data=bytes([data1, data2])))
-                        add_event(track_number, MidiEvent(tick=tick + duration, kind="note_off", track=track_number, channel=channel, data=bytes([data1, 0])))
-                    elif kind in (0xA0, 0xB0, 0xE0) and data2 is not None:
-                        add_event(track_number, MidiEvent(tick=tick, kind=_channel_kind(kind), track=track_number, channel=channel, data=bytes([data1, data2])))
-                    elif kind in (0xC0, 0xD0):
-                        add_event(track_number, MidiEvent(tick=tick, kind=_channel_kind(kind), track=track_number, channel=channel, data=bytes([data1])))
-                    elif kind == 0xF0:
-                        bank_data = sysex_banks.get(data1)
-                        if bank_data and bank_data.data:
-                            add_event(track_number, MidiEvent(tick=tick, kind="sysex", track=track_number, data=bank_data.data))
-                else:
-                    if chunk.remaining < 4:
-                        raise MidiFileError("Corrupted Cakewalk WRK file")
-                    text_len = chunk.read_u32_le()
-                    if chunk.remaining < text_len:
-                        raise MidiFileError("Corrupted Cakewalk WRK file")
-                    text_bytes = chunk.read(text_len) if text_len else b""
-                    meta_type = 0x01 if status not in (1, 2, 3, 4, 5, 6, 7) else status
-                    add_event(track_number, MidiEvent(tick=tick, kind="meta", track=track_number, data=text_bytes, meta_type=meta_type))
+            _read_wrk_note_array(
+                chunk,
+                track_number,
+                events,
+                sysex_banks,
+                add_event,
+                settings_for,
+            )
             continue
 
         # Unused chunk types for playback are ignored for now.
