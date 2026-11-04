@@ -14,19 +14,17 @@ session. Before changing code, read especially:
 
 ## Visual Reference
 
-The PyQt6 screenshots that document the current UI live under
-`images/dmidiplayer_py/after/`.  The original C++ sources remain the behavioral
-reference; the obsolete C++ screenshot reference set was removed from the
-repository.
+The original C++ sources remain the behavioral reference for the port.
+Screenshot sets are not kept in the repository; capture a temporary image when
+a window changes and compare it against the corresponding C++ behavior.
 
 Keep this checklist active while porting:
 
-- [x] Main window captured without the removed virtual keyboard.
-- [x] Piano Player captured for the audited MIDI files at 1360x768 and
-  1920x1080.
-- [ ] Playlist, Lyrics, Channels and Rhythm windows captured when they change.
-- [ ] When a referenced screenshot and the current PyQt6 port differ, record
-  the gap in the relevant roadmap section before calling the feature complete.
+- [ ] Capture the main window after layout changes.
+- [ ] Capture every Piano Player tab at 1360x768 and 1920x1080.
+- [ ] Capture Playlist, Lyrics, Channels and Rhythm windows when they change.
+- [ ] When the implementation and C++ behavior differ, record the gap in the
+  relevant roadmap section before calling the feature complete.
 
 This repository contains two C++/Qt projects that must coexist during the port:
 
@@ -712,8 +710,8 @@ than assuming the previous roadmap notes were correct.
 
 - `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
   -> 373 passed, 1 skipped with a Sonivox library; 370 passed, 4 skipped without one.
-- Offscreen screenshots after the fix are under
-  `images/dmidiplayer_py/after/`.
+- Offscreen screenshots were used during the audit but are not kept in the
+  repository.
 - The six files in `MIDI-Karaoke/` are loaded and analysed by
   `tests/test_midi_collection.py` (channel counts: 14, 16, 4, 11, 9, 10).
 - The internal FluidSynth output was exercised through the PipeWire/Pulse
