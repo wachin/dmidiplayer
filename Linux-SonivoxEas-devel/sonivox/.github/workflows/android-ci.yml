@@ -1,0 +1,38 @@
+name: Android CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master", "devel" ]
+  pull_request:
+    branches: [ "master", "devel" ]
+
+env:
+  BUILD_TYPE: Release
+  TEMP: ${{github.workspace}}/temp
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Android CI
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Temp Environment Variable
+      run: mkdir temp
+
+    - name: Configure CMake
+      run: |
+        cmake -B ${{github.workspace}}/build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DBUILD_TESTING=No \
+            -DUSE_44KHZ=Yes \
+            -DUSE_16BITS_SAMPLES=Yes \
+            -DNEW_HOST_WRAPPER=Yes \
+            -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=x86_64 \
+            -DANDROID_PLATFORM=android-35
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

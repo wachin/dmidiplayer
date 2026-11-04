@@ -1,0 +1,60 @@
+name: FreeBSD CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master", "devel" ]
+  pull_request:
+    branches: [ "master", "devel" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: FreeBSD CI
+    env:
+      BUILD_TYPE: RelWithDebInfo
+      INSTALL_LOCATION: ${{github.workspace}}/SonivoxV4
+      TEMP: ${{github.workspace}}/temp
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Temp Environment Variable
+      run: |
+        mkdir -p ${{github.workspace}}/temp
+
+    - name: Downloading a DLS file for testing
+      uses: ethanjli/cached-download-action@v0.1.3
+      with:
+        url: http://www.ronimusic.com/sf2/Airfont_340.dls
+        destination: ${{env.TEMP}}/soundfont.dls
+        cache-key: cached.soundfont.dls
+        enable-cross-os-archive: true
+
+    - name: FreeBSD test
+      id: test
+      uses: vmactions/freebsd-vm@v1
+      with:
+        envs: 'BUILD_TYPE INSTALL_LOCATION TEMP'
+        usesh: true
+        prepare: |
+          pkg install -y \
+              cmake \
+              ninja \
+              pkgconf \
+              googletest
+        run: |
+          set -e -x
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{env.INSTALL_LOCATION}}
+          cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+          cd ${{github.workspace}}/build
+          ctest -C ${{env.BUILD_TYPE}} --verbose
+          cd ${{github.workspace}}
+          cmake --install ${{github.workspace}}/build
+          tar cvf SonivoxV4.tar SonivoxV4
+
+    - uses: actions/upload-artifact@v6
+      with:
+        name: SonivoxV4-freebsd
+        path: SonivoxV4.tar
+        retention-days: 90
+        overwrite: true
