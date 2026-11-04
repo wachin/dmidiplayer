@@ -182,6 +182,144 @@ class Sequence(QObject):
                 banks[event.channel] = (bank_msb.get(event.channel, 0) * 0x80) + value
         return banks
 
+    def channel_part_names(self) -> dict[int, list[str]]:
+        """Return track/part names associated with each used MIDI channel.
+
+        Tracks and instruments are deliberately *not* treated as one-to-one:
+        several tracks may share a channel.  The returned lists preserve every
+        distinct name for the channel without creating duplicate channels.
+        """
+        names: dict[int, list[str]] = {}
+        if self.midi is None:
+            return names
+        for track in self.midi.tracks:
+            channels = {event.channel for event in track.events if event.channel is not None}
+            if not channels:
+                continue
+            track_name = self._decode_track_text(track.name_data, track.name)
+            instrument_name = self._decode_track_text(track.instrument_name_data, track.instrument_name)
+            name = track_name or instrument_name
+            if not name:
+                continue
+            for channel in sorted(channels):
+                channel_names = names.setdefault(channel, [])
+                if name not in channel_names:
+                    channel_names.append(name)
+        return names
+
+    @staticmethod
+    def selector_label(channel: int, instrument: str, part_name: str) -> str:
+        label = f"{channel + 1}: {instrument}"
+        if part_name:
+            folded_instrument = instrument.casefold()
+            folded_part = part_name.casefold()
+            if folded_part != folded_instrument and folded_part not in folded_instrument and folded_instrument not in folded_part:
+                label += f" - {part_name}"
+        return label
+
+    def instrument_at_tick(
+        self,
+        channel: int,
+        tick: int,
+        percussion_channel: int = 9,
+    ) -> tuple[int, int, str, bool]:
+        """Return ``(program, bank, instrument name, is percussion)``.
+
+        The program used by the score at ``tick`` is the last program change at
+        or before that tick (0 when the file never selects a program).
+        """
+        if self.midi is None:
+            return (0, 0, "", False)
+        if channel == percussion_channel:
+            return (0, 0, "Drums", True)
+        program = 0
+        bank_msb = 0
+        bank_lsb = 0
+        for event in self.midi.events:
+            if event.tick > tick:
+                break
+            if event.channel != channel:
+                continue
+            if event.kind == "control_change" and len(event.data) >= 2:
+                if event.data[0] == 0:
+                    bank_msb = event.data[1]
+                elif event.data[0] == 32:
+                    bank_lsb = event.data[1]
+            elif event.kind == "program_change" and event.data:
+                program = event.data[0]
+        return (program, (bank_msb << 7) | bank_lsb, gm_program_name(program), False)
+
+    def channel_infos(self, percussion_channel: int = 9) -> list[dict[str, object]]:
+        """Return one authoritative entry per used MIDI channel.
+
+        This is the data model shared by the Piano Player and the Channels
+        dialog.  It merges tracks that share a channel and keeps program
+        changes so the UI can follow them during playback.
+        """
+        if self.midi is None:
+            return []
+        used = self.used_channels()
+        if not used:
+            return []
+        used_set = set(used)
+        part_names = self.channel_part_names()
+        first_programs: dict[int, int] = {}
+        first_banks: dict[int, int] = {}
+        program_changes: dict[int, list[tuple[int, int]]] = {channel: [] for channel in used}
+        bank_msb: dict[int, int] = {}
+        bank_lsb: dict[int, int] = {}
+        notes: dict[int, list[int]] = {channel: [] for channel in used}
+        note_counts: dict[int, int] = {channel: 0 for channel in used}
+        for event in self.midi.events:
+            channel = event.channel
+            if channel is None or channel not in used_set:
+                continue
+            if event.kind == "control_change" and len(event.data) >= 2:
+                if event.data[0] == 0:
+                    bank_msb[channel] = event.data[1]
+                elif event.data[0] == 32:
+                    bank_lsb[channel] = event.data[1]
+            elif event.kind == "program_change" and event.data:
+                program_changes[channel].append((event.tick, event.data[0]))
+                if channel not in first_programs:
+                    first_programs[channel] = event.data[0]
+                    first_banks[channel] = (bank_msb.get(channel, 0) << 7) | bank_lsb.get(channel, 0)
+            elif event.kind in ("note_on", "note_off", "key_pressure") and event.data:
+                notes[channel].append(event.data[0])
+                if event.kind == "key_pressure" or (
+                    event.kind == "note_on" and len(event.data) >= 2 and event.data[1] > 0
+                ):
+                    note_counts[channel] += 1
+        labels = self.default_channel_labels(percussion_channel)
+        infos: list[dict[str, object]] = []
+        for channel in used:
+            names = part_names.get(channel, [])
+            part_name = names[0] if names else ""
+            is_percussion = channel == percussion_channel
+            program = first_programs.get(channel, 0)
+            bank = first_banks.get(channel, 0)
+            instrument = "Drums" if is_percussion else gm_program_name(program)
+            note_list = notes.get(channel, [])
+            infos.append(
+                {
+                    "channel": channel,
+                    "title": labels.get(channel, ""),
+                    "part_name": part_name,
+                    "part_names": names,
+                    "instrument_name": instrument,
+                    "program": program,
+                    "bank": bank,
+                    "percussion": is_percussion,
+                    "min_note": min(note_list, default=21),
+                    "max_note": max(note_list, default=108),
+                    "note_count": note_counts[channel],
+                    "program_changes": program_changes[channel],
+                    "label": self.selector_label(channel, instrument, part_name),
+                }
+            )
+        return infos
+
+
     def info_metadata(self) -> dict[str, str]:
         if self.midi is None:
             return {}
@@ -249,35 +387,13 @@ class Sequence(QObject):
         """Return per-channel info for the Pianola, matching C++ behaviour.
 
         The C++ Pianola shows one piano keyboard per MIDI channel (0-15),
-        only for channels that are actually used in the loaded file.  This
-        method produces the same channel-oriented data so the Python port
-        can display the same number of rows.
+        only for channels that are actually used in the loaded file.  The
+        number of rows therefore comes from channels, not from tracks, and
+        multiple tracks sharing a channel are merged into one keyboard
+        (``Pianola::m_frame[MIDI_STD_CHANNELS]``).  Tabs are a Python-port
+        addition to keep up to eight readable keyboards on screen.
         """
-        if self.midi is None:
-            return []
-        used = self.used_channels()
-        if not used:
-            return []
-        labels = self.default_channel_labels(percussion_channel)
-        notes_by_channel: dict[int, list[int]] = {ch: [] for ch in used}
-        for event in self.midi.events:
-            ch = event.channel
-            if ch is None or ch not in notes_by_channel:
-                continue
-            if event.kind in ("note_on", "note_off", "key_pressure") and event.data:
-                notes_by_channel[ch].append(event.data[0])
-        infos: list[dict[str, object]] = []
-        for ch in used:
-            note_list = notes_by_channel.get(ch, [])
-            infos.append(
-                {
-                    "channel": ch,
-                    "title": labels.get(ch, ""),
-                    "min_note": min(note_list, default=21),
-                    "max_note": max(note_list, default=108),
-                }
-            )
-        return infos
+        return self.channel_infos(percussion_channel)
 
     def default_channel_labels(self, percussion_channel: int = 9) -> dict[int, str]:
         if self.midi is None:

@@ -396,15 +396,18 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(output.events[0].channel, 2)
         self.assertEqual(output.events[0].data, bytes([7, 75]))
 
-    def test_channel_program_override_rewrites_program_change_event(self) -> None:
+    def test_channel_program_override_does_not_rewrite_score_program_change(self) -> None:
+        # C++ parity: selecting a patch sends it immediately and remembers it
+        # as the last program, but the score keeps control of its own program
+        # changes until the user enables the channel lock.
         player = SequencePlayer(OutputStub())
         player.set_channel_program(0, 40)
 
         event = MidiEvent(tick=0, kind="program_change", channel=0, data=bytes([10]))
         patched = player._playable_event(event)
 
-        self.assertIsNotNone(patched)
-        self.assertEqual(patched.data, bytes([40]))
+        self.assertIs(patched, event)
+        self.assertEqual(player.channel_program(0), 40)
 
     def test_set_channel_program_sends_immediate_program_change(self) -> None:
         output = OutputStub()
@@ -417,13 +420,18 @@ class SequencePlayerTest(unittest.TestCase):
         self.assertEqual(output.events[0].channel, 3)
         self.assertEqual(output.events[0].data, bytes([55]))
 
-    def test_locked_channel_suppresses_program_change_without_override(self) -> None:
+    def test_locked_channel_uses_locked_program_without_override(self) -> None:
+        # C++ parity: a locked channel receives the program captured when the
+        # lock was enabled, never the score's program change.
         player = SequencePlayer(OutputStub())
+        player._last_programs[0] = 7
         player.set_channel_locked(0, True)
 
         event = MidiEvent(tick=0, kind="program_change", channel=0, data=bytes([10]))
+        patched = player._playable_event(event)
 
-        self.assertIsNone(player._playable_event(event))
+        self.assertIsNotNone(patched)
+        self.assertEqual(patched.data, bytes([7]))
 
     def test_locked_channel_rewrites_program_change_with_override(self) -> None:
         player = SequencePlayer(OutputStub())
@@ -460,7 +468,8 @@ class SequencePlayerTest(unittest.TestCase):
             [
                 ("note_on", 0, bytes([60, 0])),
                 ("control_change", 1, bytes([7, 40])),
-                ("program_change", 2, bytes([40])),
+                ("program_change", 2, bytes([10])),
+                ("program_change", 3, bytes([0])),
             ],
         )
 
@@ -476,13 +485,9 @@ class SequencePlayerTest(unittest.TestCase):
 
         player.play()
 
-        self.assertGreaterEqual(len(output.events), 4)
-        self.assertEqual(output.events[0].kind, "sysex")
-        self.assertEqual(output.events[0].data, bytes.fromhex("7e 7f 09 01 f7"))
-        self.assertEqual(output.events[1].kind, "sysex")
-        self.assertEqual(output.events[1].data, bytes.fromhex("41 10 42 12 40 00 7f 00 41 f7"))
-        self.assertEqual(output.events[2].kind, "sysex")
-        self.assertEqual(output.events[2].data, bytes.fromhex("43 10 4c 00 00 7e 00 f7"))
+        sysex_events = [event for event in output.events if getattr(event, "kind", "") == "sysex"]
+        self.assertEqual(len(sysex_events), 1)
+        self.assertEqual(sysex_events[0].data, bytes.fromhex("7e 7f 09 01 f7"))
 
     def test_play_does_not_send_reset_sysex_when_disabled(self) -> None:
         output = OutputStub()

@@ -41,7 +41,7 @@ class AppSettings:
     DEFAULT_LYRICS_FONT_SIZE = 10
     DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
     DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
-    DEFAULT_MIDI_DRIVER = "alsa"
+    DEFAULT_MIDI_DRIVER = "sonivox"
 
     def __init__(self, base_dir: Path | None = None, settings_path: Path | None = None) -> None:
         self.base_dir = base_dir or app_config_dir()

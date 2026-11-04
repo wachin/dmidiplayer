@@ -5,10 +5,11 @@ import configparser
 import os
 import random
 import sys
+import time
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QLocale, QObject, QSignalBlocker, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QIcon, QKeySequence, QPalette
+from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QFontMetrics, QIcon, QKeySequence, QPalette
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -32,7 +33,9 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QProgressBar,
+    QSizePolicy,
     QSlider,
+    QSpacerItem,
     QSpinBox,
     QTabWidget,
     QTableWidget,
@@ -47,7 +50,7 @@ from PyQt6.QtWidgets import (
 
 from drumstick_py import BackendManager, MidiEvent, MidiFileError, MidiOutputError, PianoKeyboard, read_smf
 from .i18n import install_translator
-from .instrumentset import bank_label, gm_program_label
+from .instrumentset import bank_label, gm_program_label, gm_program_name
 from .connectionsdialog_ui import ConnectionsDialog
 from .loopdialog_ui import LoopDialog
 from .player import SequencePlayer
@@ -836,6 +839,19 @@ class ChannelsDialog(QDialog):
             if isinstance(level, QProgressBar):
                 level.setValue(0)
 
+    def set_channel_program_display(self, channel: int, program: int) -> None:
+        """Follow program changes sent by the score, like C++ ``slotPatch``."""
+        row = self.channel_rows.get(channel)
+        if row is None:
+            return
+        combo = self.table.cellWidget(row, 6)
+        if not isinstance(combo, QComboBox):
+            return
+        if combo.currentIndex() == program:
+            return
+        with QSignalBlocker(combo):
+            combo.setCurrentIndex(max(0, min(127, program)))
+
     def set_channel_level(self, channel: int, value: int) -> None:
         row = self.channel_rows.get(channel)
         if row is None:
@@ -863,7 +879,14 @@ class PianolaDialog(QDialog):
         self._channel_keyboards: dict[int, PianoKeyboard] = {}
         self._channel_visibility: dict[int, QCheckBox] = {}
         self._channel_keyboard_containers: dict[int, QWidget] = {}
+        self._channel_rows: dict[int, QWidget] = {}
+        self._tab_spacers: dict[QWidget, QSpacerItem] = {}
+        self._channel_labels: dict[int, QLabel] = {}
+        self._channel_part_names: dict[int, str] = {}
+        self._channel_instruments: dict[int, str] = {}
         self._song_note_range: tuple[int, int] = (21, 108)
+        self._geometry_adopted = False
+        self._header_height = 24
         # C++ parity: Pianola::setNoteRange() starts tightened (m_tightenKeys = true).
         self._range_mode = "tightened"
         self._note_label_mode = "never"
@@ -873,7 +896,10 @@ class PianolaDialog(QDialog):
         self._octave_designation = "scientific"
         self._note_label_font = QFont("Sans Serif", 8)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(4)
         button_row = QHBoxLayout()
+        button_row.setSpacing(4)
         button_row.addWidget(QLabel(self.tr("Range:"), self))
         self.range_mode_combo = QComboBox(self)
         self.range_mode_combo.setObjectName("pianola_range_mode_combo")
@@ -921,8 +947,11 @@ class PianolaDialog(QDialog):
         layout.addLayout(button_row)
         self.tabs = QTabWidget(self)
         self.tabs.setObjectName("pianola_tabs")
-        layout.addWidget(self.tabs)
-        self.resize(780, 520)
+        self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tabs.currentChanged.connect(self._tab_changed)
+        layout.addWidget(self.tabs, 1)
+        self.setMinimumSize(420, 300)
+        self.resize(900, 620)
 
     def set_display_preferences(
         self,
@@ -981,45 +1010,89 @@ class PianolaDialog(QDialog):
         first = octave_base * 12
         return (first, min(127, first + num_keys - 1))
 
+    def _clear_tabs(self) -> None:
+        while self.tabs.count():
+            page = self.tabs.widget(0)
+            self.tabs.removeTab(0)
+            if page is not None:
+                page.deleteLater()
+
+    def _tab_label(self, chunk: list[dict[str, object]]) -> str:
+        numbers = [int(info["channel"]) + 1 for info in chunk]
+        if not numbers:
+            return self.tr("Channels")
+        if numbers == list(range(numbers[0], numbers[-1] + 1)):
+            if len(numbers) == 1:
+                return self.tr("Channel {number}").format(number=numbers[0])
+            return self.tr("Channels {start}-{end}").format(start=numbers[0], end=numbers[-1])
+        return self.tr("Channels {numbers}").format(numbers=", ".join(str(number) for number in numbers))
+
     def set_channels(self, channels: list[dict[str, object]]) -> None:
         """Populate the Pianola with one keyboard row per MIDI channel.
 
         ``channels`` is a list of dicts from
-        ``Sequence.pianola_channel_infos()``.  Each dict has at least
-        ``"channel"`` (0-15), ``"title"``, ``"min_note"``, and
-        ``"max_note"``.
+        ``Sequence.channel_infos()``.  Multiple tracks sharing a channel are
+        merged by the sequence model and therefore produce a single keyboard.
+        Tabs hold at most :attr:`CHANNELS_PER_TAB` used channels.
 
-        This matches the C++ Pianola behaviour: one piano keyboard per
-        MIDI channel (max 16), grouped into tabs of up to 8.
+        The layout deliberately gives each row a stretch factor.  Qt then
+        distributes all available vertical space among the visible keyboards
+        instead of leaving a large empty area at the bottom (the old layout
+        used a trailing stretch, which pinned every keyboard to its minimum
+        height and forced the dialog to be taller than a 768-pixel screen).
         """
         self._channel_keyboards.clear()
         self._channel_visibility.clear()
         self._channel_keyboard_containers.clear()
+        self._channel_rows.clear()
+        self._tab_spacers.clear()
+        self._channel_labels.clear()
+        self._channel_part_names.clear()
+        self._channel_instruments.clear()
         if not channels:
             self._song_note_range = (21, 108)
-            self.tabs.clear()
+            self._clear_tabs()
             empty = QLabel(self.tr("No MIDI channels available"), self)
             empty.setObjectName("pianola_empty_label")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tabs.addTab(empty, self.tr("Channels 1-8"))
+            self.tabs.addTab(empty, self.tr("Channels"))
             return
-        song_min = min((int(ch.get("min_note", 21)) for ch in channels), default=21)
-        song_max = max((int(ch.get("max_note", 108)) for ch in channels), default=108)
+        # Only channels with actual notes narrow the song-wide key range.
+        # Channels that contain only a program change must not force the
+        # tightened keyboard back to the full 88-key range.
+        note_ranges = [
+            (int(ch.get("min_note", 21)), int(ch.get("max_note", 108)))
+            for ch in channels
+            if int(ch.get("note_count", 0)) > 0
+        ]
+        if note_ranges:
+            song_min = min(low for low, _high in note_ranges)
+            song_max = max(high for _low, high in note_ranges)
+        else:
+            song_min, song_max = 21, 108
         self._song_note_range = (song_min, song_max)
-        self.tabs.clear()
+        self._clear_tabs()
+        header_height = max(20, QFontMetrics(self.font()).height() + 4)
+        self._header_height = header_height
         for tab_index in range(0, len(channels), self.CHANNELS_PER_TAB):
             chunk = channels[tab_index : tab_index + self.CHANNELS_PER_TAB]
             page = QWidget(self.tabs)
             page_layout = QVBoxLayout(page)
+            page_layout.setContentsMargins(0, 0, 0, 0)
+            page_layout.setSpacing(2)
             for ch_info in chunk:
                 channel = int(ch_info["channel"])
                 title = str(ch_info.get("title", ""))
+                part_name = str(ch_info.get("part_name", "")) or title
+                instrument = str(ch_info.get("instrument_name", ""))
                 display_min_note, display_max_note = self._keyboard_note_range()
                 row = QWidget(page)
+                row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 row_layout = QVBoxLayout(row)
                 row_layout.setContentsMargins(0, 0, 0, 0)
                 row_layout.setSpacing(2)
                 header = QWidget(row)
+                header.setFixedHeight(header_height)
                 header_layout = QHBoxLayout(header)
                 header_layout.setContentsMargins(0, 0, 0, 0)
                 header_layout.setSpacing(6)
@@ -1027,28 +1100,34 @@ class PianolaDialog(QDialog):
                 visible_checkbox.setObjectName(f"pianola_channel_visible_{channel + 1}")
                 visible_checkbox.setChecked(True)
                 header_layout.addWidget(visible_checkbox)
-                label = QLabel(self._format_channel_heading(channel, title), row)
+                label = QLabel(self._format_channel_heading(channel, title), header)
                 label.setObjectName(f"pianola_channel_label_{channel + 1}")
-                header_layout.addWidget(label)
-                header_layout.addStretch(1)
-                row_layout.addWidget(header)
+                label.setToolTip(self._channel_tooltip(channel, instrument, part_name))
+                label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+                header_layout.addWidget(label, 1)
+                row_layout.addWidget(header, 0)
                 keyboard_container = QWidget(row)
+                keyboard_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 keyboard_layout = QVBoxLayout(keyboard_container)
                 keyboard_layout.setContentsMargins(0, 0, 0, 0)
                 keyboard_layout.setSpacing(0)
-                keyboard = PianoKeyboard(row)
+                keyboard = PianoKeyboard(keyboard_container)
                 keyboard.setObjectName(f"pianola_channel_keyboard_{channel + 1}")
                 keyboard.set_note_range(display_min_note, display_max_note)
                 keyboard.set_note_label_mode(self._note_label_mode)
                 keyboard.set_note_label_font(self._note_label_font)
                 keyboard.set_velocity_tinting_enabled(self._velocity_tinting)
                 keyboard.set_octave_offset(-1 if self._octave_designation == "scientific" else -2)
-                keyboard_layout.addWidget(keyboard)
-                row_layout.addWidget(keyboard_container)
-                page_layout.addWidget(row)
+                keyboard_layout.addWidget(keyboard, 1)
+                row_layout.addWidget(keyboard_container, 1)
+                page_layout.addWidget(row, 1)
                 self._channel_keyboards[channel] = keyboard
                 self._channel_visibility[channel] = visible_checkbox
                 self._channel_keyboard_containers[channel] = keyboard_container
+                self._channel_rows[channel] = row
+                self._channel_labels[channel] = label
+                self._channel_part_names[channel] = part_name
+                self._channel_instruments[channel] = instrument
                 keyboard.notePressed.connect(
                     lambda note, velocity, ch=channel: self.manualNoteOn.emit(ch, note, velocity)
                 )
@@ -1058,12 +1137,120 @@ class PianolaDialog(QDialog):
                 visible_checkbox.toggled.connect(
                     lambda checked, ch=channel: self._set_channel_visible(ch, checked, emit_signal=True)
                 )
-            page_layout.addStretch(1)
-            start = tab_index + 1
-            end = tab_index + len(chunk)
-            self.tabs.addTab(page, self.tr("Channels {start}-{end}").format(start=start, end=end))
+            # Keep the keyboard height consistent across tabs.  A tab with
+            # fewer than eight channels gets empty vertical slots at the
+            # bottom instead of stretching its last keyboard over the whole
+            # page.  The slots collapse when the user hides a channel.
+            spacer = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+            page_layout.addItem(spacer)
+            self._tab_spacers[page] = spacer
+            self._update_tab_spacer(page)
+            self.tabs.addTab(page, self._tab_label(chunk))
         self._apply_channel_colors()
         self.tabs.setCurrentIndex(0)
+        self.updateGeometry()
+
+    def _channel_tooltip(self, channel: int, instrument: str, part_name: str) -> str:
+        text = self.tr("Channel {number}: {instrument}").format(number=channel + 1, instrument=instrument)
+        if part_name and part_name.casefold() not in instrument.casefold():
+            text += f" - {part_name}"
+        return text
+
+    def set_channel_instrument(self, channel: int, instrument: str) -> None:
+        """Follow a program change without losing the channel/part label."""
+        if not instrument:
+            return
+        self._channel_instruments[channel] = instrument
+        label = self._channel_labels.get(channel)
+        if label is None:
+            return
+        part_name = self._channel_part_names.get(channel, "")
+        label.setToolTip(self._channel_tooltip(channel, instrument, part_name))
+        if not part_name:
+            label.setText(self._format_channel_heading(channel, instrument))
+
+    def _tab_changed(self, index: int) -> None:
+        page = self.tabs.widget(index)
+        if page is not None:
+            page.updateGeometry()
+            layout = page.layout()
+            if layout is not None:
+                layout.activate()
+
+    def fit_to_screen(self) -> None:
+        """Size the window to a useful fraction of the available screen.
+
+        The C++ Pianola simply restores its saved geometry.  The Python port
+        additionally adapts to the current screen so that eight keyboards are
+        readable on 1366x768 and use more vertical space on 1920x1080.  A
+        saved geometry still wins; this method is only called for the first
+        opening or when no geometry was stored.
+        """
+        if self._geometry_adopted:
+            return
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        minimum = self.minimumSizeHint()
+        if not self._channel_keyboards:
+            # No song loaded yet: a normal-sized empty window is friendlier
+            # than a near-fullscreen blank page.
+            width = min(max(900, minimum.width()), available.width() - 40)
+            height = min(max(620, minimum.height()), available.height() - 40)
+        else:
+            width = max(minimum.width(), min(int(available.width() * 0.9), available.width() - 40))
+            height = max(minimum.height(), min(int(available.height() * 0.9), available.height() - 40))
+        self.resize(width, height)
+        frame = self.frameGeometry()
+        frame.moveCenter(available.center())
+        self.move(frame.topLeft())
+        self._geometry_adopted = True
+
+    def _clamp_to_screen(self) -> None:
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        width = min(self.width(), available.width())
+        height = min(self.height(), available.height())
+        if width != self.width() or height != self.height():
+            self.resize(width, height)
+        x = min(max(self.x(), available.left()), available.right() - width + 1)
+        y = min(max(self.y(), available.top()), available.bottom() - height + 1)
+        if (x, y) != (self.x(), self.y()):
+            self.move(x, y)
+
+    def showEvent(self, event: object) -> None:
+        if not self._geometry_adopted:
+            self._clamp_to_screen()
+        super().showEvent(event)
+
+    def _update_tab_spacer(self, page: QWidget | None, *, expand: bool = False) -> None:
+        """Balance keyboard rows against empty slots at the bottom of a tab."""
+        if page is None:
+            return
+        spacer = self._tab_spacers.get(page)
+        layout = page.layout()
+        if spacer is None or layout is None:
+            return
+        index = layout.indexOf(spacer)
+        if index < 0:
+            return
+        if expand:
+            layout.setStretch(index, 0)
+            return
+        visible = 0
+        for row in self._channel_rows.values():
+            if row.parentWidget() is not page:
+                continue
+            # The keyboard container is registered separately; hidden rows
+            # keep their header visible.
+            for candidate in self._channel_keyboard_containers.values():
+                if candidate.parentWidget() is row and not candidate.isHidden():
+                    visible += 1
+                    break
+        layout.setStretch(index, max(0, self.CHANNELS_PER_TAB - visible))
 
     def _set_channel_visible(self, channel: int, visible: bool, emit_signal: bool) -> None:
         checkbox = self._channel_visibility.get(channel)
@@ -1073,17 +1260,38 @@ class PianolaDialog(QDialog):
         container = self._channel_keyboard_containers.get(channel)
         if container is not None:
             container.setVisible(visible)
+        row = self._channel_rows.get(channel)
+        if row is not None:
+            # Keep the header (and therefore the Show checkbox) visible, but
+            # let the remaining visible keyboards use the freed vertical space.
+            page_layout = row.parentWidget().layout() if row.parentWidget() is not None else None
+            if not visible:
+                row.setMaximumHeight(self._header_height)
+                if page_layout is not None:
+                    page_layout.setStretch(page_layout.indexOf(row), 0)
+            else:
+                row.setMaximumHeight(16_777_215)
+                if page_layout is not None:
+                    page_layout.setStretch(page_layout.indexOf(row), 1)
+            row.updateGeometry()
+            parent = row.parentWidget()
+            if parent is not None:
+                self._update_tab_spacer(parent, expand=not visible)
         if emit_signal:
             self.channelVisibilityChanged.emit(channel, visible)
 
     def show_all_channels(self) -> None:
         for channel in list(self._channel_visibility):
             self._set_channel_visible(channel, True, emit_signal=False)
+        for page in self._tab_spacers:
+            self._update_tab_spacer(page)
         self.allTracksVisibilityChanged.emit(True)
 
     def hide_all_channels(self) -> None:
         for channel in list(self._channel_visibility):
             self._set_channel_visible(channel, False, emit_signal=False)
+        for page in self._tab_spacers:
+            self._update_tab_spacer(page, expand=True)
         self.allTracksVisibilityChanged.emit(False)
 
     def _range_mode_changed(self, index: int) -> None:
@@ -1157,6 +1365,28 @@ class PianolaDialog(QDialog):
     def clear(self) -> None:
         for keyboard in self._channel_keyboards.values():
             keyboard.clear()
+
+    def show_active_notes(
+        self,
+        active_notes: dict[int, set[int]],
+        velocity_getter: object | None = None,
+        count_getter: object | None = None,
+    ) -> None:
+        """Show notes that are already sounding when the window is opened."""
+        self.clear()
+        for channel, notes in active_notes.items():
+            keyboard = self._channel_keyboards.get(channel)
+            if keyboard is None:
+                continue
+            for note in sorted(notes):
+                velocity = 100
+                if callable(velocity_getter):
+                    velocity = int(velocity_getter(channel, note))
+                count = 1
+                if callable(count_getter):
+                    count = max(1, int(count_getter(channel, note)))
+                for _ in range(count):
+                    keyboard.note_on(note, max(1, min(127, velocity)))
 
     def keyPressEvent(self, event: object) -> None:
         if getattr(event, "key", lambda: None)() == int(Qt.Key.Key_Escape) and self.isFullScreen():
@@ -1482,8 +1712,11 @@ class MainWindow(QMainWindow):
         self._output_driver = output_driver
         self.manager = BackendManager(self)
         self.output = self._create_midi_output(output_driver, output_connection)
-        if not hasattr(self.output, "connections"):
-            self._output_driver = "dummy"
+        self._output_driver = getattr(
+            self.output,
+            "driver",
+            "alsa" if hasattr(self.output, "connections") else "dummy",
+        )
         self.player = SequencePlayer(self.output, self)
         self.player.set_percussion_channel(self.settings.percussion_channel())
         self.player.set_send_reset_before_playback(self.settings.midi_reset_before_playback())
@@ -1492,6 +1725,7 @@ class MainWindow(QMainWindow):
         self.player.stopped.connect(self._playback_stopped)
         self.player.positionChanged.connect(self._update_position)
         self.player.eventPlayed.connect(self._event_played)
+        self.player.channelProgramChanged.connect(self._channel_program_changed)
         self.player.outputError.connect(self._output_error)
         self.player.finished.connect(self._finished)
         self.auto_play_on_load = self.settings.auto_play_on_load()
@@ -1542,9 +1776,10 @@ class MainWindow(QMainWindow):
         self.position_summary_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.time_label = QLabel(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.rhythm_view = RhythmView()
-        self.keyboard = PianoKeyboard()
-        self.keyboard.notePressed.connect(lambda note, velocity: self._manual_note_on(0, note, velocity, "Keyboard"))
-        self.keyboard.noteReleased.connect(lambda note: self._manual_note_off(0, note, "Keyboard"))
+        # The main window deliberately has no virtual keyboard.  Note activity
+        # is still tracked per channel for the Channels dialog level bars.
+        self._channel_active_counts: dict[int, dict[int, int]] = {}
+        self._last_event_label_update_ns = 0
         self.event_label = QLabel(self.tr("MIDI output: {name}").format(name=self.output.name))
         self.connection_combo = QComboBox()
         self.connection_combo.setMinimumWidth(260)
@@ -2002,11 +2237,6 @@ class MainWindow(QMainWindow):
         self.statusbar_action.setChecked(True)
         self.statusbar_action.toggled.connect(self.statusBar().setVisible)
         view_menu.addAction(self.statusbar_action)
-        self.keyboard_action = QAction(self.tr("Keyboard"), self)
-        self.keyboard_action.setObjectName("toggle_keyboard_action")
-        self.keyboard_action.setCheckable(True)
-        self.keyboard_action.setChecked(True)
-        self.keyboard_action.toggled.connect(self.keyboard.setVisible)
         toolbar_buttons_menu = view_menu.addMenu(self.tr("Toolbar Buttons"))
         toolbar_buttons_menu.setObjectName("toolbar_buttons_menu")
         toolbar_buttons_menu.addAction(self.toolbar_icon_only_action)
@@ -2026,7 +2256,6 @@ class MainWindow(QMainWindow):
         self.lyrics_action.setObjectName("lyrics_action")
         self.lyrics_action.triggered.connect(self._show_lyrics_dialog)
         view_menu.addAction(self.lyrics_action)
-        view_menu.addAction(self.keyboard_action)
         self.rhythm_action = QAction(self.tr("Rhythm"), self)
         self.rhythm_action.setObjectName("toggle_rhythm_action")
         self.rhythm_action.setCheckable(True)
@@ -2086,20 +2315,28 @@ class MainWindow(QMainWindow):
     def _dialog_is_visible(self, dialog: QDialog | None) -> bool:
         return dialog is not None and dialog.isVisible()
 
-    def _register_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> None:
+    def _register_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> bool:
         if id(dialog) in self._dialog_geometry_keys:
-            return
+            return False
         self._dialog_geometry_keys[id(dialog)] = geometry_key
         dialog.installEventFilter(self)
-        self._restore_dialog_geometry(dialog, geometry_key)
+        return self._restore_dialog_geometry(dialog, geometry_key)
 
-    def _restore_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> None:
+    def _restore_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> bool:
         geometry = self.settings.dialog_geometry(geometry_key)
         if geometry is None:
-            return
+            return False
         x, y, width, height = geometry
+        screen = dialog.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            width = min(width, available.width())
+            height = min(height, available.height())
+            x = min(max(x, available.left()), available.right() - width + 1)
+            y = min(max(y, available.top()), available.bottom() - height + 1)
         dialog.resize(width, height)
         dialog.move(x, y)
+        return True
 
     def _save_dialog_geometry(self, dialog: QDialog | None, geometry_key: str) -> None:
         if dialog is None:
@@ -2131,8 +2368,9 @@ class MainWindow(QMainWindow):
                 dialog = factory()
                 setattr(self, attribute_name, dialog)
                 geometry_key = DIALOG_GEOMETRY_KEYS.get(attribute_name)
+                restored = False
                 if geometry_key is not None:
-                    self._register_dialog_geometry(dialog, geometry_key)
+                    restored = self._register_dialog_geometry(dialog, geometry_key)
                 if attribute_name == "channels_dialog":
                     self._refresh_channels_dialog()
                 elif attribute_name == "pianola_dialog":
@@ -2158,6 +2396,8 @@ class MainWindow(QMainWindow):
                         lambda channel, note: self._manual_note_off(channel, note, "Piano Player")
                     )
                     self._refresh_pianola_dialog()
+                    if not restored:
+                        dialog.fit_to_screen()
                 elif attribute_name == "lyrics_dialog":
                     dialog.set_display_preferences(
                         self.lyrics_font_family,
@@ -2211,7 +2451,7 @@ class MainWindow(QMainWindow):
         self.time_label.setText(self.tr("00:00 / 00:00 - 120 BPM - Bar 1/1"))
         self.event_label.setText(self.tr("No file loaded"))
         self.rhythm_view.clear()
-        self.keyboard.clear()
+        self._clear_channel_activity()
         if self.channels_dialog is not None:
             self.channels_dialog.set_channels([])
         if self.pianola_dialog is not None:
@@ -2617,13 +2857,15 @@ class MainWindow(QMainWindow):
     def _refresh_channels_dialog(self) -> None:
         if self.channels_dialog is None:
             return
-        initial_programs = self.player.sequence.initial_programs()
-        initial_banks = self.player.sequence.initial_banks()
+        channel_banks = {
+            int(info["channel"]): int(info.get("bank", 0))
+            for info in self.player.sequence.channel_infos(self.player.percussion_channel - 1)
+        }
         channel_programs = {
             channel: (
                 self.player.channel_program(channel)
                 if self.player.channel_program(channel) is not None
-                else initial_programs.get(channel, 0)
+                else self.player.last_program(channel)
             )
             for channel in self.player.sequence.used_channels()
         }
@@ -2632,7 +2874,7 @@ class MainWindow(QMainWindow):
             muted_channels=self.player.muted_channels(),
             solo_channels=self.player.solo_channels(),
             channel_programs=channel_programs,
-            channel_banks=initial_banks,
+            channel_banks=channel_banks,
             locked_channels=self.player.locked_channels(),
             channel_volumes={channel: self.player.channel_volume_percent(channel) for channel in self.player.sequence.used_channels()},
             channel_labels=self.channel_labels,
@@ -2653,7 +2895,9 @@ class MainWindow(QMainWindow):
     def _ensure_pianola_dialog(self) -> PianolaDialog:
         if self.pianola_dialog is None:
             self.pianola_dialog = self._create_pianola_dialog()
-            self._register_dialog_geometry(self.pianola_dialog, DIALOG_GEOMETRY_KEYS["pianola_dialog"])
+            restored = self._register_dialog_geometry(
+                self.pianola_dialog, DIALOG_GEOMETRY_KEYS["pianola_dialog"]
+            )
             self.pianola_dialog.set_display_preferences(
                 self.pianola_color_mode,
                 self.pianola_single_color,
@@ -2676,6 +2920,8 @@ class MainWindow(QMainWindow):
                 lambda channel, note: self._manual_note_off(channel, note, "Piano Player")
             )
             self._refresh_pianola_dialog()
+            if not restored:
+                self.pianola_dialog.fit_to_screen()
         return self.pianola_dialog
 
     def _show_pianola_dialog(self) -> None:
@@ -2687,6 +2933,12 @@ class MainWindow(QMainWindow):
         self.pianola_dialog.set_channels(
             self.player.sequence.pianola_channel_infos(self.player.percussion_channel - 1)
         )
+        if self.player.is_playing:
+            self.pianola_dialog.show_active_notes(
+                self.player.active_notes(),
+                self.player.active_note_velocity,
+                self.player.active_note_count,
+            )
 
     def _pianola_channel_visibility_changed(self, channel: int, visible: bool) -> None:
         self.statusBar().showMessage(
@@ -3035,16 +3287,24 @@ class MainWindow(QMainWindow):
         return PreferencesDialog(self, self.settings)
 
     def _apply_color_mode(self) -> None:
-        QApplication.setPalette(dark_palette() if self.force_dark_mode else QApplication.style().standardPalette())
+        target = dark_palette() if self.force_dark_mode else QApplication.style().standardPalette()
+        # Reapplying an identical palette forces a full widget restyle.  In a
+        # long-lived application (and in the test suite, which creates many
+        # windows) that is both slow and a source of platform-theme crashes.
+        if QApplication.palette() != target:
+            QApplication.setPalette(target)
 
     def _apply_qt_style(self, style_name: str) -> None:
         target = self._system_qt_style if style_name == "system" else style_name
         if not target:
             return
-        applied = QApplication.setStyle(target)
-        if applied is not None:
-            self.qt_style = style_name if style_name in {"system", *available_qt_styles()} else "system"
-            self._apply_color_mode()
+        current = QApplication.style().objectName() if QApplication.style() is not None else ""
+        if current.casefold() != target.casefold():
+            applied = QApplication.setStyle(target)
+            if applied is None:
+                return
+        self.qt_style = style_name if style_name in {"system", *available_qt_styles()} else "system"
+        self._apply_color_mode()
 
     def _apply_preferences(
         self,
@@ -3155,6 +3415,7 @@ class MainWindow(QMainWindow):
         message = self.tr("Paused") if self._pause_requested else self.tr("Stopped")
         self._set_playback_indicator("paused" if self._pause_requested else "stopped")
         self.statusBar().showMessage(message)
+        self._clear_channel_activity()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
@@ -3193,9 +3454,9 @@ class MainWindow(QMainWindow):
         right.addWidget(self._build_playback_settings())
         right.addWidget(self.rhythm_view)
         right.addWidget(self._build_midi_destination_row())
-        right.addWidget(self.keyboard)
         right.addWidget(self._build_transport_deck())
         right.addWidget(self.event_label)
+        right.addStretch(1)
         root.addLayout(left, 1)
         root.addLayout(right, 3)
         root.addWidget(self._build_master_volume_strip(), 0, Qt.AlignmentFlag.AlignTop)
@@ -3381,6 +3642,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._action_button(self.disconnect_midi_action))
         return row
 
+    def _channel_program_changed(self, channel: int, program: int) -> None:
+        instrument = "Drums" if channel == self.player.percussion_channel - 1 else gm_program_name(program)
+        if self.channels_dialog is not None:
+            self.channels_dialog.set_channel_program_display(channel, program)
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.set_channel_instrument(channel, instrument)
+
     def _spinbox(self, minimum: int, maximum: int, value: int, slot: object, suffix: str = "") -> QSpinBox:
         spinbox = QSpinBox()
         spinbox.setRange(minimum, maximum)
@@ -3404,17 +3672,43 @@ class MainWindow(QMainWindow):
         try:
             return self.manager.create_output(driver, connection)
         except MidiOutputError as exc:
+            # Keep the application usable when the preferred internal synth
+            # is not installed or cannot open audio.  This mirrors Drumstick's
+            # backend preference order: SonivoxEAS, FluidSynth, ALSA, dummy.
+            fallback_order = {
+                "sonivox": ("fluidsynth", "alsa"),
+                "fluidsynth": ("alsa",),
+            }.get(driver, ())
+            for fallback_driver in fallback_order:
+                try:
+                    fallback = self.manager.create_output(fallback_driver)
+                except MidiOutputError:
+                    continue
+                label = {
+                    "fluidsynth": "FluidSynth",
+                    "alsa": "ALSA",
+                }.get(fallback_driver, fallback_driver)
+                self.statusBar().showMessage(
+                    self.tr("{driver} is unavailable ({error}); using {fallback}.").format(
+                        driver=driver.capitalize(),
+                        error=exc,
+                        fallback=label,
+                    ),
+                    10000,
+                )
+                return fallback
             info = self.manager.alsa_audio_info()
             suffix = (
                 self.tr(" Cards detected by python3-alsaaudio: {count}.").format(count=len(info.cards))
                 if info.available
                 else ""
             )
+            if driver == "alsa":
+                message = self.tr("ALSA is not available, using dummy output: {error}.{suffix}")
+            else:
+                message = self.tr("MIDI output is not available, using dummy output: {error}.{suffix}")
             self.statusBar().showMessage(
-                self.tr("ALSA is not available, using dummy output: {error}.{suffix}").format(
-                    error=exc,
-                    suffix=suffix,
-                ),
+                message.format(error=exc, suffix=suffix),
                 10000,
             )
             return self.manager.create_output("dummy")
@@ -3426,7 +3720,11 @@ class MainWindow(QMainWindow):
 
         connection_query = getattr(connection, "name", None)
         output = self._create_midi_output(driver, connection_query)
-        actual_driver = "alsa" if hasattr(output, "connections") else "dummy"
+        actual_driver = getattr(
+            output,
+            "driver",
+            "alsa" if hasattr(output, "connections") else "dummy",
+        )
 
         self.output = output
         self._output_driver = actual_driver
@@ -3528,7 +3826,7 @@ class MainWindow(QMainWindow):
         except MidiOutputError as exc:
             QMessageBox.warning(self, self.tr("MIDI connection"), str(exc))
             return
-        if remember:
+        if remember and self._output_driver == "alsa":
             self.settings.set_midi_destination(connection.name)
         self.statusBar().showMessage(self.tr("Connected to {name}").format(name=connection.name), 10000)
         self._update_midi_output_label()
@@ -3652,7 +3950,7 @@ class MainWindow(QMainWindow):
         self._reset_loop_controls()
         self._select_playlist_file(file_name)
         self._update_time_label(0, midi.length_ticks)
-        self.keyboard.clear()
+        self._clear_channel_activity()
         self._refresh_channels_dialog()
         self._refresh_pianola_dialog()
         self._refresh_lyrics_dialog()
@@ -3733,7 +4031,7 @@ class MainWindow(QMainWindow):
         if self._updating_position:
             return
         self.player.seek(self.position.value())
-        self.keyboard.clear()
+        self._clear_channel_activity()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
@@ -3765,7 +4063,7 @@ class MainWindow(QMainWindow):
             with QSignalBlocker(self.jump_bar):
                 self.jump_bar.setValue(target_bar)
         self.player.seek(sequence.tick_for_bar(target_bar))
-        self.keyboard.clear()
+        self._clear_channel_activity()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
@@ -3866,6 +4164,8 @@ class MainWindow(QMainWindow):
     def _set_percussion_channel(self, value: int) -> None:
         self.player.set_percussion_channel(value)
         self.settings.set_percussion_channel(self.player.percussion_channel)
+        if self.player.sequence.midi is not None:
+            self._refresh_pianola_dialog()
 
     def _update_time_label(self, tick: int, maximum: int) -> None:
         midi = self.player.sequence.midi
@@ -3907,29 +4207,52 @@ class MainWindow(QMainWindow):
         minutes, seconds = divmod(seconds, 60)
         return f"{minutes:02d}:{seconds:02d}"
 
+    def _clear_channel_activity(self) -> None:
+        self._channel_active_counts.clear()
+        if self.channels_dialog is not None:
+            self.channels_dialog.clear_levels()
+
     def _event_played(self, event: object) -> None:
         kind = getattr(event, "kind", "event")
         channel = getattr(event, "channel", None)
         data = getattr(event, "data", b"")
-        self.event_label.setText(
-            self.tr("{kind} channel={channel} data={data}").format(
-                kind=kind,
-                channel=channel if channel is not None else "-",
-                data=data.hex(" "),
+        now = time.monotonic_ns()
+        # The event label is informational; updating it for every control
+        # change and pitch bend starved the MIDI scheduler.  Coalesce it.
+        if now - self._last_event_label_update_ns >= 50_000_000:
+            self._last_event_label_update_ns = now
+            self.event_label.setText(
+                self.tr("{kind} channel={channel} data={data}").format(
+                    kind=kind,
+                    channel=channel if channel is not None else "-",
+                    data=data.hex(" "),
+                )
             )
-        )
+        if channel is None or channel not in range(16) or not data:
+            return
+        note = data[0]
         if kind == "note_on" and len(data) >= 2 and data[1] > 0:
-            self.keyboard.note_on(data[0], data[1])
-            if channel is not None and self.channels_dialog is not None:
+            counts = self._channel_active_counts.setdefault(channel, {})
+            counts[note] = counts.get(note, 0) + 1
+            if self.channels_dialog is not None:
                 self.channels_dialog.set_channel_level(channel, data[1])
-            if channel is not None and self.pianola_dialog is not None:
-                self.pianola_dialog.note_on(channel, data[0], data[1])
-        elif kind in ("note_off", "note_on") and data:
-            self.keyboard.note_off(data[0])
-            if channel is not None and self.channels_dialog is not None:
+            if self.pianola_dialog is not None:
+                self.pianola_dialog.note_on(channel, note, data[1])
+            return
+        if kind not in ("note_off", "note_on"):
+            return
+        counts = self._channel_active_counts.get(channel, {})
+        count = counts.get(note, 0)
+        if count <= 1:
+            counts.pop(note, None)
+            if not counts:
+                self._channel_active_counts.pop(channel, None)
+            if self.channels_dialog is not None and channel not in self._channel_active_counts:
                 self.channels_dialog.set_channel_level(channel, 0)
-            if channel is not None and self.pianola_dialog is not None:
-                self.pianola_dialog.note_off(channel, data[0])
+        else:
+            counts[note] = count - 1
+        if self.pianola_dialog is not None:
+            self.pianola_dialog.note_off(channel, note)
 
     def _finished(self) -> None:
         next_row = self._next_playlist_row() if self.auto_advance_playlist else None
@@ -3938,7 +4261,7 @@ class MainWindow(QMainWindow):
         self.event_label.setText(self.tr("End of sequence"))
         self._set_playback_indicator("stopped")
         self.statusBar().showMessage(self.tr("End of sequence"))
-        self.keyboard.clear()
+        self._clear_channel_activity()
         if self.channels_dialog is not None:
             self.channels_dialog.clear_levels()
         if self.pianola_dialog is not None:
@@ -3998,8 +4321,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "-d",
         "--driver",
-        default="alsa",
-        help="MIDI Out Driver.",
+        help="MIDI Out Driver (alsa, fluidsynth or dummy).",
     )
     parser.add_argument(
         "-c",
@@ -4022,10 +4344,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.portable or args.portable_file
         else AppSettings()
     )
+    driver = args.driver or settings.midi_driver()
     window = MainWindow(
         args.files,
         settings=settings,
-        output_driver=args.driver,
+        output_driver=driver,
         output_connection=args.connection,
     )
     window.show()

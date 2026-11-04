@@ -247,6 +247,10 @@ class MidiFile:
     _events_cache: list[MidiEvent] | None = field(default=None, init=False, repr=False)
     _length_ticks_cache: int | None = field(default=None, init=False, repr=False)
     _tempo_changes_cache: list[TempoChange] | None = field(default=None, init=False, repr=False)
+    # (start tick, microseconds per quarter note, start time in microseconds)
+    _tempo_segments_cache: list[tuple[int, int, int]] | None = field(default=None, init=False, repr=False)
+    _tempo_segment_ticks_cache: list[int] | None = field(default=None, init=False, repr=False)
+    _tempo_segment_times_cache: list[int] | None = field(default=None, init=False, repr=False)
     _time_signatures_cache: list[TimeSignature] | None = field(default=None, init=False, repr=False)
     _key_signatures_cache: list[KeySignature] | None = field(default=None, init=False, repr=False)
     _text_events_cache: list[TextEvent] | None = field(default=None, init=False, repr=False)
@@ -351,6 +355,42 @@ class MidiFile:
         self._title_cache = self.path.name
         return self._title_cache
 
+    @property
+    def _tempo_segments(self) -> list[tuple[int, int, int]]:
+        """Tempo map as ``(start_tick, tempo_us_per_quarter, start_us)``.
+
+        ``start_us`` is the exact, integer-rounded time of ``start_tick``.
+        Using one shared table for both directions guarantees that
+        :meth:`microseconds_to_tick` is the inverse of
+        :meth:`tick_to_microseconds` across tempo changes.  The earlier
+        implementation forgot the tempo in effect at tick 0, so seeking
+        produced a position that drifted (and could even pass the song end).
+        """
+        if self._tempo_segments_cache is not None:
+            return self._tempo_segments_cache
+        ticks_per_quarter = self.division
+        if ticks_per_quarter <= 0:
+            raise MidiFileError("Invalid MIDI division")
+
+        changes = self.tempo_changes
+        index = 0
+        tempo = 500_000
+        while index < len(changes) and changes[index].tick <= 0:
+            tempo = changes[index].microseconds_per_quarter
+            index += 1
+        segments: list[tuple[int, int, int]] = [(0, tempo, 0)]
+        previous_tick, previous_tempo, previous_us = segments[0]
+        for change in changes[index:]:
+            elapsed = previous_us + ((change.tick - previous_tick) * previous_tempo) // ticks_per_quarter
+            segments.append((change.tick, change.microseconds_per_quarter, elapsed))
+            previous_tick = change.tick
+            previous_tempo = change.microseconds_per_quarter
+            previous_us = elapsed
+        self._tempo_segments_cache = segments
+        self._tempo_segment_ticks_cache = [segment[0] for segment in segments]
+        self._tempo_segment_times_cache = [segment[2] for segment in segments]
+        return segments
+
     def tick_to_microseconds(self, tick: int) -> int:
         if tick <= 0:
             return 0
@@ -361,20 +401,11 @@ class MidiFile:
         if ticks_per_quarter <= 0:
             raise MidiFileError("Invalid MIDI division")
 
-        elapsed = 0
-        previous_tick = 0
-        previous_tempo = 500_000
-        for change in self.tempo_changes:
-            if change.tick <= 0:
-                previous_tempo = change.microseconds_per_quarter
-                continue
-            if change.tick >= tick:
-                break
-            elapsed += ((change.tick - previous_tick) * previous_tempo) // ticks_per_quarter
-            previous_tick = change.tick
-            previous_tempo = change.microseconds_per_quarter
-        elapsed += ((tick - previous_tick) * previous_tempo) // ticks_per_quarter
-        return elapsed
+        segments = self._tempo_segments
+        segment_ticks = self._tempo_segment_ticks_cache or [segment[0] for segment in segments]
+        index = max(0, bisect_right(segment_ticks, tick) - 1)
+        start_tick, tempo, start_us = segments[index]
+        return start_us + ((tick - start_tick) * tempo) // ticks_per_quarter
 
     def event_microseconds(self, event: MidiEvent) -> int:
         return self.tick_to_microseconds(event.tick)
@@ -382,6 +413,8 @@ class MidiFile:
     def microseconds_to_tick(self, microseconds: int) -> int:
         if microseconds <= 0:
             return 0
+        if microseconds >= self.length_microseconds:
+            return self.length_ticks
         if self.division & 0x8000:
             return _smpte_microseconds_to_tick(self.division, microseconds)
 
@@ -389,20 +422,11 @@ class MidiFile:
         if ticks_per_quarter <= 0:
             raise MidiFileError("Invalid MIDI division")
 
-        elapsed = 0
-        previous_tick = 0
-        previous_tempo = 500_000
-        changes = [change for change in self.tempo_changes if change.tick > 0]
-        for change in changes:
-            segment_us = ((change.tick - previous_tick) * previous_tempo) // ticks_per_quarter
-            if elapsed + segment_us >= microseconds:
-                remaining = microseconds - elapsed
-                return previous_tick + (remaining * ticks_per_quarter) // previous_tempo
-            elapsed += segment_us
-            previous_tick = change.tick
-            previous_tempo = change.microseconds_per_quarter
-        remaining = microseconds - elapsed
-        return previous_tick + (remaining * ticks_per_quarter) // previous_tempo
+        segments = self._tempo_segments
+        segment_times = self._tempo_segment_times_cache or [segment[2] for segment in segments]
+        index = max(0, bisect_right(segment_times, microseconds) - 1)
+        start_tick, tempo, start_us = segments[index]
+        return start_tick + ((microseconds - start_us) * ticks_per_quarter) // tempo
 
     def tempo_at_tick(self, tick: int) -> int:
         if self.division & 0x8000:
@@ -2076,6 +2100,26 @@ def _read_track(data: bytes, track_number: int) -> MidiTrack:
                     data=reader.read(reader.read_varlen()),
                 )
             )
+            continue
+
+        if status >= 0xF8:
+            # MIDI real-time messages may appear between any bytes and do not
+            # clear running status.  They are not expected in an SMF track,
+            # but tolerating them prevents the rest of the file from being
+            # decoded as bogus channel events.
+            continue
+
+        if 0xF1 <= status <= 0xF6:
+            # System Common messages.  They have no channel and are not valid
+            # SMF track events, but some writers emit them.  Consume the
+            # correct number of data bytes and clear running status.
+            system_data_lengths = {0xF1: 1, 0xF2: 2, 0xF3: 1, 0xF4: 0, 0xF5: 0, 0xF6: 0}
+            data_length = system_data_lengths.get(status, 0)
+            if data_length:
+                reader.read(data_length)
+            # Keep the previous channel running status.  Drumstick's qSmf
+            # reader also tolerates system messages between channel events,
+            # and some real files rely on that behaviour.
             continue
 
         event_type = status & 0xF0

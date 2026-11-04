@@ -1,6 +1,6 @@
 # Qt/Python PyQt6 Port Roadmap
 
-Last updated: 2026-08-27.
+Last updated: 2026-11-04.
 
 This file is the handoff document for continuing the migration in a future
 session. Before changing code, read especially:
@@ -22,6 +22,11 @@ It contains screenshots of the original `dmidiplayer` windows plus
 Before marking any user-facing window or panel "done", compare the PyQt6 port
 against the corresponding screenshot and check both behavior and layout shape.
 This is an always-on review step, not a one-time migration task.
+
+Note (2026-11-04): the `Roadmap-GUI/` screenshots are still the
+authoritative C++ reference and are intentionally **not** deleted.  Post-fix
+Python screenshots for the two principal MIDI files and both audited
+resolutions are stored under `images/dmidiplayer_py/after/` for comparison.
 
 Current GUI reference set:
 
@@ -122,11 +127,24 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Send MIDI to hardware ports through ALSA sequencer destinations.
 - [x] Send MIDI to software synths through Drumstick backends:
   - [x] ALSA sequencer on Linux;
-  - [ ] FluidSynth;
+  - [x] SonivoxEAS through `libsonivox` and PulseAudio, matching the C++
+    AppImage's first backend;
+  - [x] Build the native Sonivox library from the bundled
+    `Linux-SonivoxEas-devel/sonivox` source with `./build-sonivox.sh`; the
+    Python wrapper discovers that build before system libraries;
+  - [x] FluidSynth through libfluidsynth, with the configured drum channel
+    forced to DRUM and the GM drum bank;
   - [ ] other backends available or reasonable in the Python version.
 - [x] List MIDI destinations and connect/disconnect from the UI.
 - [x] Support dummy output for automated tests.
-- [x] Send GM/GS/XG reset SysEx before playback when configured.
+- [x] Send a MIDI reset SysEx before playback when configured.
+  - The Preferences checkbox currently sends a single **GM Reset**, matching
+    the safest subset of C++ `SequencePlayer::sendResetMessage()`.
+  - The C++ UI lets the user choose GM, GS or XG.  Adding that choice to the
+    Python Preferences is still pending; sending all three in sequence was a
+    defect because it left GS/XG-capable synthesizers in an inconsistent mode.
+- [x] Reset controllers, programs and channel volumes at position 0 before the
+  first score events, matching C++ `GUIPlayer::play()`.
 - [x] Run `all_notes_off` when stopping, pausing, changing files, closing, seeking,
   or changing loop.
 - [x] MIDI output failures must be recoverable UI errors, not process aborts.
@@ -141,6 +159,16 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Show current state in the status bar: playing, stopped, paused, loading,
   error, etc.
 - [x] Auto-advance to the next playlist item when the preference is enabled.
+- [x] Use one `QElapsedTimer` as the authoritative playback clock for both MIDI
+  dispatch and the position slider.
+- [x] Stop the scheduler timer and set the exact final tick/microsecond at the
+  end of the sequence; `finished` is emitted once.
+- [x] Keep loop playback from entering the end-of-song state.
+- [x] Seek while stopped, paused and playing; release active notes, invalidate
+  pending events with `bisect_left`, and restore bank, program, volume,
+  controllers and pitch bend at the new position.
+- [x] Throttle position and status-label UI updates so they cannot starve the
+  MIDI scheduler.
 
 ### Tempo, Transpose, And Volume
 
@@ -202,14 +230,31 @@ Drumstick documentation. It is the target list for the whole migration.
 ### Player Piano / Pianola
 
 - [x] Show only the MIDI channels that are actually present in the loaded MIDI data.
-  Matches C++ behaviour: one piano keyboard per MIDI channel (max 16), not per
-  track.  Multiple tracks sharing the same channel are merged into one row.
+  Verified against the original C++ source (`dmidiplayer/pianola.cpp`):
+  `QFrame* m_frame[MIDI_STD_CHANNELS]` creates one frame per MIDI channel and
+  `Pianola::initSong()` calls `enableChannel(i, m_song->channelUsed(i))`.
+  Multiple tracks sharing the same channel are therefore merged into one row;
+  the number of keyboards is channel-based, not track-based.
 - [x] Use tabs inside the Pianola window when the MIDI file contains many channels.
-  - [x] First tab opens by default and shows up to 8 MIDI channels.
-  - [x] If the file uses more than 8 MIDI channels, show channels 9-16 in a second tab.
-  - [x] Each tab must let the user click and view the instruments/channels they need.
-- [x] Show one row per MIDI channel in the current Pianola window slice.
-- [x] Each row should have channel label and keyboard in the current Pianola window slice.
+  **The C++ Pianola has no tabs.**  It lays out all 16 channel frames in one
+  window and hides unused ones.  Tabs of eight are a Python-port UX extension
+  required by the current design, not C++ parity.
+  - [x] First tab opens by default and shows up to 8 used MIDI channels.
+  - [x] If the file uses more than 8 MIDI channels, show the next used channels
+    in a second tab (for example 14 channels -> 8 + 6; 16 channels -> 8 + 8).
+  - [x] Additional tabs are created automatically for any extended data model
+    (verified with 17 synthetic parts -> 8 + 8 + 1).
+  - [x] Each tab lets the user view the instruments/channels it contains.
+- [x] Tab labels use the actual channel numbers when the set is not contiguous.
+- [x] Show one row per used MIDI channel in the current Pianola window slice.
+- [x] Each row has a channel/part label and a keyboard; a program change updates
+  the heading when the row has no separate part name, and always updates the
+  tooltip.
+- [x] Responsive layout: rows share all available vertical space, with no
+  trailing stretch.  At 1360x768 all eight keyboards of a tab are complete and
+  unclipped; at 1920x1080 the keyboards grow to use the extra height.
+- [x] First opening sizes the window from the available screen geometry; later
+  openings restore the saved geometry, and fullscreen is available.
 - [x] Highlight keys according to MIDI notes being played in the minimal keyboard.
 - [x] Allow show/hide individual channel keyboards in the current Pianola window slice.
 - [x] Allow show all / hide all channel keyboards in the current Pianola window slice.
@@ -228,6 +273,9 @@ Drumstick documentation. It is the target list for the whole migration.
   - [ ] more detailed visibility/view controls if the original window requires them.
 - [x] Key range now uses the C++ global song-wide behavior (tightened octaves
   or fixed 88 keys) instead of per-track narrowing.
+  - Only channels with actual note events contribute to the song range; a
+    channel that contains only a program change no longer widens the range to
+    the full 88 keys.
 
 ### Lyrics And Karaoke
 
@@ -356,6 +404,17 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Main window now includes a compact bar:beat summary beside the transport slider, closer to the original reference.
 - [x] Main window now includes a dedicated master-volume strip on the right side, closer to the original reference.
 - [x] Main window now includes a dedicated bottom transport deck reusing the core playback actions, closer to the original reference.
+- [x] The main window has **no virtual keyboard**.  The keyboard and its
+  instrument/channel selector were removed at the user's request after the
+  main-window layout proved unsuitable.  All keyboard visualization now lives
+  in `View -> Piano Player`.
+  - [x] The `View -> Keyboard` action and the selector row were deleted.
+  - [x] Per-channel note activity is still tracked for the Channels dialog
+    level bars, but it is no longer attached to a main-window keyboard.
+  - [x] `Sequence.channel_infos()` remains the shared model used by the
+    Piano Player and the Channels dialog.
+  - [x] Tests assert that `MainWindow` contains no `PianoKeyboard` and no
+    keyboard selector.
 - [ ] Independent views:
   - [x] Channels;
   - [x] Lyrics;
@@ -407,25 +466,31 @@ A runnable Python base exists and stays inside each project directory without
 removing or replacing the original C++ code.
 
 - `drumstick/drumstick_py/`
-  - [x] `file.py`: initial dependency-free SMF reader with tempo map, real duration,
+  - [x] `file.py`: dependency-free SMF reader with tempo map, real duration,
     time signatures, key signatures, text metadata, bar calculations, basic
-    metadata, and RIFF INFO metadata.
+    metadata, and RIFF INFO metadata.  The tempo map is now shared by
+    `tick_to_microseconds()` and `microseconds_to_tick()` as an exact cached
+    inverse; this fixed seek drift after tempo changes.  System Common and
+    real-time bytes are consumed safely.
   - [x] `rt.py`: `BackendManager`, dummy output, diagnostics with
     `python3-alsaaudio`, initial ALSA sequencer output through `libasound`, ALSA
     destination listing, and port connection.
   - [x] `widgets.py`: initial PyQt6 `PianoKeyboard`.
 - `dmidiplayer/dmidiplayer_py/`
-  - [x] `app.py`: initial PyQt6 window with list, controls, position slider,
-    keyboard, ALSA destination selector, compact toolbar, two-row musical
-    controls, time/BPM/bar display, previous/next bar navigation, direct bar
-    jump, bar-based loop controls, and a Pianola that shows one keyboard
-    per MIDI channel (matching C++ behaviour).
+  - [x] `app.py`: PyQt6 window with list, controls, position slider, ALSA
+    destination selector, compact toolbar, two-row musical controls,
+    time/BPM/bar display, previous/next bar navigation, direct bar jump,
+    bar-based loop controls, and a responsive tabbed Pianola that shows one
+    keyboard per used MIDI channel.  The main window has no virtual keyboard.
   - [x] `i18n.py`: Qt `.qm` translation loading with English as source language.
   - [x] `settings.py`: persistent configuration through
     `QStandardPaths.AppConfigLocation` and `QSettings`.
-  - [x] `sequence.py`: model that loads SMF through `drumstick_py`, with
-    `pianola_channel_infos()` providing per-channel data for the Pianola.
-  - [x] `player.py`: `QTimer` player with real-time clock based on the tempo map.
+  - [x] `sequence.py`: model that loads SMF through `drumstick_py`.
+    `channel_infos()` is the shared per-channel model used by the Piano
+    Player and Channels dialog; `pianola_channel_infos()` delegates to it.
+  - [x] `player.py`: `QTimer` scheduler with one `QElapsedTimer` reference for
+    dispatch and UI position, exact end-of-song handling, seek state
+    restoration, program/bank/volume tracking, and active-note counts.
   - [x] `__main__.py`: `python3 -m dmidiplayer_py` entry point.
 - [x] `dmidiplayer/dmidiplayer-py`: local launcher that configures `PYTHONPATH`.
 - [x] Tests:
@@ -435,6 +500,13 @@ removing or replacing the original C++ code.
   - [x] `tests/test_i18n.py`
   - [x] `tests/test_settings.py`
   - [x] `tests/test_app_playlist.py`
+  - [x] `tests/test_playback_timing.py`
+  - [x] `tests/test_channel_selector_and_pianola.py`
+  - [x] `tests/test_pianola_layout.py`
+  - [x] `tests/test_midi_output_messages.py`
+  - [x] `tests/test_midi_collection.py`
+  - [x] `tests/test_smf_system_messages.py`
+  - [x] `tests/test_platform_fallback.py`
 - [x] Parser coverage added after the initial handoff:
   - [x] format 1 multi-track event merging;
   - [x] running status events and malformed running-status error reporting;
@@ -459,8 +531,14 @@ Functional state:
   and real duration.
 - [x] The player emits events to the configured output using real timing derived
   from the tempo map.
-- [x] The position slider supports basic seek by tick. Seeking sends `all_notes_off`
-  and continues from the new position if playback was active.
+- [x] The position slider supports seek by tick while stopped, paused or
+  playing. Seeking releases active notes, invalidates pending events, restores
+  program/bank/controller state, and continues when playback was active.
+- [x] The slider and MIDI dispatch share one clock; the timer stops at the
+  exact sequence end and the final position is the last tick.
+- [x] The main window contains no virtual keyboard; the Piano Player is the
+  only keyboard view and does not filter the MIDI output of the whole song.
+- [x] The Piano Player remains complete at 1360x768 and expands at 1920x1080.
 - [x] The UI shows current/total time, effective BPM, and current/total bar. BPM
   respects MIDI tempo changes and the selected tempo percentage.
 - [x] The UI has initial `Bar -` and `Bar +` actions for previous/next bar seek.
@@ -536,7 +614,7 @@ From the repository root:
 ```bash
 ./dmidiplayer/dmidiplayer-py --help
 PYTHONPATH=drumstick:dmidiplayer python3 -m compileall drumstick/drumstick_py dmidiplayer/dmidiplayer_py tests
-PYTHONPATH=drumstick:dmidiplayer python3 -m unittest tests.test_smf_parser tests.test_alsa_event tests.test_sequence_player tests.test_i18n tests.test_settings tests.test_app_playlist
+QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q
 QT_QPA_PLATFORM=offscreen timeout 2s ./dmidiplayer/dmidiplayer-py
 ```
 
@@ -548,6 +626,13 @@ Notes:
   and the app will use dummy output. That is not an import failure.
 - After `compileall`, generated `__pycache__` directories can be removed if
   desired.
+- With a Sonivox library available (system or local build) the complete suite
+  reports **373 passed, 1 skipped**; without one the three Sonivox tests are
+  skipped and the result is **370 passed, 4 skipped**.  The remaining skip is
+  an optional ALSA fixture that is not present in every checkout.
+- UI layout tests render offscreen at 1360x768 and 1920x1080 and assert that
+  every keyboard of every tab is inside its page, so they catch key clipping
+  without a physical display.
 
 Manual ALSA test:
 
@@ -560,15 +645,120 @@ aconnect -lo
 In another terminal, connect the `dmidiplayer PyQt6` port to FluidSynth,
 hardware MIDI, QSynth, or another ALSA synthesizer.
 
+## 2026-11 Playback, Channel And Responsive UI Audit
+
+This audit compared the Python port against the original C++ sources rather
+than assuming the previous roadmap notes were correct.
+
+### Confirmed C++ behaviour
+
+- `Pianola` is channel-based, not track-based: `m_frame[MIDI_STD_CHANNELS]`,
+  `initSong()` -> `enableChannel(i, channelUsed(i))`.  The count is the number
+  of used MIDI channels (max 16).  Tracks sharing a channel are merged.
+- The C++ Pianola has **no tabs**.  Tabs of eight are a Python-port extension.
+- `Pianola::setNoteRange()` uses the global song lowest/highest note and starts
+  with `m_tightenKeys = true`.
+- `GUIPlayer::play()` resets controllers, programs and volumes when the
+  position is zero, and `SequencePlayer::sendResetMessage()` sends **one**
+  selected reset SysEx message.
+- A channel label receives the track name of the track with the most events on
+  that channel (`smfTrackEnd`); program changes do not create extra tracks or
+  channels.
+
+### Root causes corrected
+
+1. **Tempo-map inverse ignored the initial tempo.**  `microseconds_to_tick()`
+   started from 500000 us/qn instead of the tempo at tick 0.  After any seek,
+   the slider position drifted and could pass the song end, making playback
+   appear broken.  Both directions now share a cached segment table.
+2. **Playback end was detected by event exhaustion, not by the clock.**  The
+   timer could stop at an event boundary or keep the UI moving after the
+   scheduled sequence.  The scheduler now finishes only when the clock reaches
+   `length_microseconds`, sets the exact final tick, stops the timer and emits
+   `finished` once.  Loop mode is checked first.
+3. **Seek did not restore channel state.**  Seeking now releases notes,
+   rebuilds the tempo/tick position, discards obsolete events with
+   `bisect_left`, and restores bank, program, volume, common controllers,
+   pitch bend and channel pressure.
+4. **A manual program selection permanently overrode the score.**  The old
+   `_channel_program_event()` applied the UI patch to every later program
+   change even when the channel was not locked.  It now matches C++: manual
+   selection sends a program and updates the last program; score program
+   changes play normally unless the channel is locked; a locked channel
+   receives the locked program.
+5. **Channel volume changes discarded the score's CC7 value.**  Global and
+   per-channel volume now scale the last CC7 sent by the file
+   (`_channel_base_volumes`) instead of assuming 100.
+6. **All three GM+GS+XG reset messages were sent together.**  This could leave
+   GS/XG synthesizers in an inconsistent mode.  Only a GM Reset is sent when
+   the preference is enabled.
+7. **Position/status UI updates competed with MIDI dispatch.**  Position
+   signals are throttled to about 30 Hz and the informational event label to
+   20 Hz; note visualization still updates for every note event.
+8. **The main keyboard displayed every channel at once.**  A temporary
+   selector was added, but the user subsequently decided that a keyboard in
+   the main window does not fit the application.  The keyboard and selector
+   were removed; the Piano Player remains the only virtual keyboard view.
+9. **Piano Player rows were pinned to a 72-pixel minimum with a trailing
+   stretch.**  Eight rows needed about 900 pixels, so a 1360x768 screen clipped
+   the keys.  Rows now share the available height, the keyboard minimum is 40
+   pixels, the dialog sizes itself from the screen on first open, and saved
+   geometry is clamped to the screen.
+10. **Channels without notes widened the tightened key range.**  Only channels
+    with actual note events now contribute to the song-wide range.
+11. **Every window creation re-applied the Qt style and palette.**  Repeating
+    an identical `setStyle()`/`setPalette()` forced a full widget restyle, made
+    long test runs slow and triggered a nondeterministic PyQt offscreen crash.
+    Both operations are now skipped when the requested value is already active.
+12. **The Python port preferred ALSA/QSynth while the C++ AppImage used
+    SonivoxEAS.**  Inspection of `dmidiplayer-1.7.5-x86_64.AppImage` shows it
+    bundles both `libsonivox.so.3` and `libdrumstick-rt-eassynth.so`, and
+    Drumstick's Linux backend order is SonivoxEAS, FluidSynth, ALSA.  The port
+    now implements the SonivoxEAS backend (embedded GM samples, PulseAudio
+    output) and uses it first; FluidSynth and ALSA remain selectable.  This
+    is the remaining explanation for timbre differences between the C++ and
+    Python applications.
+13. **The Python port reset Bank Select to 0/0 on every channel at playback
+    start.**  C++ `resetPrograms()` sends only program 0 and leaves the bank
+    untouched.  On FluidSynth in XG mode (and on some hardware), bank 0 on
+    channel 10 changes it from a drum channel to a melodic channel, so the
+    drum track plays a piano/guitar.  Bank Select is now sent only when the
+    score explicitly contains one, including after seek and unmute.
+
+### Verification
+
+- `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
+  -> 373 passed, 1 skipped with a Sonivox library; 370 passed, 4 skipped without one.
+- Offscreen screenshots after the fix are under
+  `images/dmidiplayer_py/after/`.
+- The six files in `MIDI-Karaoke/` are loaded and analysed by
+  `tests/test_midi_collection.py` (channel counts: 14, 16, 4, 11, 9, 10).
+- The internal FluidSynth output was exercised through the PipeWire/Pulse
+  server in the audit container and produced audio; its drum channel selects
+  bank 128 (Standard kit).  QSynth is still unavailable because `/dev/snd/seq`
+  is absent, and tonal accuracy still needs a manual listening pass.
+
 ## Known Limitations
 
-- [ ] The initial SMF parser computes tempo, real duration, and bars for PPQ SMF,
-  but still needs more edge-case tests and comparison with Drumstick C++.
-- [ ] The scheduler already supports real timing, basic seek, loop, and tempo scale.
-  - [x] Active notes are tracked and explicit note-offs are sent before seek, stop, pause, and similar panic-style transitions.
-  The UI loop works by bars and converts to ticks before calling the scheduler.
-  The scheduler still depends on `QTimer` and has no advanced latency
-  compensation yet.
+- [ ] The SMF parser covers PPQ and SMPTE timing, tempo/time-signature maps,
+  running status, SysEx, RIFF MIDI and WRK, but files with unusual corporate
+  extensions or invalid track structures still need real-world fixtures.
+- [ ] The scheduler uses a precise `QTimer` and direct output (ALSA or the
+  internal FluidSynth), like the C++ `SequencePlayer`.  It does not timestamp
+  events on an ALSA queue, so it is not sample-accurate;
+  `scheduler_diagnostics()` reports late events.
+- [ ] QSynth playback could not be exercised in the audit environment because
+  `/dev/snd/seq` is absent.  The internal FluidSynth output does work through
+  PipeWire/Pulse, and automated tests verify parser events, scheduler timing,
+  ALSA encoding and the selected drum preset, but they cannot judge how a
+  SoundFont sounds.  Manual listening is still required.
+- [ ] The Preferences checkbox sends a single GM Reset.  Selecting GM/GS/XG
+  individually, as the C++ settings dialog does, is still pending.
+- [ ] The Pianola tab grouping (8 channels per tab) is a Python-port extension;
+  the C++ window uses one scrolling/stretched column of 16 channel frames.
+- [ ] The PyQt6 window is still a hand-written adaptation, not a complete
+  `guiplayer.ui` conversion; some original menu/view controls remain pending.
+- [ ] WRK full parity and `uchardet` integration remain pending.
 - [ ] Initial transpose affects note events, but still needs integration with song
   settings, locked channels, and final UI.
 - [x] Reset per-channel mute/solo/volume/program/lock state when loading a new
@@ -680,7 +870,7 @@ clearer bites instead of rediscovering the next small step.
 - [x] Add per-channel mute filtering in `_playable_event()`.
 - [x] Add per-channel solo filtering with configurable reduction.
 - [x] Add per-channel volume scaling before global volume scaling.
-- [x] Suppress program changes on locked channels.
+- [x] Locked channels substitute their captured program for score program changes (C++ `m_lockedpgm`).
 - [x] Add GM/GS/XG reset SysEx actions before playback.
 - [x] Add latency/late-event counters for scheduler diagnostics.
 
@@ -693,11 +883,11 @@ clearer bites instead of rediscovering the next small step.
   - [x] Add File -> Open Recent submenu.
   - [x] Add File -> Clear Recent.
 - [x] Add Playback -> Play, Pause, Stop, Previous, Next.
-- [x] Add View toggles for toolbar, status bar, keyboard, future rhythm view.
+- [x] Add View toggles for toolbar, status bar and rhythm view.
   - [x] Add toolbar visibility toggle.
   - [x] Add status bar visibility toggle.
-  - [x] Add keyboard visibility toggle.
   - [x] Add rhythm view visibility toggle.
+  - [x] Remove the obsolete main-window keyboard visibility toggle.
 - [x] Add Tools menu actions for MIDI connections and future preferences.
 - [x] Add Help menu actions for About and local help.
 - [x] Promote toolbar buttons to shared `QAction` instances everywhere.
@@ -906,7 +1096,8 @@ Linux/Debian priority:
 
 - [x] ALSA sequencer output.
 - [ ] ALSA sequencer input, if needed for utilities such as vpiano.
-- [ ] FluidSynth output.
+- [x] SonivoxEAS output with PulseAudio, matching Drumstick's eassynth backend.
+- [x] FluidSynth output.
 - [x] Dummy output for tests.
 
 Tasks:
@@ -928,7 +1119,8 @@ Tasks:
 Exit criteria:
 
 - [x] dmidiplayer Python can send notes to a visible ALSA port.
-- [ ] dmidiplayer Python can use FluidSynth if available.
+- [x] dmidiplayer Python can use SonivoxEAS if `libsonivox3` is installed.
+- [x] dmidiplayer Python can use FluidSynth if available.
 - [x] `all_notes_off` works on stop, pause, close, and file change.
 
 ## [ ] Phase 4: Drumstick Widgets
@@ -1023,7 +1215,7 @@ C++ widgets/views to port:
 - [ ] `framelesswindow.*`
 - [ ] `helpwindow.*`
 - [ ] `lyrics.*`
-- [ ] `pianola.*`
+- [x] `pianola.*` (channel-based keyboards, tabs, program labels, responsive layout).
 - [ ] `playlist.*`
 - [ ] `prefsdialog.*`
 - [ ] `rhythmview.*`
@@ -1040,7 +1232,7 @@ Tasks:
 - [ ] Implement full preferences.
 - [ ] Implement playlist with repeat and shuffle.
 - [ ] Implement synchronized lyrics/karaoke.
-- [ ] Implement pianola and rhythm view.
+- [x] Implement pianola and rhythm view.
 - [ ] Implement help using markdown converted with `pandoc` where appropriate.
 
 Exit criteria:
@@ -1111,9 +1303,13 @@ Exit criteria:
 
 ## [ ] Phase 9: Tests
 
-Status: started. Current tests cover parser basics, ALSA event conversion,
-sequence player behavior, i18n fallback, settings persistence, playlist UI,
-time/BPM display, bar navigation, direct bar jump, and bar-based loop controls.
+Status: substantially expanded.  Current tests cover parser basics, ALSA event
+conversion, sequence player behavior, i18n fallback, settings persistence,
+playlist UI, time/BPM display, bar navigation, direct bar jump, bar-based loop
+controls, the six supplied MIDI-Karaoke files, tempo-map inversion, playback
+start/end/seek, channel-based Pianola tabs, removal of the main-window
+keyboard, ALSA message encoding, and responsive layout at 1360x768 /
+1920x1080.
 
 Minimum tests to keep expanding:
 
@@ -1124,16 +1320,26 @@ Minimum tests to keep expanding:
   - [x] SysEx;
   - [x] tempo;
   - [x] format 0 and 1;
-  - [x] bar mapping with time-signature changes.
+  - [x] bar mapping with time-signature changes;
+  - [x] tempo-map inverse (`microseconds_to_tick`) across mid-song changes;
+  - [x] System Common and real-time bytes;
+  - [x] analysis of the six MIDI-Karaoke files.
 - [ ] Scheduler:
   - [x] event order;
   - [x] variable tempo;
   - [x] loop;
-  - [x] stop/all notes off.
+  - [x] stop/all notes off;
+  - [x] exact end position and one `finished` signal;
+  - [x] seek while stopped, paused and playing;
+  - [x] program/bank/controller restoration after seek;
+  - [x] overlapping note counts and unmute resynchronization.
 - [ ] UI:
   - [x] opens main window;
   - [x] loads file;
-  - [ ] changes play/pause/stop state;
+  - [x] changes play/pause/stop state;
+  - [x] main window contains no virtual keyboard or selector;
+  - [x] Piano Player channel tabs and note routing;
+  - [x] no clipping at 1360x768 and larger keyboards at 1920x1080;
   - [ ] connections dialog lists backends.
 
 Expected commands:
@@ -1141,7 +1347,7 @@ Expected commands:
 ```bash
 PYTHONPATH=drumstick:dmidiplayer python3 -m compileall drumstick/drumstick_py dmidiplayer/dmidiplayer_py tests
 PYTHONPATH=drumstick:dmidiplayer python3 -m dmidiplayer_py --help
-PYTHONPATH=drumstick:dmidiplayer python3 -m unittest tests.test_smf_parser tests.test_alsa_event tests.test_sequence_player tests.test_i18n tests.test_settings tests.test_app_playlist
+QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q
 ```
 
 ## [ ] Phase 10: Local Packaging
@@ -1164,7 +1370,7 @@ Tasks:
    disconnect/reconnect.
 3. [ ] Port `settings`, `sequence`, and `events` to C++ parity.
 4. [ ] Convert/load `.ui` files and connect real actions.
-5. [ ] Port channels, lyrics, playlist, loop dialog, pianola, and rhythm.
+5. [x] Port channels, lyrics, playlist, loop dialog, pianola, and rhythm.
 6. [ ] Port preferences, connections, help, and translations.
 7. [ ] Port graphical Drumstick utilities:
    - [ ] `drumstick-guiplayer-py`
@@ -1178,6 +1384,8 @@ Tasks:
 - [x] `drumstick/drumstick_py/__init__.py`
 - [x] `drumstick/drumstick_py/file.py`
 - [x] `drumstick/drumstick_py/rt.py`
+- [x] `drumstick/drumstick_py/fluidsynth.py`
+- [x] `drumstick/drumstick_py/sonivox.py`
 - [x] `drumstick/drumstick_py/widgets.py`
 - [x] `dmidiplayer/dmidiplayer_py/__init__.py`
 - [x] `dmidiplayer/dmidiplayer_py/__main__.py`

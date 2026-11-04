@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPainter, QPaintEvent
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 
 class PianoKeyboard(QWidget):
@@ -35,6 +35,7 @@ class PianoKeyboard(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._active: set[int] = set()
+        self._active_counts: dict[int, int] = {}
         self._active_velocities: dict[int, int] = {}
         self._min_note = 21
         self._max_note = 108
@@ -49,21 +50,41 @@ class PianoKeyboard(QWidget):
         self._black_idle_color = QColor("#111827")
         self._mouse_note: int | None = None
         self._pressed_keys: dict[int, int] = {}
-        self.setMinimumHeight(72)
+        # The keyboard is designed to be stretched by a layout.  A small
+        # minimum lets eight rows fit on a 1366x768 screen without clipping;
+        # sizeHint() asks for a comfortable default height on larger screens.
+        self.setMinimumHeight(40)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
+    def sizeHint(self) -> QSize:
+        return QSize(720, 92)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(160, 40)
+
     def note_on(self, note: int, velocity: int = 127) -> None:
+        # Several tracks may play the same pitch on the same channel.  Count
+        # the active note-ons so one note-off does not clear a still sounding
+        # voice in the visualization.
+        self._active_counts[note] = self._active_counts.get(note, 0) + 1
         self._active.add(note)
         self._active_velocities[note] = max(1, min(127, velocity))
         self.update()
 
     def note_off(self, note: int) -> None:
+        count = self._active_counts.get(note, 0)
+        if count > 1:
+            self._active_counts[note] = count - 1
+            return
+        self._active_counts.pop(note, None)
         self._active.discard(note)
         self._active_velocities.pop(note, None)
         self.update()
 
     def clear(self) -> None:
         self._active.clear()
+        self._active_counts.clear()
         self._active_velocities.clear()
         self.update()
 
@@ -190,7 +211,7 @@ class PianoKeyboard(QWidget):
         if not white_notes:
             return {}
         key_width = max(1, self.width() / len(white_notes))
-        black_height = max(12, round(self.height() * 0.62))
+        black_height = max(8, round(self.height() * 0.62))
         black_width = max(4, round(key_width * 0.62))
         rects: dict[int, tuple[int, int, int, int]] = {}
         for note in self.visible_black_notes():
@@ -238,7 +259,7 @@ class PianoKeyboard(QWidget):
                 painter.setFont(self._note_label_font)
                 painter.setPen(Qt.GlobalColor.black)
                 painter.drawText(rect_x, self.height() - 18, rect_w, 16, int(Qt.AlignmentFlag.AlignCenter), labels[note])
-        black_height = max(12, round(self.height() * 0.62))
+        black_height = max(8, round(self.height() * 0.62))
         black_width = max(4, round(key_width * 0.62))
         for note in self.visible_black_notes():
             previous_white = note - 1

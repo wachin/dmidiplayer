@@ -98,6 +98,7 @@ def alsa_audio_info() -> AlsaAudioInfo:
 
 class DummyMidiOutput(QObject):
     eventSent = pyqtSignal(object)
+    driver = "dummy"
 
     def __init__(self, name: str = "Dummy output", parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -148,13 +149,23 @@ class _SndSeqEvExt(ctypes.Structure):
     _fields_ = [("len", ctypes.c_uint), ("ptr", ctypes.c_void_p)]
 
 
+class _SndSeqEvQueue(ctypes.Structure):
+    # ALSA's snd_seq_ev_queue_control_t: 1 + 3 + a 12-byte union.
+    _fields_ = [
+        ("queue", ctypes.c_ubyte),
+        ("unused", ctypes.c_ubyte * 3),
+        ("param", ctypes.c_ubyte * 12),
+    ]
+
+
 class _SndSeqEventData(ctypes.Union):
     _fields_ = [
         ("note", _SndSeqEvNote),
         ("control", _SndSeqEvCtrl),
         ("ext", _SndSeqEvExt),
-        ("raw8", ctypes.c_ubyte * 12),
-        ("raw32", ctypes.c_uint * 3),
+        ("queue", _SndSeqEvQueue),
+        ("raw8", ctypes.c_ubyte * 16),
+        ("raw32", ctypes.c_uint * 4),
     ]
 
 
@@ -295,6 +306,7 @@ class _AlsaLib:
 
 class AlsaSequencerOutput(QObject):
     eventSent = pyqtSignal(object)
+    driver = "alsa"
 
     def __init__(self, name: str = "dmidiplayer PyQt6", parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -470,6 +482,10 @@ class AlsaSequencerOutput(QObject):
         event.flags &= ~SND_SEQ_EVENT_LENGTH_MASK
         event.flags |= SND_SEQ_EVENT_LENGTH_FIXED
         event.queue = SND_SEQ_QUEUE_DIRECT
+        # The kernel normally fills the source client, but setting both parts
+        # of the address explicitly matches the C++ SequencerEvent usage and
+        # avoids clients that reject a zero source client.
+        event.source.client = self.__dict__.get("_client", 0)
         event.source.port = self._port
         event.dest.client = SND_SEQ_ADDRESS_SUBSCRIBERS
         event.dest.port = SND_SEQ_ADDRESS_UNKNOWN
@@ -574,8 +590,8 @@ def _normalize_connection_query(value: str) -> str:
 class BackendManager(QObject):
     """Small stand-in for Drumstick::rt::BackendManager.
 
-    Real ALSA/FluidSynth/PipeWire outputs are tracked in ROADMAP.md.  The dummy
-    output lets the GUI, parser, and sequencer be ported and tested first.
+    ALSA, the internal FluidSynth backend and the dummy output are available;
+    other Drumstick backends remain tracked in ROADMAP.md.
     """
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -583,7 +599,25 @@ class BackendManager(QObject):
         self._output = DummyMidiOutput(parent=self)
 
     def output_drivers(self) -> list[str]:
-        return ["alsa", "dummy"]
+        # Drumstick's Linux output preference: SonivoxEAS, FluidSynth, ALSA.
+        drivers: list[str] = []
+        try:
+            from .sonivox import sonivox_available
+
+            if sonivox_available():
+                drivers.append("sonivox")
+        except MidiOutputError:
+            pass
+        try:
+            from .fluidsynth import fluidsynth_available
+
+            if fluidsynth_available():
+                drivers.append("fluidsynth")
+        except MidiOutputError:
+            pass
+        drivers.append("alsa")
+        drivers.append("dummy")
+        return drivers
 
     def connections(self, driver: str = "dummy") -> list[MidiConnection]:
         if driver == "alsa":
@@ -591,6 +625,24 @@ class BackendManager(QObject):
                 return list_alsa_output_ports()
             except MidiOutputError:
                 return []
+        if driver == "fluidsynth":
+            try:
+                from .fluidsynth import fluidsynth_available
+
+                if fluidsynth_available():
+                    return [MidiConnection(driver="fluidsynth", name="FluidSynth")]
+            except MidiOutputError:
+                pass
+            return []
+        if driver == "sonivox":
+            try:
+                from .sonivox import sonivox_available
+
+                if sonivox_available():
+                    return [MidiConnection(driver="sonivox", name="SonivoxEAS")]
+            except MidiOutputError:
+                pass
+            return []
         return [MidiConnection(driver=driver, name=self._output.name)]
 
     def alsa_audio_info(self) -> AlsaAudioInfo:
@@ -602,6 +654,14 @@ class BackendManager(QObject):
             if connection:
                 output.connect_to(connection)
             return output
+        if driver == "fluidsynth":
+            from .fluidsynth import FluidSynthOutput
+
+            return FluidSynthOutput(parent=self)
+        if driver == "sonivox":
+            from .sonivox import SonivoxOutput
+
+            return SonivoxOutput(parent=self)
         self._output.name = connection or self._output.name
         return self._output
 

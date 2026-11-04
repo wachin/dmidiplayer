@@ -12,6 +12,92 @@ If the project is eventually prepared for Debian packaging, see
 `Debian-Packaging-Notes.md` for repository-specific notes about archive
 compatibility, format support, and licensing concerns.
 
+## Piano Player
+
+The main window does **not** contain a virtual keyboard.  All keyboard
+visualization is provided by `View -> Piano Player`, which opens the
+channel-based keyboards.  The number of keyboards comes from the used
+MIDI channels, not from the track count, so several tracks sharing one
+channel produce a single keyboard.  Each tab holds at most eight
+channels (for example 14 channels are shown as 8 + 6).  The keyboard
+rows share the available window height, so all eight keyboards remain
+complete at 1360x768 and grow at 1920x1080.  The window can be switched
+to fullscreen from its own button.  Seeking works while stopped, paused
+or playing; active notes are released and the bank, program, volume,
+controllers and pitch bend for the new position are restored.
+
+## MIDI output and drum-bank notes
+
+The default output is **SonivoxEAS**, the same backend that the C++
+dmidiplayer AppImage uses on Linux.  Drumstick prefers its MIDI outputs in
+this order:
+
+1. SonivoxEAS
+2. FluidSynth
+3. ALSA
+
+SonivoxEAS is a compact General MIDI wave-table synthesizer with **embedded
+samples**; it does not load an external SoundFont.  This is why it sounds
+different from QSynth or FluidR3 even when the MIDI events are identical.
+
+Install the Sonivox runtime on Debian/Ubuntu/MX:
+
+```sh
+sudo apt install libsonivox3
+```
+
+The repository also contains the complete Sonivox source under
+`Linux-SonivoxEas-devel/sonivox`.  It can be built locally without installing
+anything system-wide:
+
+```sh
+./build-sonivox.sh
+```
+
+The Python backend searches that build next, after the system `libsonivox3`,
+so after building the next launch uses SonivoxEAS automatically.  The system
+3.6.15 library is preferred for exact parity with the C++ 1.7.5 AppImage; the
+bundled source is Sonivox 4.0 and is the fallback.  The DSP stays in native C
+for realtime performance and sample-exact output; PyQt6/Python implements the
+controller, event routing and PulseAudio output.  If SonivoxEAS is not
+installed or built, the port falls back to its internal
+**FluidSynth** output, then to ALSA/QSynth, then to the dummy output.
+
+- SonivoxEAS receives the GM events, program changes, controllers, pitch bend
+  and note data directly.  Its SysEx handling is skipped, matching Drumstick's
+  `eassynth` backend.
+- FluidSynth loads a General MIDI SoundFont (FluidR3_GM by default) and keeps
+  the configured drum channel in the GM drum bank (128).
+- ALSA remains the right choice for external hardware or for deliberately
+  routing playback through QSynth.
+- At position zero the player resets controllers, programs and channel
+  volumes.  It does **not** force Bank Select to 0/0, matching C++
+  `SequencePlayer::resetPrograms()`.
+- Bank Select is sent to an ALSA destination only when the MIDI file
+  explicitly contains one, also after seeking or unmuting.
+
+Backend overrides:
+
+```sh
+# Force the internal FluidSynth backend and choose its SoundFont:
+DMIDIPLAYER_SOUNDFONT=/path/to/FluidR3_GM.sf2 \
+./dmidiplayer-py -d fluidsynth
+
+# Use a non-system Sonivox library:
+DMIDIPLAYER_SONIVOX_LIB=/path/to/libsonivox.so.3 ./dmidiplayer-py -d sonivox
+
+# Choose the FluidSynth audio driver:
+DMIDIPLAYER_FLUIDSYNTH_AUDIO=pulseaudio ./dmidiplayer-py -d fluidsynth
+```
+
+`Tools -> MIDI Connections` lists every available driver.  When using
+ALSA/QSynth, an older Python build may have left QSynth's channel 10 melodic;
+restart QSynth once to clear that state.
+
+The Preferences option "Send MIDI reset SysEx before playback" currently
+sends a single GM Reset.  Selecting GM, GS or XG individually, as the
+original C++ settings do, is still pending.
+
 ## Current Test Environment
 
 Manual testing is currently being done on MX Linux 23.
@@ -26,13 +112,16 @@ For real MIDI playback, the test system also has:
 -   QSynth
 -   `fluid-soundfont-gm`
 
-The soundfont used for testing is `FluidR3.sf2`, installed by the
-`fluid-soundfont-gm` package. It is loaded in QSynth through the
-`Soundfonts` configuration page.
+The C++ AppImage and the Python port both prefer the internal SonivoxEAS
+synthesizer, which uses its own embedded GM samples. The optional FluidSynth
+backend loads `/usr/share/sounds/sf2/FluidR3_GM.sf2` automatically. QSynth
+remains available as an ALSA destination and loads its own SoundFont through
+the `Soundfonts` configuration page.
 
-With QjackCtl running and QSynth open, dmidiplayer PyQt6 can send MIDI
-events through ALSA sequencer to QSynth. The application also includes
-an ALSA MIDI destination selector so the output can be connected
+With QjackCtl running and QSynth open, select the `ALSA` output in
+`Tools -> MIDI Connections`; dmidiplayer PyQt6 can then send MIDI events
+through the ALSA sequencer to QSynth. The application includes an ALSA MIDI
+destination selector so the output can be connected
 directly from the UI.
 
 ## Tested on AV Linux MX Edition 25.2 (MX Linux 25 / Debian 13)
@@ -200,8 +289,10 @@ real-world latency from a MIDI event to sound at the speakers.
 6.  Set QSynth's sample rate to **48000 Hz** to match Cable/PipeWire.
 7.  Load the FluidR3 GM SoundFont in **QSynth -\> Setup -\>
     Soundfonts**.
-8.  Start dmidiplayer and select the QSynth/FluidSynth ALSA MIDI
-    destination if it was not connected automatically.
+8.  Start dmidiplayer. It uses its internal SonivoxEAS output by default
+    (install `libsonivox3` first). To route through QSynth instead, choose
+    `ALSA` in **Tools -> MIDI Connections** and select the QSynth/FluidSynth
+    destination.
 9.  Play a complete MIDI file and watch Cable's **Xruns** counter. If
     xruns increase, use a larger quantum (for example, return from 128
     to 256).
@@ -233,7 +324,7 @@ sudo apt install python3-pyqt6 python3-alsaaudio alsa-utils
 For good-quality MIDI playback through QSynth/FluidSynth:
 
 ``` bash
-sudo apt install qjackctl qsynth fluidsynth fluid-soundfont-gm
+sudo apt install qjackctl qsynth fluidsynth libfluidsynth3 libsonivox3 fluid-soundfont-gm
 ```
 
 Packages used or expected during the migration:
@@ -373,9 +464,11 @@ cd /home/wachin/Dev/dmidiplayer
 ./dmidiplayer/dmidiplayer-py dmidiplayer/examples/test.mid
 ```
 
-If QSynth is already open, the app tries to connect automatically to a
-destination that looks like QSynth/FluidSynth. If it does not, use the
-`MIDI destination` selector, press `Refresh`, and then press `Connect`.
+The default output is the internal SonivoxEAS/FluidSynth backend. If you
+select `ALSA` in **Tools -> MIDI Connections**, the app tries to connect
+automatically to a destination that looks like QSynth/FluidSynth. If it
+does not, use the `MIDI destination` selector, press `Refresh`, and then press
+`Connect`.
 
 Below the position slider there are initial controls split across two
 rows: one for `Pitch`, `Tempo`, `Volume`, and bar navigation, and

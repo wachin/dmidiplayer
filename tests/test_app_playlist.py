@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import QToolButton
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
 
-from drumstick_py import MidiConnection, MidiEvent
+from drumstick_py import MidiConnection, MidiEvent, PianoKeyboard
 from dmidiplayer_py.app import (
     MainWindow,
     PreferencesDialog,
@@ -82,6 +82,7 @@ class FakeSettings:
     DEFAULT_PIANOLA_NOTE_FONT_SIZE = 8
     DEFAULT_PIANOLA_OCTAVE_DESIGNATION = "scientific"
     midi_destination_value = ""
+    midi_driver_value = "alsa"
     percussion_channel_value = 10
     auto_play_on_load_value = False
     playlist_auto_advance_value = True
@@ -127,6 +128,12 @@ class FakeSettings:
     def set_midi_destination(self, destination: str) -> None:
         self.saved_midi_destination = destination
         type(self).midi_destination_value = destination
+
+    def midi_driver(self) -> str:
+        return self.midi_driver_value
+
+    def set_midi_driver(self, driver: str) -> None:
+        type(self).midi_driver_value = driver or "alsa"
 
     def recent_files(self) -> list[Path]:
         return list(self.recent)
@@ -1207,7 +1214,16 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertIsNotNone(window.findChild(type(window.channels_action), "channels_action"))
             self.assertIsNotNone(window.findChild(type(window.pianola_action), "pianola_action"))
             self.assertIsNotNone(window.findChild(type(window.lyrics_action), "lyrics_action"))
-            self.assertIsNotNone(window.findChild(type(window.keyboard_action), "toggle_keyboard_action"))
+            self.assertIsNone(window.findChild(type(window.statusbar_action), "toggle_keyboard_action"))
+            self.assertIsNone(window.findChild(PianoKeyboard))
+            view_menu = next(
+                action.menu()
+                for action in window.menuBar().actions()
+                if action.text() == "View"
+            )
+            view_actions = [action.text() for action in view_menu.actions()]
+            self.assertNotIn("Keyboard", view_actions)
+            self.assertIn("Piano Player", view_actions)
             self.assertIsNotNone(window.findChild(type(window.rhythm_action), "toggle_rhythm_action"))
             self.assertIsNotNone(window.findChild(type(window.next_bar_action), "next_bar_action"))
             self.assertIsNotNone(window.findChild(type(window.jump_bar_action), "jump_bar_action"))
@@ -1296,17 +1312,17 @@ class AppPlaylistTest(unittest.TestCase):
             window.statusbar_action.setChecked(True)
             self.assertFalse(window.statusBar().isHidden())
 
-    def test_view_menu_toggles_keyboard(self) -> None:
+    def test_main_window_has_no_virtual_keyboard(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
         ):
             window = MainWindow([])
 
-            window.keyboard_action.setChecked(False)
-            self.assertTrue(window.keyboard.isHidden())
-            window.keyboard_action.setChecked(True)
-            self.assertFalse(window.keyboard.isHidden())
+            self.assertIsNone(window.findChild(PianoKeyboard))
+            self.assertFalse(hasattr(window, "keyboard"))
+            self.assertFalse(hasattr(window, "keyboard_action"))
+            self.assertFalse(hasattr(window, "keyboard_channel_combo"))
 
     def test_channels_action_opens_dialog(self) -> None:
         shown: list[str] = []
@@ -1509,7 +1525,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
 
                 window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
                 self.assertIn(60, keyboard._active)
@@ -1530,8 +1546,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_2")
 
                 # C++ parity: tightened key range from the song-wide lowest/highest
                 # notes (48..84 -> whole octaves 48..96), same for every track row.
@@ -1549,8 +1565,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_2")
                 range_mode_combo = dialog.findChild(QComboBox, "pianola_range_mode_combo")
 
                 range_mode_combo.setCurrentIndex(range_mode_combo.findData("fixed"))
@@ -1570,7 +1586,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
                 note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
 
                 note_labels_combo.setCurrentIndex(note_labels_combo.findData("minimal"))
@@ -1597,7 +1613,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
                 note_labels_combo = dialog.findChild(QComboBox, "pianola_note_labels_combo")
                 octave_combo = dialog.findChild(QComboBox, "pianola_octave_designation_combo")
 
@@ -1626,8 +1642,8 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_2")
                 color_mode_combo = dialog.findChild(QComboBox, "pianola_color_mode_combo")
 
                 default_color = keyboard_one._white_high_color.name()
@@ -1650,7 +1666,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
 
                 keyboard_one.note_on(60, 20)
                 soft = keyboard_one.active_note_color(60).name()
@@ -1663,22 +1679,6 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertFalse(keyboard_one._velocity_tinting_enabled)
                 self.assertEqual(keyboard_one.active_note_color(60).name(), keyboard_one.active_note_color(61).name())
 
-    def test_main_keyboard_manual_notes_send_midi_events(self) -> None:
-        with (
-            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
-            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
-        ):
-            window = MainWindow([])
-
-            window.keyboard.notePressed.emit(60, 96)
-            window.keyboard.noteReleased.emit(60)
-
-            self.assertEqual(window.output.events[-2].kind, "note_on")
-            self.assertEqual(window.output.events[-2].channel, 0)
-            self.assertEqual(window.output.events[-2].data, bytes([60, 96]))
-            self.assertEqual(window.output.events[-1].kind, "note_off")
-            self.assertEqual(window.output.events[-1].data, bytes([60, 0]))
-
     def test_pianola_manual_notes_send_midi_events_on_track_channel(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "tracks.mid")
@@ -1690,7 +1690,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
+                keyboard = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_2")
 
                 keyboard.notePressed.emit(61, 88)
                 keyboard.noteReleased.emit(61)
@@ -1713,7 +1713,7 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
                 checkbox = dialog.findChild(QCheckBox, "pianola_channel_visible_1")
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
 
                 checkbox.setChecked(False)
 
@@ -1738,8 +1738,8 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_pianola_dialog()
                 show_all_button = dialog.findChild(QPushButton, "pianola_show_all_button")
                 hide_all_button = dialog.findChild(QPushButton, "pianola_hide_all_button")
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
-                keyboard_two = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_2")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
+                keyboard_two = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_2")
 
                 hide_all_button.click()
 
@@ -1806,7 +1806,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
 
                 window._event_played(MidiEvent(tick=0, kind="note_on", channel=0, data=bytes([60, 100])))
                 self.assertIn(60, keyboard._active)
@@ -3180,7 +3180,7 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_pianola_dialog()
-                keyboard_one = dialog.findChild(type(window.keyboard), "pianola_channel_keyboard_1")
+                keyboard_one = dialog.findChild(PianoKeyboard, "pianola_channel_keyboard_1")
 
                 self.assertEqual(dialog.color_mode_combo.currentData(), "blue")
                 self.assertEqual(dialog.note_labels_combo.currentData(), "minimal")
@@ -3444,6 +3444,11 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.playlist.currentRow(), 0)
                 self.assertEqual(window.windowTitle(), "first.mid [1/2] - dmidiplayer PyQt6")
+                # Auto-advance deliberately started the first song again.
+                # Do not leave a repeating playlist playing while the other
+                # tests process Qt events.
+                window.repeat_playlist_action.setChecked(False)
+                window.stop()
 
     def test_playlist_auto_advance_preference_can_disable_end_of_song_navigation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3528,6 +3533,8 @@ class AppPlaylistTest(unittest.TestCase):
 
                 self.assertEqual(window.playlist.currentRow(), 0)
                 self.assertEqual(window.windowTitle(), "first.mid [1/3] - dmidiplayer PyQt6")
+                window.shuffle_playlist_action.setChecked(False)
+                window.stop()
 
     def test_saved_midi_destination_is_reconnected_on_startup(self) -> None:
         FakeSettings.midi_destination_value = "129:0"
@@ -3571,6 +3578,27 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(kwargs["output_driver"], "dummy")
             self.assertEqual(kwargs["output_connection"], "Test Port")
             fake_window.show.assert_called_once()
+
+    def test_main_uses_saved_midi_driver(self) -> None:
+        app_instance = MagicMock()
+        app_instance.exec.return_value = 0
+        fake_window = MagicMock()
+        previous = FakeSettings.midi_driver_value
+        FakeSettings.midi_driver_value = "fluidsynth"
+        try:
+            with (
+                patch("dmidiplayer_py.app.QApplication", return_value=app_instance),
+                patch("dmidiplayer_py.app.install_translator"),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch("dmidiplayer_py.app.MainWindow", return_value=fake_window) as main_window_class,
+            ):
+                exit_code = main(["song.mid"])
+        finally:
+            FakeSettings.midi_driver_value = previous
+
+        self.assertEqual(exit_code, 0)
+        _, kwargs = main_window_class.call_args
+        self.assertEqual(kwargs["output_driver"], "fluidsynth")
 
     def test_manual_midi_connection_is_saved(self) -> None:
         FakeSettings.midi_destination_value = ""

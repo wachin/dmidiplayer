@@ -39,7 +39,7 @@ class AlsaEventTest(unittest.TestCase):
         self.assertEqual(_SndSeqEvent.source.offset, 12)
         self.assertEqual(_SndSeqEvent.dest.offset, 14)
         self.assertEqual(_SndSeqEvent.data.offset, 16)
-        self.assertEqual(ctypes.sizeof(_SndSeqEvent), 28)
+        self.assertEqual(ctypes.sizeof(_SndSeqEvent), 32)
 
     def test_connect_and_disconnect_track_active_connections(self) -> None:
         class FakeLib:
