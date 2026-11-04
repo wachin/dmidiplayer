@@ -9,41 +9,24 @@ session. Before changing code, read especially:
 - `Quick Verification`
 - `Next Session: Concrete Tasks`
 - `Known Limitations`
-- `Roadmap-GUI/dmidiplayer-GUI.md`
 - `Debian-Packaging-Notes.md` if the work touches licensing, bundled assets,
   sample files, or future Debian upload constraints
 
-## GUI Reference Check
+## Visual Reference
 
-The `Roadmap-GUI/` folder is now part of the working reference for this port.
-It contains screenshots of the original `dmidiplayer` windows plus
-`Roadmap-GUI/dmidiplayer-GUI.md`, which maps the available images.
-
-Before marking any user-facing window or panel "done", compare the PyQt6 port
-against the corresponding screenshot and check both behavior and layout shape.
-This is an always-on review step, not a one-time migration task.
-
-Note (2026-11-04): the `Roadmap-GUI/` screenshots are still the
-authoritative C++ reference and are intentionally **not** deleted.  Post-fix
-Python screenshots for the two principal MIDI files and both audited
-resolutions are stored under `images/dmidiplayer_py/after/` for comparison.
-
-Current GUI reference set:
-
-- `Roadmap-GUI/dmidiplayer.png`: main window
-- `Roadmap-GUI/Play List ....png`: `File -> Play List...`
-- `Roadmap-GUI/Lyrics and Texts.png`: `View -> Lyrics and texts`
-- `Roadmap-GUI/Channels.png`: `View -> Channels`
-- `Roadmap-GUI/Piano Player.png`: `View -> Piano Player`
+The PyQt6 screenshots that document the current UI live under
+`images/dmidiplayer_py/after/`.  The original C++ sources remain the behavioral
+reference; the obsolete C++ screenshot reference set was removed from the
+repository.
 
 Keep this checklist active while porting:
 
-- [ ] Main window layout and control grouping visually checked against `Roadmap-GUI/dmidiplayer.png`.
-- [ ] Playlist window/dialog visually checked against `Roadmap-GUI/Play List ....png`.
-- [ ] Lyrics window visually checked against `Roadmap-GUI/Lyrics and Texts.png`.
-- [ ] Channels window visually checked against `Roadmap-GUI/Channels.png`.
-- [ ] Piano Player window visually checked against `Roadmap-GUI/Piano Player.png`.
-- [ ] When a referenced screenshot and the current PyQt6 port differ, record the gap in the relevant roadmap section before calling the feature complete.
+- [x] Main window captured without the removed virtual keyboard.
+- [x] Piano Player captured for the audited MIDI files at 1360x768 and
+  1920x1080.
+- [ ] Playlist, Lyrics, Channels and Rhythm windows captured when they change.
+- [ ] When a referenced screenshot and the current PyQt6 port differ, record
+  the gap in the relevant roadmap section before calling the feature complete.
 
 This repository contains two C++/Qt projects that must coexist during the port:
 
