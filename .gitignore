@@ -10,8 +10,5 @@ build/
 dist/
 *.egg-info/
 
-# automation script
-God-Bless-You-10-rounds-repo-root_v1.sh
-
 # Person
-src-origin
+external
