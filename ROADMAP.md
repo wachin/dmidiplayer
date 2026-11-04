@@ -704,7 +704,12 @@ than assuming the previous roadmap notes were correct.
     output) and uses it first; FluidSynth and ALSA remain selectable.  This
     is the remaining explanation for timbre differences between the C++ and
     Python applications.
-13. **The Python port reset Bank Select to 0/0 on every channel at playback
+13. **FluidSynth retained state between songs.**  Programs, banks, channel
+    types, controllers and voices survived loading another MIDI; returning to
+    an earlier file could sound incomplete until the application was
+    restarted.  The internal FluidSynth backend now resets the synth at the
+    start of each song and re-applies the configured drum channel.
+14. **The Python port reset Bank Select to 0/0 on every channel at playback
     start.**  C++ `resetPrograms()` sends only program 0 and leaves the bank
     untouched.  On FluidSynth in XG mode (and on some hardware), bank 0 on
     channel 10 changes it from a drum channel to a melodic channel, so the
@@ -714,7 +719,7 @@ than assuming the previous roadmap notes were correct.
 ### Verification
 
 - `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
-  -> 375 passed, 1 skipped with a Sonivox library; 372 passed, 4 skipped without one.
+  -> 376 passed, 1 skipped with a Sonivox library; 373 passed, 4 skipped without one.
 - Offscreen screenshots were used during the audit but are not kept in the
   repository.
 - The six original files in `MIDI-Karaoke/` are loaded and analysed by

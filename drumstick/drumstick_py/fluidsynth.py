@@ -294,6 +294,20 @@ class FluidSynthOutput(QObject):
     # ------------------------------------------------------------------
     # Channel state
     # ------------------------------------------------------------------
+    def reset_for_new_song(self) -> None:
+        """Reset FluidSynth state before the first event of a new song.
+
+        Programs, banks, channel types, controllers, pitch bend and active
+        voices otherwise survive between files.  A previous GS/XG file could
+        leave a melodic channel on an unusable bank or a drum channel marked as
+        melodic, making the next song sound incomplete until the application
+        was restarted.
+        """
+        if not self._synth:
+            return
+        self._lib.lib.fluid_synth_system_reset(self._synth)
+        self._apply_channel_types()
+
     def set_percussion_channel(self, channel: int) -> None:
         """Force the configured channel to DRUM and the old one to MELODIC."""
         channel = max(0, min(15, int(channel)))

@@ -680,6 +680,9 @@ class SequencePlayer(QObject):
             self._strict_setup = False
 
     def _prepare_playback_state(self) -> None:
+        reset_output = getattr(self.output, "reset_for_new_song", None)
+        if callable(reset_output):
+            reset_output()
         if self._send_reset_before_playback:
             self._send_setup_event(
                 MidiEvent(

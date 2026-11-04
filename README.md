@@ -88,7 +88,9 @@ installed or built, the port falls back to its internal
   and note data directly.  Its SysEx handling is skipped, matching Drumstick's
   `eassynth` backend.
 - FluidSynth loads a General MIDI SoundFont (FluidR3_GM by default) and keeps
-  the configured drum channel in the GM drum bank (128).
+  the configured drum channel in the GM drum bank (128).  It resets its synth
+  state at the start of every song so programs, banks, channel types and
+  voices from a previous file cannot leak into the next one.
 - ALSA remains the right choice for external hardware or for deliberately
   routing playback through QSynth.
 - At position zero the player resets controllers, programs and channel

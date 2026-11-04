@@ -204,7 +204,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   truncated system-message parsing.
 - Added `tests/test_platform_fallback.py`: the window remains usable with dummy
   output when ALSA/libasound is unavailable (Windows/macOS path).
-- Full suite: **375 passed, 1 skipped** with a Sonivox library available (system or local build); **372 passed, 4 skipped** without one.
+- Full suite: **376 passed, 1 skipped** with a Sonivox library available (system or local build); **373 passed, 4 skipped** without one.
 
 #### Verification limits
 

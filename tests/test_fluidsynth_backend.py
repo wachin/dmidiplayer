@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from drumstick_py.fluidsynth import (
     default_soundfont_path,
     fluidsynth_available,
 )
+from tests.test_sequence_player import write_simple_midi
 
 
 @unittest.skipUnless(fluidsynth_available(), "libfluidsynth is not available")
@@ -82,6 +84,30 @@ class FluidSynthBackendTest(unittest.TestCase):
             player.stop()
             self.assertEqual(output.channel_preset_bank(9), 128)
             self.assertIn("trumpet", output.channel_preset_name(0).casefold())
+        finally:
+            output.close()
+
+    def test_new_song_resets_stale_channel_state(self) -> None:
+        output = self.make_output()
+        try:
+            # Simulate the state a previous XG/GS file can leave behind:
+            # channel 10 switched to a melodic bank and preset.
+            lib = output._lib.lib
+            synth = output._synth
+            lib.fluid_synth_set_channel_type(synth, 9, 0)
+            lib.fluid_synth_bank_select(synth, 9, 0)
+            lib.fluid_synth_program_change(synth, 9, 0)
+            self.assertEqual(output.channel_preset_bank(9), 0)
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                path = Path(tmpdir, "clean.mid")
+                write_simple_midi(path)
+                player = SequencePlayer(output)
+                player.load_file(str(path))
+                player.play()
+                player.stop()
+
+            self.assertEqual(output.channel_preset_bank(9), 128)
         finally:
             output.close()
 
