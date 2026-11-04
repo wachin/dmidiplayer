@@ -274,7 +274,12 @@ Drumstick documentation. It is the target list for the whole migration.
   - [x] other relevant types;
   - [x] all.
 - [x] Detect encoding automatically and allow manual override.
-- [x] Highlight past/future lyrics with configurable colors.
+- [x] Concatenate lyric syllables and preserve the line breaks embedded in the
+  MIDI, matching the C++ `sanitizeText()` behavior.
+- [x] Show track names in the track selector and the eight C++ text types.
+- [x] Follow playback without rebuilding the document: past text is dimmed,
+  the current event is highlighted, future text keeps the configured color,
+  and the view scrolls to keep the current lyric visible.
 - [x] Copy lyrics to clipboard.
 - [x] Save lyrics to a file with selected encoding.
 - [x] Print lyrics.
@@ -608,8 +613,8 @@ Notes:
 - After `compileall`, generated `__pycache__` directories can be removed if
   desired.
 - With a Sonivox library available (system or local build) the complete suite
-  reports **373 passed, 1 skipped**; without one the three Sonivox tests are
-  skipped and the result is **370 passed, 4 skipped**.  The remaining skip is
+  reports **375 passed, 1 skipped**; without one the three Sonivox tests are
+  skipped and the result is **372 passed, 4 skipped**.  The remaining skip is
   an optional ALSA fixture that is not present in every checkout.
 - UI layout tests render offscreen at 1360x768 and 1920x1080 and assert that
   every keyboard of every tab is inside its page, so they catch key clipping
@@ -709,11 +714,13 @@ than assuming the previous roadmap notes were correct.
 ### Verification
 
 - `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
-  -> 373 passed, 1 skipped with a Sonivox library; 370 passed, 4 skipped without one.
+  -> 375 passed, 1 skipped with a Sonivox library; 372 passed, 4 skipped without one.
 - Offscreen screenshots were used during the audit but are not kept in the
   repository.
-- The six files in `MIDI-Karaoke/` are loaded and analysed by
+- The six original files in `MIDI-Karaoke/` are loaded and analysed by
   `tests/test_midi_collection.py` (channel counts: 14, 16, 4, 11, 9, 10).
+  The karaoke MIDI files under `MIDI-Karaoke/with-lyrics/` are exercised by the
+  lyrics-follow tests.
 - The internal FluidSynth output was exercised through the PipeWire/Pulse
   server in the audit container and produced audio; its drum channel selects
   bank 128 (Standard kit).  QSynth is still unavailable because `/dev/snd/seq`
@@ -1195,7 +1202,8 @@ C++ widgets/views to port:
 - [ ] `connections.*`
 - [ ] `framelesswindow.*`
 - [ ] `helpwindow.*`
-- [ ] `lyrics.*`
+- [x] `lyrics.*` (track/type filters, encodings, font, copy/save/print,
+  fullscreen, synchronized follow and highlighting).
 - [x] `pianola.*` (channel-based keyboards, tabs, program labels, responsive layout).
 - [ ] `playlist.*`
 - [ ] `prefsdialog.*`
@@ -1212,7 +1220,7 @@ Tasks:
 - [ ] Implement connections dialog using `BackendManager`.
 - [ ] Implement full preferences.
 - [ ] Implement playlist with repeat and shuffle.
-- [ ] Implement synchronized lyrics/karaoke.
+- [x] Implement synchronized lyrics/karaoke.
 - [x] Implement pianola and rhythm view.
 - [ ] Implement help using markdown converted with `pandoc` where appropriate.
 

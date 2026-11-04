@@ -50,6 +50,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Fixed
 
+- **The Lyrics and Texts window now behaves like the C++ one.**  Lyric
+  syllables are concatenated instead of being rendered as one labeled
+  paragraph per event; line breaks embedded in the MIDI (`@I`, `@K`, `/`, `\`,
+  CR/LF) are honored.  Track names and all eight text types are available.
+  Playback now updates character formats and scroll position in place instead
+  of rebuilding the HTML on every position tick, so the current lyric remains
+  visible and the view no longer jumps to the top.  Past, current and future
+  text use the configured colors, with the current event highlighted.
+  Added real-file tests with the three `MIDI-Karaoke/with-lyrics/` songs.
+
 - **A tab containing fewer than eight channels no longer stretches its last
   keyboard over the full page.**  Every tab now reserves eight equal vertical
   slots; a single-channel tab keeps the same row height as the eight-row tab
@@ -194,7 +204,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   truncated system-message parsing.
 - Added `tests/test_platform_fallback.py`: the window remains usable with dummy
   output when ALSA/libasound is unavailable (Windows/macOS path).
-- Full suite: **373 passed, 1 skipped** with a Sonivox library available (system or local build); **370 passed, 4 skipped** without one.
+- Full suite: **375 passed, 1 skipped** with a Sonivox library available (system or local build); **372 passed, 4 skipped** without one.
 
 #### Verification limits
 

@@ -26,6 +26,27 @@ to fullscreen from its own button.  Seeking works while stopped, paused
 or playing; active notes are released and the bank, program, volume,
 controllers and pitch bend for the new position are restored.
 
+## Lyrics and texts
+
+`View -> Lyrics` opens the synchronized lyrics/text window.  It follows the
+C++ behavior:
+
+- The track selector shows MIDI track names; the type selector offers all
+  types, text, copyright, sequence name, instrument name, lyric events,
+  markers and cue points.
+- Lyric syllables are joined as the C++ player does, preserving line breaks
+  embedded as `@I`, `@K`, `/`, backslash or CR/LF.  Metadata types are separated by
+  lines.
+- During playback the past text is dimmed, the current event is highlighted,
+  and the view scrolls to keep it visible.  Seeking updates the highlight
+  immediately.
+- Font, future/past colors, encoding, copy, save, print and fullscreen are
+  available from the window.
+
+The repository includes three karaoke files for manual testing under
+`MIDI-Karaoke/with-lyrics/`:
+`Abre_mis_ojos.mid`, `Al_estar_ante_ti.mid` and `De_tal_manera.mid`.
+
 ## MIDI output and drum-bank notes
 
 The default output is **SonivoxEAS**, the same backend that the C++

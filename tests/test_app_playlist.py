@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtGui import QFont, QPalette
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtGui import QKeyEvent, QTextCursor
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtWidgets import QComboBox
@@ -35,6 +35,8 @@ from dmidiplayer_py.app import (
     portable_settings_path,
 )
 from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_midi
+
+LYRICS_DIR = Path(__file__).resolve().parents[1] / "MIDI-Karaoke" / "with-lyrics"
 
 
 def smf_data(midi_format: int, division: int, tracks: list[bytes]) -> bytes:
@@ -1978,12 +1980,14 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("all"))
                 text = dialog.browser.toPlainText()
 
-                self.assertIn("Text: Hello", text)
-                self.assertIn("Lyric: Sing!", text)
-                self.assertIn("Marker: Verse", text)
-                self.assertIn("Cue Point: Cue", text)
+                self.assertIn("Hello", text)
+                self.assertIn("Sing!", text)
+                self.assertIn("Verse", text)
+                self.assertIn("Cue", text)
+                self.assertNotIn("Lyric:", text)
 
     def test_lyrics_dialog_filter_selects_event_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1997,11 +2001,11 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
 
-                dialog.filter_combo.setCurrentIndex(1)
-                self.assertEqual(dialog.browser.toPlainText().strip(), "Lyric: Sing!")
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Sing!")
 
-                dialog.filter_combo.setCurrentIndex(3)
-                self.assertEqual(dialog.browser.toPlainText().strip(), "Marker: Verse")
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("marker"))
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Verse")
 
     def test_lyrics_dialog_track_filter_defaults_to_most_text_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2016,10 +2020,12 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_lyrics_dialog()
 
                 self.assertEqual(dialog.track_combo.currentText(), "Track 2")
+                self.assertIn("Line1", dialog.browser.toPlainText())
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("all"))
                 text = dialog.browser.toPlainText()
-                self.assertIn("Lyric: Line1", text)
-                self.assertIn("Lyric: Line2", text)
-                self.assertIn("Cue Point: Solo", text)
+                self.assertIn("Line1", text)
+                self.assertIn("Line2", text)
+                self.assertIn("Solo", text)
                 self.assertNotIn("Intro", text)
 
     def test_lyrics_dialog_prefers_track_with_lyrics_over_plain_text_track(self) -> None:
@@ -2035,8 +2041,8 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_lyrics_dialog()
 
                 self.assertEqual(dialog.track_combo.currentText(), "Track 2")
-                self.assertIn("Lyric: Line1", dialog.browser.toPlainText())
-                self.assertNotIn("Text: Intro", dialog.browser.toPlainText())
+                self.assertIn("Line1", dialog.browser.toPlainText())
+                self.assertNotIn("Intro", dialog.browser.toPlainText())
 
     def test_lyrics_dialog_track_filter_can_show_all_tracks(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2050,12 +2056,14 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
 
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("all"))
                 dialog.track_combo.setCurrentIndex(0)
                 text = dialog.browser.toPlainText()
 
-                self.assertIn("Track 1 - Text: Intro", text)
-                self.assertIn("Track 1 - Marker: Start", text)
-                self.assertIn("Track 2 - Lyric: Line1", text)
+                self.assertIn("Intro", text)
+                self.assertIn("Start", text)
+                self.assertIn("Line1", text)
+                self.assertNotIn("Track 1 -", text)
 
     def test_lyrics_dialog_track_filter_can_select_individual_track(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2069,8 +2077,9 @@ class AppPlaylistTest(unittest.TestCase):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
 
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("all"))
                 dialog.track_combo.setCurrentIndex(1)
-                self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Intro\nMarker: Start")
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Intro\nStart")
 
     def test_lyrics_dialog_copy_button_uses_filtered_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2083,11 +2092,11 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
-                dialog.filter_combo.setCurrentIndex(1)
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
 
                 dialog.copy_button.click()
 
-                self.assertEqual(QApplication.clipboard().text().strip(), "Lyric: Sing!")
+                self.assertEqual(QApplication.clipboard().text().strip(), "Sing!")
 
     def test_lyrics_dialog_font_button_updates_browser_font(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2121,11 +2130,11 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
-                dialog.filter_combo.setCurrentIndex(1)
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
 
                 dialog.save_button.click()
 
-                self.assertEqual(save_path.read_text(encoding="utf-8").strip(), "Lyric: Sing!")
+                self.assertEqual(save_path.read_text(encoding="utf-8").strip(), "Sing!")
                 self.assertEqual(window.statusBar().currentMessage(), "Saved lyrics to lyrics.txt (utf-8)")
 
     def test_lyrics_dialog_save_button_uses_selected_encoding(self) -> None:
@@ -2204,7 +2213,7 @@ class AppPlaylistTest(unittest.TestCase):
                 dialog = window._ensure_lyrics_dialog()
 
                 self.assertEqual(dialog.encoding_combo.currentData(), None)
-                self.assertIn("Text: Precio €10", dialog.browser.toPlainText())
+                self.assertIn("Precio €10", dialog.browser.toPlainText())
 
     def test_lyrics_dialog_lists_extended_supported_encodings(self) -> None:
         with (
@@ -2233,7 +2242,7 @@ class AppPlaylistTest(unittest.TestCase):
 
                 dialog.encoding_combo.setCurrentIndex(dialog.encoding_combo.findData("latin-1"))
 
-                self.assertEqual(dialog.browser.toPlainText().strip(), "Text: Precio \x8010")
+                self.assertEqual(dialog.browser.toPlainText().strip(), "Precio \x8010")
 
     def test_lyrics_dialog_highlights_past_current_and_future_lines(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2259,6 +2268,68 @@ class AppPlaylistTest(unittest.TestCase):
                 window._update_position(240, 240)
                 self.assertEqual(dialog._event_state(2, dialog._visible_events), "current")
 
+    @unittest.skipUnless(
+        (LYRICS_DIR / "Al_estar_ante_ti.mid").exists(),
+        "karaoke lyric collection is not available",
+    )
+    def test_lyrics_dialog_real_karaoke_follows_and_scrolls(self) -> None:
+        path = LYRICS_DIR / "Al_estar_ante_ti.mid"
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([str(path)], output_driver="dummy")
+            dialog = window._ensure_lyrics_dialog()
+            dialog.show()
+            self.app.processEvents()
+
+            self.assertEqual(dialog.filter_combo.currentData(), "lyrics")
+            self.assertIn("2: Al estar ante ti", dialog.track_combo.currentText())
+            text = dialog.browser.toPlainText()
+            self.assertIn("adorando frente al mar de cristal", text)
+            self.assertIn("\n", text)
+            self.assertNotIn("Lyric:", text)
+            self.assertGreater(len(dialog._ranges), 300)
+
+            target = dialog._ranges[-4][0].tick
+            window._update_position(target, 100_000)
+            self.app.processEvents()
+            self.assertEqual(dialog._last_current_index, len(dialog._ranges) - 4)
+            self.assertGreater(dialog.browser.verticalScrollBar().value(), 0)
+
+            current_event, current_start, _current_end = dialog._ranges[-4]
+            previous_event, previous_start, _previous_end = dialog._ranges[-5]
+            cursor = QTextCursor(dialog.browser.document())
+            cursor.setPosition(current_start + 1)
+            current_format = cursor.charFormat()
+            self.assertEqual(current_format.foreground().color().name(), "#111827")
+            self.assertEqual(current_format.background().color().name(), "#fde68a")
+            cursor.setPosition(previous_start + 1)
+            self.assertEqual(cursor.charFormat().foreground().color().name(), "#6b7280")
+            self.assertLess(previous_event.tick, current_event.tick)
+            dialog.close()
+            window.close()
+
+    @unittest.skipUnless(
+        (LYRICS_DIR / "Abre_mis_ojos.mid").exists(),
+        "karaoke lyric collection is not available",
+    )
+    def test_lyrics_dialog_real_karaoke_uses_syllable_text(self) -> None:
+        path = LYRICS_DIR / "Abre_mis_ojos.mid"
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([str(path)], output_driver="dummy")
+            dialog = window._ensure_lyrics_dialog()
+            text = dialog.browser.toPlainText()
+
+            self.assertEqual(dialog.filter_combo.currentData(), "lyrics")
+            self.assertTrue(text.startswith("Abre mis ojos"), text[:80])
+            self.assertGreater(len(dialog._ranges), 200)
+            self.assertNotIn("Lyric:", text)
+            window.close()
+
     def test_lyrics_dialog_print_button_prints_filtered_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "text.mid")
@@ -2272,12 +2343,12 @@ class AppPlaylistTest(unittest.TestCase):
             ):
                 window = MainWindow([str(path)])
                 dialog = window._ensure_lyrics_dialog()
-                dialog.filter_combo.setCurrentIndex(1)
+                dialog.filter_combo.setCurrentIndex(dialog.filter_combo.findData("lyrics"))
                 dialog._print_document = lambda printer: printed.append(dialog.current_text())
 
                 dialog.print_button.click()
 
-                self.assertEqual(printed, ["Lyric: Sing!\n"])
+                self.assertEqual(printed, ["Sing!\n"])
                 self.assertEqual(window.statusBar().currentMessage(), "Printed lyrics")
 
     def test_lyrics_dialog_print_button_respects_cancelled_dialog(self) -> None:

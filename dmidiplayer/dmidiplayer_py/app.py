@@ -4,12 +4,13 @@ import argparse
 import configparser
 import os
 import random
+import re
 import sys
 import time
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QLocale, QObject, QSignalBlocker, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QFontMetrics, QIcon, QKeySequence, QPalette
+from PyQt6.QtGui import QAction, QActionGroup, QColor, QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QFontMetrics, QIcon, QKeySequence, QPalette, QTextCharFormat, QTextCursor
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -1399,12 +1400,14 @@ class LyricsDialog(QDialog):
     textPrinted = pyqtSignal()
     textSaved = pyqtSignal(str, str)
     FILTERS = (
-        ("all", "All"),
-        ("lyrics", "Lyrics"),
-        ("text", "Text"),
+        ("all", "All Types"),
+        ("text", "Texts"),
+        ("copyright", "Copyright Notice"),
+        ("sequence", "Sequence Name"),
+        ("instrument", "Instrument Name"),
+        ("lyrics", "Lyric Events"),
         ("marker", "Marker"),
         ("cue", "Cue Point"),
-        ("other", "Other"),
     )
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -1412,10 +1415,17 @@ class LyricsDialog(QDialog):
         self.setWindowTitle(self.tr("Lyrics and Texts"))
         self._text_events: list[object] = []
         self._track_counts: dict[int, int] = {}
+        self._track_names: dict[int, str] = {}
         self._current_tick = 0
         self._visible_events: list[object] = []
+        self._ranges: list[tuple[object, int, int]] = []
+        self._last_current_index = -2
+        self._source_signature: tuple[object, ...] = ()
         self._past_color = "#6b7280"
         self._future_color = "#2563eb"
+        self._future_format = QTextCharFormat()
+        self._past_format = QTextCharFormat()
+        self._current_format = QTextCharFormat()
         layout = QVBoxLayout(self)
         filter_row = QHBoxLayout()
         filter_row.addWidget(QLabel(self.tr("Track:")))
@@ -1481,7 +1491,9 @@ class LyricsDialog(QDialog):
         layout.addLayout(filter_row)
         self.browser = QTextBrowser(self)
         self.browser.setObjectName("lyrics_browser")
-        layout.addWidget(self.browser)
+        self.browser.setReadOnly(True)
+        self.browser.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        layout.addWidget(self.browser, 1)
         button_row = QHBoxLayout()
         button_row.addWidget(self.save_button)
         button_row.addWidget(self.print_button)
@@ -1496,30 +1508,55 @@ class LyricsDialog(QDialog):
         button_row_widget.setVisible(False)
         button_row_widget.setLayout(button_row)
         layout.addWidget(button_row_widget)
-        self.resize(560, 420)
+        self.setMinimumSize(720, 460)
+        self.resize(900, 620)
+        self._make_formats()
 
     def set_display_preferences(self, font_family: str, font_size: int, future_color: str, past_color: str) -> None:
         self.browser.setFont(QFont(font_family, max(6, min(48, font_size))))
         self._future_color = future_color or "#2563eb"
         self._past_color = past_color or "#6b7280"
-        self._apply_filter()
+        self._make_formats()
+        if self._text_events:
+            self._apply_filter()
 
-    def set_text_events(self, text_events: list[object]) -> None:
-        self._text_events = list(text_events)
-        self._current_tick = 0
+    def set_text_events(
+        self,
+        text_events: list[object],
+        track_names: dict[int, str] | None = None,
+    ) -> None:
+        events = list(text_events)
+        signature = tuple(
+            (
+                getattr(event, "track", 0),
+                getattr(event, "tick", 0),
+                getattr(event, "meta_type", 0),
+                bytes(getattr(event, "data", b"")),
+            )
+            for event in events
+        )
+        source_changed = signature != self._source_signature
+        self._source_signature = signature
+        self._text_events = events
+        self._track_names = dict(track_names or {})
+        if source_changed:
+            self._current_tick = 0
         self._track_counts = self._count_tracks()
-        self._rebuild_track_filter()
+        self._rebuild_track_filter(reset=source_changed)
+        self._rebuild_type_filter(reset=source_changed)
         self._apply_filter()
 
     def set_current_tick(self, tick: int) -> None:
         self._current_tick = max(0, tick)
-        self._apply_filter()
+        self._update_follow()
 
     def _apply_filter(self) -> None:
         category = self.filter_combo.currentData()
         track = self.track_combo.currentData()
         self._visible_events = self._filtered_text_events(track, category)
-        self.browser.setHtml(self._highlighted_html(self._visible_events))
+        self._render_document()
+        self._last_current_index = -2
+        self._update_follow(force=True)
 
     def _count_tracks(self) -> dict[int, int]:
         counts: dict[int, int] = {}
@@ -1528,59 +1565,158 @@ class LyricsDialog(QDialog):
             counts[track] = counts.get(track, 0) + 1
         return counts
 
-    def _rebuild_track_filter(self) -> None:
+    def _rebuild_track_filter(self, reset: bool = False) -> None:
         current_track = self.track_combo.currentData()
         with QSignalBlocker(self.track_combo):
             self.track_combo.clear()
-            self.track_combo.addItem(self.tr("All tracks"), None)
-            for track in sorted(self._track_counts):
-                self.track_combo.addItem(
-                    self.tr("Track {number}").format(number=track + 1),
-                    track,
-                )
-            if current_track in self._track_counts:
+            self.track_combo.addItem(self.tr("All Tracks"), None)
+            tracks = sorted(set(self._track_counts) | set(self._track_names))
+            for track in tracks:
+                name = self._track_names.get(track, "").replace("\x00", " ").strip()
+                if name:
+                    label = f"{track + 1}: {name}"
+                else:
+                    label = self.tr("Track {number}").format(number=track + 1)
+                self.track_combo.addItem(label, track)
+            if not reset and current_track in tracks:
                 index = self.track_combo.findData(current_track)
             else:
                 index = self.track_combo.findData(self._preferred_track())
             self.track_combo.setCurrentIndex(max(0, index))
 
+    def _rebuild_type_filter(self, reset: bool = False) -> None:
+        current_type = self.filter_combo.currentData()
+        with QSignalBlocker(self.filter_combo):
+            if reset or current_type is None:
+                self.filter_combo.setCurrentIndex(
+                    max(0, self.filter_combo.findData(self._preferred_type()))
+                )
+
     def _preferred_track(self) -> int | None:
         if not self._track_counts:
             return None
         lyric_counts: dict[int, int] = {}
+        text_counts: dict[int, int] = {}
         for event in self._text_events:
-            if getattr(event, "meta_type", None) != 0x05:
-                continue
             track = getattr(event, "track", 0)
-            lyric_counts[track] = lyric_counts.get(track, 0) + 1
+            meta_type = getattr(event, "meta_type", None)
+            if meta_type == 0x05:
+                lyric_counts[track] = lyric_counts.get(track, 0) + 1
+            elif meta_type == 0x01:
+                text_counts[track] = text_counts.get(track, 0) + 1
         if lyric_counts:
             return max(lyric_counts, key=lambda track: (lyric_counts[track], -track))
-        return max(self._track_counts, key=lambda track: (self._track_counts[track], -track))
+        if text_counts:
+            return max(text_counts, key=lambda track: (text_counts[track], -track))
+        # Files with only track names are easier to read with all tracks shown.
+        return None
+
+    def _preferred_type(self) -> str:
+        types = {getattr(event, "meta_type", None) for event in self._text_events}
+        for meta_type, key in ((0x05, "lyrics"), (0x01, "text"), (0x06, "marker"), (0x07, "cue")):
+            if meta_type in types:
+                return key
+        return "all"
 
     def _filtered_text_events(self, track: int | None, category: str) -> list[object]:
         events = list(self._text_events)
         if track is not None:
             events = [event for event in events if getattr(event, "track", None) == track]
-        if category == "lyrics":
-            return [event for event in events if getattr(event, "meta_type", None) == 0x05]
-        if category == "text":
-            return [event for event in events if getattr(event, "meta_type", None) == 0x01]
-        if category == "marker":
-            return [event for event in events if getattr(event, "meta_type", None) == 0x06]
-        if category == "cue":
-            return [event for event in events if getattr(event, "meta_type", None) == 0x07]
-        if category == "other":
-            return [event for event in events if getattr(event, "meta_type", None) in (0x02, 0x03, 0x04)]
+        meta_types = {
+            "text": {0x01},
+            "copyright": {0x02},
+            "sequence": {0x03},
+            "instrument": {0x04},
+            "lyrics": {0x05},
+            "marker": {0x06},
+            "cue": {0x07},
+        }.get(category)
+        if meta_types is not None:
+            events = [event for event in events if getattr(event, "meta_type", None) in meta_types]
         return events
 
-    def _format_text_event(self, event: object) -> str:
-        meta_type = getattr(event, "meta_type", 0x01)
-        label = self.tr(TEXT_EVENT_LABELS.get(meta_type, "Text"))
-        text = self._decoded_text(event)
-        track = getattr(event, "track", None)
-        if track is None or len(self._track_counts) <= 1 or self.track_combo.currentData() is not None:
-            return f"{label}: {text}"
-        return self.tr("Track {number} - {label}: {text}").format(number=track + 1, label=label, text=text)
+    def _make_formats(self) -> None:
+        self._future_format = QTextCharFormat()
+        self._future_format.setForeground(QColor(self._future_color))
+        self._past_format = QTextCharFormat()
+        self._past_format.setForeground(QColor(self._past_color))
+        self._current_format = QTextCharFormat()
+        self._current_format.setForeground(QColor("#111827"))
+        self._current_format.setBackground(QColor("#fde68a"))
+
+    def _sanitize_text(self, text: str) -> str:
+        text = re.sub(r"@[IKLTVW]", "\n", text)
+        text = re.sub(r"[/\\]+", "\n", text)
+        text = re.sub(r"[\r\n]+", "\n", text)
+        return text.replace("\x00", " ")
+
+    def _render_document(self) -> None:
+        self.browser.clear()
+        self._ranges = []
+        if not self._visible_events:
+            return
+        cursor = QTextCursor(self.browser.document())
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        self.browser.setTextCursor(cursor)
+        last_text = ""
+        last_type: int | None = None
+        for event in self._visible_events:
+            text = self._sanitize_text(self._decoded_text(event))
+            if not text:
+                continue
+            meta_type = getattr(event, "meta_type", 0x01)
+            if (
+                self._ranges
+                and not last_text.endswith("\n")
+                and (meta_type != 0x05 or last_type != 0x05)
+            ):
+                cursor.insertText("\n", self._future_format)
+            start = cursor.position()
+            cursor.insertText(text, self._future_format)
+            end = cursor.position()
+            self._ranges.append((event, start, end))
+            last_text = text
+            last_type = meta_type
+        self.browser.moveCursor(QTextCursor.MoveOperation.Start)
+        self.browser.verticalScrollBar().setValue(0)
+
+    def _apply_formats(self, current_index: int) -> None:
+        cursor = QTextCursor(self.browser.document())
+        for index, (_event, start, end) in enumerate(self._ranges):
+            if index < current_index:
+                char_format = self._past_format
+            elif index == current_index:
+                char_format = self._current_format
+            else:
+                char_format = self._future_format
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.setCharFormat(char_format)
+
+    def _update_follow(self, force: bool = False) -> None:
+        current_index = -1
+        for index, (event, _start, _end) in enumerate(self._ranges):
+            if getattr(event, "tick", 0) <= self._current_tick:
+                current_index = index
+            else:
+                break
+        if not force and current_index == self._last_current_index:
+            return
+        self._last_current_index = current_index
+        self._apply_formats(current_index)
+        if current_index < 0:
+            self.browser.moveCursor(QTextCursor.MoveOperation.Start)
+            self.browser.verticalScrollBar().setValue(0)
+            return
+        _event, start, _end = self._ranges[current_index]
+        cursor = QTextCursor(self.browser.document())
+        cursor.setPosition(start)
+        self.browser.setTextCursor(cursor)
+        self.browser.ensureCursorVisible()
+        bar = self.browser.verticalScrollBar()
+        rect = self.browser.cursorRect(cursor)
+        target = bar.value() + rect.top() - max(1, self.browser.viewport().height() // 3)
+        bar.setValue(max(0, min(bar.maximum(), target)))
 
     def _event_state(self, index: int, events: list[object]) -> str:
         if not events:
@@ -1598,29 +1734,6 @@ class LyricsDialog(QDialog):
         if index == current_index:
             return "current"
         return "future"
-
-    def _highlighted_html(self, events: list[object]) -> str:
-        blocks = [
-            "<html><body style='font-family:sans-serif;'>",
-            "<style>"
-            ".lyrics-line { margin: 0 0 8px 0; }"
-            f".past {{ color: {self._past_color}; }}"
-            ".current { color: #111827; background-color: #fde68a; font-weight: 700; }"
-            f".future {{ color: {self._future_color}; }}"
-            "</style>",
-        ]
-        for index, event in enumerate(events):
-            state = self._event_state(index, events)
-            text = self._format_text_event(event)
-            escaped = (
-                text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\n", "<br/>")
-            )
-            blocks.append(f"<p class='lyrics-line {state}'>{escaped}</p>")
-        blocks.append("</body></html>")
-        return "".join(blocks)
 
     def _decoded_text(self, event: object) -> str:
         preferred_encoding = self.selected_encoding()
@@ -3068,7 +3181,18 @@ class MainWindow(QMainWindow):
         if self.lyrics_dialog is None:
             return
         self.lyrics_dialog.set_selected_encoding(self.lyrics_encoding)
-        self.lyrics_dialog.set_text_events(self.player.sequence.text_events())
+        track_names: dict[int, str] = {}
+        midi = self.player.sequence.midi
+        if midi is not None:
+            track_names = {
+                index: track.name
+                for index, track in enumerate(midi.tracks)
+                if track.name
+            }
+        self.lyrics_dialog.set_text_events(
+            self.player.sequence.text_events(),
+            track_names,
+        )
         self.lyrics_dialog.set_current_tick(self.position.value())
 
     def _lyrics_text_saved(self, file_name: str, encoding: str) -> None:
