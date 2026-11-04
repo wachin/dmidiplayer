@@ -1,0 +1,4 @@
+[submodule "sonivox"]
+        path = sonivox
+	url = git@github.com:EmbeddedSynth/sonivox.git
+	branch = devel
