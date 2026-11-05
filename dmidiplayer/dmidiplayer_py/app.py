@@ -182,6 +182,12 @@ def bundled_icon(icon_name: str) -> QIcon:
     return QIcon()
 
 
+CUSTOM_VIEW_ICONS = {
+    "channels_action": "view-channels-custom",
+    "pianola_action": "view-pianola-custom",
+    "lyrics_action": "view-lyrics-custom",
+}
+
 ACTION_ICONS = {
     "open_action": ("document-open", "document-open"),
     "open_playlist_action": ("document-open", "view-media-playlist"),
@@ -2162,6 +2168,13 @@ class MainWindow(QMainWindow):
             action = getattr(self, action_name, None)
             if isinstance(action, QAction):
                 action.setIcon(self._icon_for(theme_name, internal_name))
+        # These three View actions always use the port's custom artwork,
+        # independently of the system icon theme.
+        for action_name, icon_name in CUSTOM_VIEW_ICONS.items():
+            action = getattr(self, action_name, None)
+            icon = bundled_icon(icon_name)
+            if isinstance(action, QAction) and not icon.isNull():
+                action.setIcon(icon)
 
     def _apply_toolbar_button_style(self, style_name: str) -> None:
         style = TOOLBAR_BUTTON_STYLES.get(style_name, Qt.ToolButtonStyle.ToolButtonFollowStyle)

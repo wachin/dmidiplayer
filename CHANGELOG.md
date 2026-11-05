@@ -50,6 +50,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Changed
 
+- Added original SVG icons for `View -> Channels`, `View -> Piano Player` and
+  `View -> Lyrics`: a mixer/fader, a piano keyboard with a note, and a lyrics
+  speech bubble with a music note.  They are applied directly and do not depend
+  on the system icon theme.
+
 - **`File -> Open` now starts playback automatically by default.**  The
   Preferences option "Auto-play after loading a file" and the Playback menu
   action can disable it, preserving the previous stopped behavior.
@@ -219,7 +224,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   truncated system-message parsing.
 - Added `tests/test_platform_fallback.py`: the window remains usable with dummy
   output when ALSA/libasound is unavailable (Windows/macOS path).
-- Full suite: **381 passed, 1 skipped** with a Sonivox library available (system or local build); **378 passed, 4 skipped** without one.
+- Full suite: **382 passed, 1 skipped** with a Sonivox library available (system or local build); **379 passed, 4 skipped** without one.
 
 #### Verification limits
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>MIDI channels mixer</title>
+  <g fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round">
+    <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="2.4" fill="#f8fafc"/>
+    <line x1="7" y1="6.6" x2="7" y2="17.4"/>
+    <line x1="12" y1="6.6" x2="12" y2="17.4"/>
+    <line x1="17" y1="6.6" x2="17" y2="17.4"/>
+  </g>
+  <g stroke="#0f172a" stroke-width="1">
+    <rect x="5.2" y="8.4" width="3.6" height="2.6" rx="1.1" fill="#f59e0b"/>
+    <rect x="10.2" y="12.2" width="3.6" height="2.6" rx="1.1" fill="#38bdf8"/>
+    <rect x="15.2" y="7.2" width="3.6" height="2.6" rx="1.1" fill="#34d399"/>
+  </g>
+  <g fill="#0f172a">
+    <circle cx="7" cy="5.6" r="1"/>
+    <circle cx="12" cy="5.6" r="1"/>
+    <circle cx="17" cy="5.6" r="1"/>
+  </g>
+</svg>

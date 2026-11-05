@@ -1205,6 +1205,18 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.count(), 2)
                 self.assertEqual(window.playlist.currentRow(), 0)
 
+    def test_view_window_actions_use_custom_icons(self) -> None:
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+        ):
+            window = MainWindow([])
+            actions = [window.channels_action, window.pianola_action, window.lyrics_action]
+            for action in actions:
+                self.assertFalse(action.icon().isNull(), action.text())
+            self.assertEqual(len({action.icon().cacheKey() for action in actions}), 3)
+            window.close()
+
     def test_menu_bar_contains_primary_menus_and_actions(self) -> None:
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),

@@ -61,6 +61,7 @@ from the Preferences General tab.
 
 The main menu bar has no separate `Window` menu.  Auxiliary windows are opened
 from `View` (Channels, Piano Player, Lyrics, Rhythm) and `File -> Play List...`.
+The Channels, Piano Player and Lyrics entries use original SVG icons.
 
 ## MIDI output and drum-bank notes
 

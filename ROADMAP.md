@@ -388,6 +388,7 @@ Drumstick documentation. It is the target list for the whole migration.
 - [ ] Port File menu, View menu, tools, status bar, and main dialogs.
 - [x] Auxiliary windows are reachable from `View` and `File -> Play List...`;
   the duplicate `Window` menu was removed.
+- [x] Original SVG icons for the Channels, Piano Player and Lyrics actions.
 - [x] Main window now includes a transport summary panel with large time and compact tempo/volume/pitch readouts closer to the original reference.
 - [x] Main window file summary now shows both song title and filename when they differ.
 - [x] Main window now includes a compact playback indicator strip beside the file summary, closer to the original reference.
@@ -617,8 +618,8 @@ Notes:
 - After `compileall`, generated `__pycache__` directories can be removed if
   desired.
 - With a Sonivox library available (system or local build) the complete suite
-  reports **381 passed, 1 skipped**; without one the three Sonivox tests are
-  skipped and the result is **378 passed, 4 skipped**.  The remaining skip is
+  reports **382 passed, 1 skipped**; without one the three Sonivox tests are
+  skipped and the result is **379 passed, 4 skipped**.  The remaining skip is
   an optional ALSA fixture that is not present in every checkout.
 - UI layout tests render offscreen at 1360x768 and 1920x1080 and assert that
   every keyboard of every tab is inside its page, so they catch key clipping
@@ -723,7 +724,7 @@ than assuming the previous roadmap notes were correct.
 ### Verification
 
 - `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
-  -> 381 passed, 1 skipped with a Sonivox library; 378 passed, 4 skipped without one.
+  -> 382 passed, 1 skipped with a Sonivox library; 379 passed, 4 skipped without one.
 - Offscreen screenshots were used during the audit but are not kept in the
   repository.
 - The six original files in `MIDI-Karaoke/` are loaded and analysed by
