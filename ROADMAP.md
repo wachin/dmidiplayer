@@ -283,7 +283,9 @@ Drumstick documentation. It is the target list for the whole migration.
 - [x] Copy lyrics to clipboard.
 - [x] Save lyrics to a file with selected encoding.
 - [x] Print lyrics.
-- [x] Change lyrics font.
+- [x] Change lyrics font; the default is the original 36-point size.
+- [x] Open the lyrics window large enough for singing (minimum 1000x650, about
+  90% of the screen by default) and remember user resizes.
 - [x] Fullscreen lyrics view.
 
 ### Rhythm View
@@ -613,8 +615,8 @@ Notes:
 - After `compileall`, generated `__pycache__` directories can be removed if
   desired.
 - With a Sonivox library available (system or local build) the complete suite
-  reports **375 passed, 1 skipped**; without one the three Sonivox tests are
-  skipped and the result is **372 passed, 4 skipped**.  The remaining skip is
+  reports **379 passed, 1 skipped**; without one the three Sonivox tests are
+  skipped and the result is **376 passed, 4 skipped**.  The remaining skip is
   an optional ALSA fixture that is not present in every checkout.
 - UI layout tests render offscreen at 1360x768 and 1920x1080 and assert that
   every keyboard of every tab is inside its page, so they catch key clipping
@@ -719,7 +721,7 @@ than assuming the previous roadmap notes were correct.
 ### Verification
 
 - `QT_QPA_PLATFORM=offscreen PYTHONPATH=drumstick:dmidiplayer python3 -m pytest tests -q`
-  -> 376 passed, 1 skipped with a Sonivox library; 373 passed, 4 skipped without one.
+  -> 379 passed, 1 skipped with a Sonivox library; 376 passed, 4 skipped without one.
 - Offscreen screenshots were used during the audit but are not kept in the
   repository.
 - The six original files in `MIDI-Karaoke/` are loaded and analysed by
@@ -895,6 +897,9 @@ clearer bites instead of rediscovering the next small step.
   - [x] Add repeat playlist toggle.
   - [x] Add shuffle toggle.
 - [x] Save and restore main window size and position.
+- [x] Save and restore the geometry of Playlist, Channels, Piano Player,
+  Lyrics, Preferences, Connections, Loop, toolbar customization, About and
+  Help windows.
 - [x] Add keyboard shortcuts for open, play/pause, stop, next/previous, and
   seek by bar.
 

@@ -39,6 +39,20 @@ from tests.test_sequence_player import OutputStub, chunk, varlen, write_simple_m
 LYRICS_DIR = Path(__file__).resolve().parents[1] / "MIDI-Karaoke" / "with-lyrics"
 
 
+def find_karaoke(*needles: str) -> Path | None:
+    if not LYRICS_DIR.is_dir():
+        return None
+    for candidate in sorted(LYRICS_DIR.glob("*.mid")):
+        folded = candidate.stem.casefold()
+        if all(needle.casefold() in folded for needle in needles):
+            return candidate
+    return None
+
+
+AL_LYRICS = find_karaoke("estar", "ante", "ti")
+ABRE_LYRICS = find_karaoke("abre", "mis", "ojos")
+
+
 def smf_data(midi_format: int, division: int, tracks: list[bytes]) -> bytes:
     header = chunk(b"MThd", struct.pack(">HHH", midi_format, len(tracks), division))
     return header + b"".join(chunk(b"MTrk", track) for track in tracks)
@@ -73,7 +87,7 @@ class FakeSettings:
     DEFAULT_SOLO_VOLUME_REDUCTION = 50
     DEFAULT_MIDI_RESET_BEFORE_PLAYBACK = False
     DEFAULT_LYRICS_FONT_FAMILY = "Sans Serif"
-    DEFAULT_LYRICS_FONT_SIZE = 10
+    DEFAULT_LYRICS_FONT_SIZE = 36
     DEFAULT_LYRICS_FUTURE_COLOR = "#2563eb"
     DEFAULT_LYRICS_PAST_COLOR = "#6b7280"
     DEFAULT_PIANOLA_COLOR_MODE = "blue"
@@ -97,7 +111,7 @@ class FakeSettings:
     solo_volume_reduction_value = 50
     midi_reset_before_playback_value = False
     lyrics_font_family_value = "Sans Serif"
-    lyrics_font_size_value = 10
+    lyrics_font_size_value = 36
     lyrics_future_color_value = "#2563eb"
     lyrics_past_color_value = "#6b7280"
     pianola_color_mode_value = "blue"
@@ -758,7 +772,7 @@ class AppPlaylistTest(unittest.TestCase):
         FakeSettings.solo_volume_reduction_value = 50
         FakeSettings.midi_reset_before_playback_value = False
         FakeSettings.lyrics_font_family_value = "Sans Serif"
-        FakeSettings.lyrics_font_size_value = 10
+        FakeSettings.lyrics_font_size_value = 36
         FakeSettings.lyrics_future_color_value = "#2563eb"
         FakeSettings.lyrics_past_color_value = "#6b7280"
         FakeSettings.pianola_color_mode_value = "blue"
@@ -1969,6 +1983,66 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.player.muted_channels(), {0, 1})
                 self.assertEqual(window.statusBar().currentMessage(), "All channels muted")
 
+    def test_lyrics_dialog_defaults_to_large_font_and_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "timed-lyrics.mid")
+            write_timed_lyrics_midi(path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                self.assertEqual(dialog.browser.font().pointSize(), 36)
+                self.assertGreaterEqual(dialog.width(), 1000)
+                self.assertGreaterEqual(dialog.height(), 650)
+                window.close()
+
+    def test_lyrics_dialog_restores_and_saves_user_geometry(self) -> None:
+        FakeSettings.dialog_geometry_values = {"lyrics": (40, 50, 1000, 650)}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "timed-lyrics.mid")
+            write_timed_lyrics_midi(path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            ):
+                window = MainWindow([str(path)])
+                dialog = window._ensure_lyrics_dialog()
+                dialog.show()
+                self.app.processEvents()
+                self.assertEqual((dialog.width(), dialog.height()), (1000, 650))
+
+                dialog.resize(1200, 740)
+                dialog.move(60, 70)
+                dialog.hide()
+                self.app.processEvents()
+                saved = FakeSettings.dialog_geometry_values.get("lyrics")
+                self.assertIsNotNone(saved)
+                self.assertEqual(saved[2:], (1200, 740))
+                window.close()
+
+    def test_modal_dialog_geometry_is_restored_and_saved(self) -> None:
+        FakeSettings.dialog_geometry_values = {"preferences": (30, 40, 600, 400)}
+        seen: list[tuple[int, int]] = []
+
+        def fake_exec(dialog: object) -> int:
+            seen.append((dialog.width(), dialog.height()))
+            dialog.resize(700, 500)
+            return int(QDialog.DialogCode.Rejected)
+
+        with (
+            patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+            patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+            patch("dmidiplayer_py.app.PreferencesDialog.exec", fake_exec),
+        ):
+            window = MainWindow([])
+            window.preferences_action.trigger()
+            window.preferences_action.trigger()
+
+        self.assertEqual(seen, [(600, 400), (700, 500)])
+        self.assertEqual(FakeSettings.dialog_geometry_values.get("preferences"), (30, 40, 700, 500))
+
     def test_lyrics_dialog_shows_text_events(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "text.mid")
@@ -2268,12 +2342,10 @@ class AppPlaylistTest(unittest.TestCase):
                 window._update_position(240, 240)
                 self.assertEqual(dialog._event_state(2, dialog._visible_events), "current")
 
-    @unittest.skipUnless(
-        (LYRICS_DIR / "Al_estar_ante_ti.mid").exists(),
-        "karaoke lyric collection is not available",
-    )
+    @unittest.skipUnless(AL_LYRICS is not None, "karaoke lyric collection is not available")
     def test_lyrics_dialog_real_karaoke_follows_and_scrolls(self) -> None:
-        path = LYRICS_DIR / "Al_estar_ante_ti.mid"
+        assert AL_LYRICS is not None
+        path = AL_LYRICS
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
@@ -2310,12 +2382,10 @@ class AppPlaylistTest(unittest.TestCase):
             dialog.close()
             window.close()
 
-    @unittest.skipUnless(
-        (LYRICS_DIR / "Abre_mis_ojos.mid").exists(),
-        "karaoke lyric collection is not available",
-    )
+    @unittest.skipUnless(ABRE_LYRICS is not None, "karaoke lyric collection is not available")
     def test_lyrics_dialog_real_karaoke_uses_syllable_text(self) -> None:
-        path = LYRICS_DIR / "Abre_mis_ojos.mid"
+        assert ABRE_LYRICS is not None
+        path = ABRE_LYRICS
         with (
             patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
             patch("dmidiplayer_py.app.AppSettings", FakeSettings),
@@ -3125,7 +3195,7 @@ class AppPlaylistTest(unittest.TestCase):
             self.assertEqual(dialog.general_qt_style.currentData(), "system")
             self.assertFalse(dialog.general_midi_reset_before_playback.isChecked())
             self.assertIn("Sans", dialog.lyrics_font_family.currentFont().family())
-            self.assertEqual(dialog.lyrics_font_size.value(), 10)
+            self.assertEqual(dialog.lyrics_font_size.value(), 36)
             self.assertEqual(dialog.lyrics_future_color.currentData(), "#2563eb")
             self.assertEqual(dialog.lyrics_past_color.currentData(), "#6b7280")
             self.assertEqual(dialog.pianola_color_mode.currentData(), "blue")

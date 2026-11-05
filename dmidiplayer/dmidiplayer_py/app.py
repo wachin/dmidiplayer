@@ -1508,8 +1508,8 @@ class LyricsDialog(QDialog):
         button_row_widget.setVisible(False)
         button_row_widget.setLayout(button_row)
         layout.addWidget(button_row_widget)
-        self.setMinimumSize(720, 460)
-        self.resize(900, 620)
+        self.setMinimumSize(1000, 650)
+        self.resize(1200, 760)
         self._make_formats()
 
     def set_display_preferences(self, font_family: str, font_size: int, future_color: str, past_color: str) -> None:
@@ -1519,6 +1519,21 @@ class LyricsDialog(QDialog):
         self._make_formats()
         if self._text_events:
             self._apply_filter()
+
+    def fit_to_screen(self) -> None:
+        """Open large enough to read while singing, then remember user resizes."""
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        width = min(max(1000, int(available.width() * 0.9)), available.width() - 40)
+        height = min(max(650, int(available.height() * 0.85)), available.height() - 40)
+        width = max(self.minimumWidth(), width)
+        height = max(self.minimumHeight(), height)
+        self.resize(width, height)
+        frame = self.frameGeometry()
+        frame.moveCenter(available.center())
+        self.move(frame.topLeft())
 
     def set_text_events(
         self,
@@ -1872,7 +1887,6 @@ class MainWindow(QMainWindow):
         self.lyrics_dialog: LyricsDialog | None = None
         self.pianola_dialog: PianolaDialog | None = None
         self.playlist_dialog: PlaylistDialog | None = None
-        self._dialog_geometry_keys: dict[int, str] = {}
 
         self.playlist = QListWidget()
         self.playlist.itemDoubleClicked.connect(lambda item: self.load_file(self._playlist_item_path(item)))
@@ -2216,7 +2230,7 @@ class MainWindow(QMainWindow):
 
     def show_customize_toolbar_dialog(self) -> None:
         dialog = self._create_toolbar_customization_dialog()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        if self._exec_dialog_with_geometry(dialog, "toolbar") != int(QDialog.DialogCode.Accepted):
             return
         self._apply_toolbar_actions(dialog.selected_action_ids())
 
@@ -2429,9 +2443,9 @@ class MainWindow(QMainWindow):
         return dialog is not None and dialog.isVisible()
 
     def _register_dialog_geometry(self, dialog: QDialog, geometry_key: str) -> bool:
-        if id(dialog) in self._dialog_geometry_keys:
+        if getattr(dialog, "_dialog_geometry_key", None) is not None:
             return False
-        self._dialog_geometry_keys[id(dialog)] = geometry_key
+        dialog._dialog_geometry_key = geometry_key
         dialog.installEventFilter(self)
         return self._restore_dialog_geometry(dialog, geometry_key)
 
@@ -2448,6 +2462,12 @@ class MainWindow(QMainWindow):
             x = min(max(x, available.left()), available.right() - width + 1)
             y = min(max(y, available.top()), available.bottom() - height + 1)
         dialog.resize(width, height)
+        if screen is not None:
+            # The widget's minimum size may have enlarged it after resize();
+            # re-clamp the position using the real size so the window stays
+            # reachable.
+            x = min(max(x, available.left()), max(available.left(), available.right() - dialog.width() + 1))
+            y = min(max(y, available.top()), max(available.top(), available.bottom() - dialog.height() + 1))
         dialog.move(x, y)
         return True
 
@@ -2457,8 +2477,16 @@ class MainWindow(QMainWindow):
         geometry = dialog.frameGeometry()
         self.settings.set_dialog_geometry(geometry_key, geometry.x(), geometry.y(), dialog.width(), dialog.height())
 
+    def _exec_dialog_with_geometry(self, dialog: QDialog, geometry_key: str) -> int:
+        """Show a modal dialog and persist its user-selected geometry."""
+        self._register_dialog_geometry(dialog, geometry_key)
+        try:
+            return int(dialog.exec())
+        finally:
+            self._save_dialog_geometry(dialog, geometry_key)
+
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        geometry_key = self._dialog_geometry_keys.get(id(watched))
+        geometry_key = getattr(watched, "_dialog_geometry_key", None)
         if geometry_key is not None and event.type() in (QEvent.Type.Hide, QEvent.Type.Close):
             self._save_dialog_geometry(watched if isinstance(watched, QDialog) else None, geometry_key)
         return super().eventFilter(watched, event)
@@ -2519,9 +2547,14 @@ class MainWindow(QMainWindow):
                         self.lyrics_past_color,
                     )
                     dialog.set_selected_encoding(self.lyrics_encoding)
+                    dialog.encoding_combo.currentIndexChanged.connect(
+                        self._lyrics_encoding_selection_changed
+                    )
                     dialog.textSaved.connect(self._lyrics_text_saved)
                     dialog.textPrinted.connect(self._lyrics_text_printed)
                     self._refresh_lyrics_dialog()
+                    if not restored:
+                        dialog.fit_to_screen()
             dialog.show()
             dialog.raise_()
             dialog.activateWindow()
@@ -2919,7 +2952,7 @@ class MainWindow(QMainWindow):
         buttons.accepted.connect(dialog.accept)
         layout.addWidget(buttons)
         dialog.resize(480, 320)
-        dialog.exec()
+        self._exec_dialog_with_geometry(dialog, "about")
 
     def _show_help_contents(self) -> None:
         self._show_markdown_help(self._help_doc_path(), self.tr("Help Contents"))
@@ -2947,7 +2980,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(buttons)
         dialog.resize(760, 560)
         self.statusBar().showMessage(self.tr("Loaded help from {name}").format(name=path.name), 5000)
-        dialog.exec()
+        self._exec_dialog_with_geometry(dialog, "help")
 
     def _create_channels_dialog(self) -> ChannelsDialog:
         return ChannelsDialog(self)
@@ -3158,7 +3191,9 @@ class MainWindow(QMainWindow):
     def _ensure_lyrics_dialog(self) -> LyricsDialog:
         if self.lyrics_dialog is None:
             self.lyrics_dialog = self._create_lyrics_dialog()
-            self._register_dialog_geometry(self.lyrics_dialog, DIALOG_GEOMETRY_KEYS["lyrics_dialog"])
+            restored = self._register_dialog_geometry(
+                self.lyrics_dialog, DIALOG_GEOMETRY_KEYS["lyrics_dialog"]
+            )
             self.lyrics_dialog.set_display_preferences(
                 self.lyrics_font_family,
                 self.lyrics_font_size,
@@ -3172,6 +3207,8 @@ class MainWindow(QMainWindow):
             self.lyrics_dialog.textSaved.connect(self._lyrics_text_saved)
             self.lyrics_dialog.textPrinted.connect(self._lyrics_text_printed)
             self._refresh_lyrics_dialog()
+            if not restored:
+                self.lyrics_dialog.fit_to_screen()
         return self.lyrics_dialog
 
     def _show_lyrics_dialog(self) -> None:
@@ -3513,7 +3550,7 @@ class MainWindow(QMainWindow):
 
     def show_preferences(self) -> None:
         dialog = self._create_preferences_dialog()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        if self._exec_dialog_with_geometry(dialog, "preferences") != int(QDialog.DialogCode.Accepted):
             return
         self._apply_preferences(*dialog.preferences())
 
@@ -3863,10 +3900,9 @@ class MainWindow(QMainWindow):
 
     def _show_connections_dialog(self) -> None:
         dialog = ConnectionsDialog(self.manager, parent=self)
-        self._register_dialog_geometry(dialog, "connections")
         dialog.set_selected_driver(self._output_driver or self.settings.midi_driver())
         dialog.set_selected_connection_query(self.settings.midi_destination())
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        if self._exec_dialog_with_geometry(dialog, "connections") != int(QDialog.DialogCode.Accepted):
             return
         self._apply_midi_output(dialog.selected_driver(), dialog.selected_connection())
 
@@ -4253,7 +4289,7 @@ class MainWindow(QMainWindow):
         bar_count = max(1, sequence.bar_count)
         dialog.set_bar_range(1, bar_count)
         dialog.set_bars(self.loop_start.value(), self.loop_end.value())
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        if self._exec_dialog_with_geometry(dialog, "loop") != int(QDialog.DialogCode.Accepted):
             return
         start_bar, end_bar = dialog.bars()
         self.loop_start.setValue(start_bar)

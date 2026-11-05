@@ -293,7 +293,7 @@ class AppSettingsTest(unittest.TestCase):
 
             settings = AppSettings(base_dir)
             self.assertEqual(settings.lyrics_font_family(), "Sans Serif")
-            self.assertEqual(settings.lyrics_font_size(), 10)
+            self.assertEqual(settings.lyrics_font_size(), 36)
             self.assertEqual(settings.lyrics_future_color(), "#2563eb")
             self.assertEqual(settings.lyrics_past_color(), "#6b7280")
 

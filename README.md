@@ -42,10 +42,14 @@ C++ behavior:
   immediately.
 - Font, future/past colors, encoding, copy, save, print and fullscreen are
   available from the window.
+- The default reading font is 36 points.  The window opens large (about 90% of
+  the available screen, minimum 1000x650) and remembers any size and position
+  the user chooses.  The other auxiliary windows remember their geometry too.
 
-The repository includes three karaoke files for manual testing under
-`MIDI-Karaoke/with-lyrics/`:
-`Abre_mis_ojos.mid`, `Al_estar_ante_ti.mid` and `De_tal_manera.mid`.
+The repository includes karaoke files for manual testing under
+`MIDI-Karaoke/with-lyrics/`.  The lyrics follow tests locate the files by
+name (for example, the "Abre mis ojos" and "Al estar ante ti" songs), so the
+tests keep working when files are renamed or more are added.
 
 ## MIDI output and drum-bank notes
 
