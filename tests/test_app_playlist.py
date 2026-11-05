@@ -69,7 +69,7 @@ class FakeBackendManager:
 
 class FakeSettings:
     DEFAULT_PERCUSSION_CHANNEL = 10
-    DEFAULT_AUTO_PLAY_ON_LOAD = False
+    DEFAULT_AUTO_PLAY_ON_LOAD = True
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_QT_STYLE = "system"
@@ -1213,7 +1213,7 @@ class AppPlaylistTest(unittest.TestCase):
             window = MainWindow([])
             menus = [action.text() for action in window.menuBar().actions()]
 
-            self.assertEqual(menus, ["File", "Playback", "View", "Window", "Tools", "Help"])
+            self.assertEqual(menus, ["File", "Playback", "View", "Tools", "Help"])
             self.assertIsNotNone(window.findChild(type(window.open_action), "open_action"))
             self.assertIsNotNone(window.findChild(type(window.open_playlist_action), "open_playlist_action"))
             self.assertIsNotNone(window.findChild(type(window.open_examples_action), "open_examples_action"))
@@ -3098,6 +3098,43 @@ class AppPlaylistTest(unittest.TestCase):
                 self.assertEqual(window.playlist.item(0).data(Qt.ItemDataRole.UserRole), str(first))
                 self.assertEqual(window.playlist.item(1).data(Qt.ItemDataRole.UserRole), str(second))
 
+    def test_file_open_autoplays_by_default(self) -> None:
+        FakeSettings.auto_play_on_load_value = True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "open-auto.mid")
+            write_simple_midi(path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch(
+                    "dmidiplayer_py.app.QFileDialog.getOpenFileNames",
+                    return_value=([str(path)], ""),
+                ),
+            ):
+                window = MainWindow([])
+                window.open_files()
+                self.assertTrue(window.player._playing)
+                window.stop()
+                window.close()
+
+    def test_file_open_can_disable_autoplay_from_preferences(self) -> None:
+        FakeSettings.auto_play_on_load_value = False
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir, "open-manual.mid")
+            write_simple_midi(path)
+            with (
+                patch("dmidiplayer_py.app.BackendManager", FakeBackendManager),
+                patch("dmidiplayer_py.app.AppSettings", FakeSettings),
+                patch(
+                    "dmidiplayer_py.app.QFileDialog.getOpenFileNames",
+                    return_value=([str(path)], ""),
+                ),
+            ):
+                window = MainWindow([])
+                window.open_files()
+                self.assertFalse(window.player._playing)
+                window.close()
+
     def test_auto_play_on_load_preference_starts_playback(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir, "auto.mid")
@@ -3187,7 +3224,7 @@ class AppPlaylistTest(unittest.TestCase):
 
             self.assertEqual(dialog.general_percussion_channel.value(), 10)
             self.assertEqual(dialog.general_solo_volume_reduction.value(), 50)
-            self.assertFalse(dialog.general_auto_play_on_load.isChecked())
+            self.assertTrue(dialog.general_auto_play_on_load.isChecked())
             self.assertTrue(dialog.general_playlist_auto_advance.isChecked())
             self.assertFalse(dialog.general_auto_song_settings.isChecked())
             self.assertFalse(dialog.general_force_dark_mode.isChecked())

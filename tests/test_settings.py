@@ -197,7 +197,7 @@ class AppSettingsTest(unittest.TestCase):
             base_dir = Path(tmpdir, "appdata")
 
             settings = AppSettings(base_dir)
-            self.assertFalse(settings.auto_play_on_load())
+            self.assertTrue(settings.auto_play_on_load())
             self.assertTrue(settings.playlist_auto_advance())
             self.assertFalse(settings.auto_song_settings())
             self.assertEqual(settings.qt_style(), "system")

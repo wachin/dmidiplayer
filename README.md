@@ -51,6 +51,17 @@ The repository includes karaoke files for manual testing under
 name (for example, the "Abre mis ojos" and "Al estar ante ti" songs), so the
 tests keep working when files are renamed or more are added.
 
+## Opening files and automatic playback
+
+`File -> Open` starts playback automatically after loading the selected MIDI.
+This is the default.  To open files in stopped state, disable
+**Tools -> Preferences -> Auto-play after loading a file** (or the equivalent
+`Auto-Play On Load` action in the Playback menu).  The option is also available
+from the Preferences General tab.
+
+The main menu bar has no separate `Window` menu.  Auxiliary windows are opened
+from `View` (Channels, Piano Player, Lyrics, Rhythm) and `File -> Play List...`.
+
 ## MIDI output and drum-bank notes
 
 The default output is **SonivoxEAS**, the same backend that the C++

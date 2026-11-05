@@ -2390,16 +2390,6 @@ class MainWindow(QMainWindow):
         self.rhythm_action.toggled.connect(self.rhythm_view.setVisible)
         view_menu.addAction(self.rhythm_action)
 
-        self.window_menu = self.menuBar().addMenu(self.tr("Window"))
-        self.window_menu.setObjectName("window_menu")
-        self.window_menu.aboutToShow.connect(self._refresh_window_menu_state)
-        self.window_menu.addAction(self.window_main_action)
-        self.window_menu.addSeparator()
-        self.window_menu.addAction(self.window_playlist_action)
-        self.window_menu.addAction(self.window_channels_action)
-        self.window_menu.addAction(self.window_pianola_action)
-        self.window_menu.addAction(self.window_lyrics_action)
-
         tools_menu = self.menuBar().addMenu(self.tr("Tools"))
         tools_menu.setObjectName("tools_menu")
         tools_menu.addAction(self.preferences_action)

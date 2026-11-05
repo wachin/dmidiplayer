@@ -48,6 +48,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Per-channel note activity is still tracked for the Channels dialog level
   bars; it is no longer attached to a main-window keyboard.
 
+#### Changed
+
+- **`File -> Open` now starts playback automatically by default.**  The
+  Preferences option "Auto-play after loading a file" and the Playback menu
+  action can disable it, preserving the previous stopped behavior.
+- Removed the duplicate `Window` menu.  Auxiliary windows remain available from
+  `View` and `File -> Play List...`.
+
 #### Fixed
 
 - **Lyrics starts with the original 36-point font and a large window.**  The
@@ -211,7 +219,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   truncated system-message parsing.
 - Added `tests/test_platform_fallback.py`: the window remains usable with dummy
   output when ALSA/libasound is unavailable (Windows/macOS path).
-- Full suite: **379 passed, 1 skipped** with a Sonivox library available (system or local build); **376 passed, 4 skipped** without one.
+- Full suite: **381 passed, 1 skipped** with a Sonivox library available (system or local build); **378 passed, 4 skipped** without one.
 
 #### Verification limits
 

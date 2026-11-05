@@ -13,7 +13,7 @@ WindowGeometry = tuple[int, int, int, int]
 class AppSettings:
     RECENT_FILES_LIMIT = 10
     DEFAULT_PERCUSSION_CHANNEL = 10
-    DEFAULT_AUTO_PLAY_ON_LOAD = False
+    DEFAULT_AUTO_PLAY_ON_LOAD = True
     DEFAULT_PLAYLIST_AUTO_ADVANCE = True
     DEFAULT_AUTO_SONG_SETTINGS = False
     DEFAULT_QT_STYLE = "system"
